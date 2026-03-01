@@ -3545,13 +3545,25 @@ async def llm_test_provider(provider: str, session_id: Optional[str] = Query(Non
         manager = get_provider_manager()
         
         try:
-            result = await manager.test_provider(provider)
-            return {
-                "provider": provider,
-                "status": "success" if result else "failed",
-                "result": result,
-                "timestamp": datetime.now().isoformat()
-            }
+            # Сначала пробуем использовать test_connection если он есть
+            provider_instance = manager.providers.get(provider)
+            if provider_instance and hasattr(provider_instance, 'test_connection'):
+                result = await provider_instance.test_connection()
+                return {
+                    "provider": provider,
+                    "status": "success" if result.get("success") else "failed",
+                    "result": result,
+                    "timestamp": datetime.now().isoformat()
+                }
+            else:
+                # Используем старый метод test_provider
+                result = await manager.test_provider(provider)
+                return {
+                    "provider": provider,
+                    "status": "success" if result else "failed",
+                    "result": result,
+                    "timestamp": datetime.now().isoformat()
+                }
         except Exception as e:
             return {
                 "provider": provider,
