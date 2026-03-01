@@ -154,7 +154,7 @@ class OpenRouterProvider(BaseProvider):
     
     def __init__(self, api_key: str = None, enabled: bool = False, model: str = None):
         super().__init__(api_key, enabled)
-        self.model = model or os.getenv("OPENROUTER_MODEL", "google/gemma-7b-it")
+        self.model = model or os.getenv("OPENROUTER_MODEL", "openai/gpt-3.5-turbo")
     
     async def generate(self, prompt: str, context: str = "") -> LLMResponse:
         if not self.enabled or not self.api_key:
@@ -163,7 +163,7 @@ class OpenRouterProvider(BaseProvider):
         # Поддержка автовыбора бесплатной модели
         model = self.model
         if model.lower() == "free":
-            model = "openrouter/free"
+            model = "google/gemma-2-9b-it:free"  # Реальная бесплатная модель
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -321,7 +321,12 @@ class ProviderManager:
     
     def setup_from_env(self):
         """Настраивает провайдеров из переменных окружения и конфигурации"""
+        from dotenv import load_dotenv
         from core.config_manager import get_config
+        
+        # Загружаем переменные окружения
+        load_dotenv()
+        
         config_manager = get_config()
         
         # GigaChat
@@ -354,7 +359,7 @@ class ProviderManager:
         )
         if openrouter_key and openrouter_enabled:
             model = config_manager.get("OPENROUTER_MODEL") or os.getenv(
-                "OPENROUTER_MODEL", "google/gemma-7b-it"
+                "OPENROUTER_MODEL", "openrouter/free"
             )
             self.register(OpenRouterProvider(openrouter_key, True, model))
     

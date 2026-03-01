@@ -38,6 +38,7 @@ class SessionProviderManager:
     def __init__(self):
         self.sessions: Dict[str, UserSession] = {}
         self.system_manager = ProviderManager()
+        self.system_manager.setup_from_env()  # Загружаем провайдеры из env
         self.default_ttl_hours = 24
     
     def create_session(self, session_id: str = None) -> str:

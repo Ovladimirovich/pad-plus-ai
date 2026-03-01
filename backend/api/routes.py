@@ -3321,8 +3321,20 @@ async def llm_providers(session_id: Optional[str] = Query(None)):
     if session_id:
         # Получаем провайдеров пользователя
         providers_status = session_manager.get_providers_status(session_id)
+        
+        # Формируем ответ в ожидаемом формате
+        providers_response = {}
+        
+        # Добавляем пользовательские провайдеры
+        if providers_status.get("user_providers"):
+            providers_response.update(providers_status["user_providers"])
+        
+        # Если нет пользовательских, добавляем системные
+        if not providers_status.get("has_user_providers") and providers_status.get("system_providers"):
+            providers_response.update(providers_status["system_providers"])
+        
         return {
-            "providers": providers_status,
+            "providers": providers_response,
             "session_id": session_id,
             "timestamp": datetime.now().isoformat()
         }
