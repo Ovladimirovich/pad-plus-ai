@@ -57,21 +57,21 @@ const Settings = ({ onClose }) => {
   const handleProviderToggle = (provider, enabled) => {
     setProviders(prev => ({
       ...prev,
-      [provider]: { ...prev[provider], enabled }
+      [provider]: { ...(prev[provider] || {}), enabled }
     }));
   };
 
   const handleModelChange = (model) => {
     setProviders(prev => ({
       ...prev,
-      openrouter: { ...prev.openrouter, model }
+      openrouter: { ...(prev.openrouter || {}), model }
     }));
   };
 
   const handleApiKeyChange = (provider, key) => {
     setProviders(prev => ({
       ...prev,
-      [provider]: { ...prev[provider], api_key: key }
+      [provider]: { ...(prev[provider] || {}), api_key: key }
     }));
   };
 
@@ -113,17 +113,17 @@ const Settings = ({ onClose }) => {
         },
         body: JSON.stringify({
           gigachat: {
-            enabled: providers.gigachat.enabled,
-            api_key: providers.gigachat.api_key || null
+            enabled: providers.gigachat?.enabled || false,
+            api_key: providers.gigachat?.api_key || null
           },
           gemini: {
-            enabled: providers.gemini.enabled,
-            api_key: providers.gemini.api_key || null
+            enabled: providers.gemini?.enabled || false,
+            api_key: providers.gemini?.api_key || null
           },
           openrouter: {
-            enabled: providers.openrouter.enabled,
-            api_key: providers.openrouter.api_key || null,
-            model: providers.openrouter.model
+            enabled: providers.openrouter?.enabled || false,
+            api_key: providers.openrouter?.api_key || null,
+            model: providers.openrouter?.model || 'google/gemma-7b-it'
           }
         })
       });
@@ -144,7 +144,7 @@ const Settings = ({ onClose }) => {
   };
 
   const getProviderStatus = (provider) => {
-    if (!provider.enabled) return 'disabled';
+    if (!provider || !provider.enabled) return 'disabled';
     if (provider.has_key) return 'active';
     return 'no_key';
   };
@@ -180,7 +180,7 @@ const Settings = ({ onClose }) => {
                 <label className="toggle-switch">
                   <input
                     type="checkbox"
-                    checked={providers.openrouter.enabled}
+                    checked={providers.openrouter?.enabled || false}
                     onChange={(e) => handleProviderToggle('openrouter', e.target.checked)}
                   />
                   <span className="slider"></span>
@@ -201,7 +201,7 @@ const Settings = ({ onClose }) => {
                   <input
                     type="password"
                     placeholder="Введите ваш OpenRouter API ключ"
-                    value={providers.openrouter.api_key || ''}
+                    value={providers.openrouter?.api_key || ''}
                     onChange={(e) => handleApiKeyChange('openrouter', e.target.value)}
                   />
                 </div>
@@ -209,7 +209,7 @@ const Settings = ({ onClose }) => {
                 <div className="form-group">
                   <label>Модель</label>
                   <select
-                    value={providers.openrouter.model}
+                    value={providers.openrouter?.model || 'google/gemma-7b-it'}
                     onChange={(e) => handleModelChange(e.target.value)}
                   >
                     <option value="google/gemma-7b-it">Google Gemma 7B (бесплатно)</option>
@@ -241,7 +241,7 @@ const Settings = ({ onClose }) => {
                 <label className="toggle-switch">
                   <input
                     type="checkbox"
-                    checked={providers.gigachat.enabled}
+                    checked={providers.gigachat?.enabled || false}
                     onChange={(e) => handleProviderToggle('gigachat', e.target.checked)}
                   />
                   <span className="slider"></span>
@@ -262,7 +262,7 @@ const Settings = ({ onClose }) => {
                   <input
                     type="password"
                     placeholder="Введите ваш GigaChat API ключ"
-                    value={providers.gigachat.api_key || ''}
+                    value={providers.gigachat?.api_key || ''}
                     onChange={(e) => handleApiKeyChange('gigachat', e.target.value)}
                   />
                 </div>
@@ -286,7 +286,7 @@ const Settings = ({ onClose }) => {
                 <label className="toggle-switch">
                   <input
                     type="checkbox"
-                    checked={providers.gemini.enabled}
+                    checked={providers.gemini?.enabled || false}
                     onChange={(e) => handleProviderToggle('gemini', e.target.checked)}
                   />
                   <span className="slider"></span>
@@ -307,7 +307,7 @@ const Settings = ({ onClose }) => {
                   <input
                     type="password"
                     placeholder="Введите ваш Gemini API ключ"
-                    value={providers.gemini.api_key || ''}
+                    value={providers.gemini?.api_key || ''}
                     onChange={(e) => handleApiKeyChange('gemini', e.target.value)}
                   />
                 </div>
