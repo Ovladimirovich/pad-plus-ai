@@ -404,6 +404,25 @@ class ProviderManager:
             },
             "order": self.order
         }
+    
+    def get_providers_status(self) -> dict:
+        """Возвращает статус провайдеров (для API)"""
+        return {
+            name: {
+                "enabled": p.enabled,
+                "healthy": p.healthy,
+                "has_key": p.api_key is not None
+            }
+            for name, p in self.providers.items()
+        }
+    
+    def get_active_provider_name(self) -> Optional[str]:
+        """Возвращает имя активного провайдера"""
+        for name in self.order:
+            provider = self.providers.get(name)
+            if provider and provider.enabled:
+                return name
+        return None
 
 
 # Глобальный экземпляр
