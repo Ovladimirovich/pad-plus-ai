@@ -10,12 +10,10 @@ LLM Provider Manager — управление провайдерами ИИ
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, List, Any, Callable
+from typing import Optional, Dict, List, Any
 from abc import ABC, abstractmethod
-import json
 import os
 import sqlite3
-import asyncio
 import httpx
 
 
@@ -93,7 +91,7 @@ class GigaChatProvider(BaseProvider):
                 self.API_URL,
                 headers=headers,
                 json=data,
-                timeout=30.0
+                timeout=30.0,
             )
             
             if response.status_code == 200:
@@ -162,6 +160,11 @@ class OpenRouterProvider(BaseProvider):
         if not self.enabled or not self.api_key:
             raise ValueError("OpenRouter не настроен")
         
+        # Поддержка автовыбора бесплатной модели
+        model = self.model
+        if model.lower() == "free":
+            model = "openrouter/free"
+        
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -170,7 +173,7 @@ class OpenRouterProvider(BaseProvider):
         }
         
         data = {
-            "model": self.model,
+            "model": model,
             "messages": [
                 {"role": "system", "content": context},
                 {"role": "user", "content": prompt}
@@ -182,7 +185,7 @@ class OpenRouterProvider(BaseProvider):
                 self.API_URL,
                 headers=headers,
                 json=data,
-                timeout=30.0
+                timeout=30.0,
             )
             
             if response.status_code == 200:
@@ -322,28 +325,41 @@ class ProviderManager:
         config_manager = get_config()
         
         # GigaChat
-        gigachat_key = os.getenv("GIGACHAT_API_KEY") or config_manager.get("GIGACHAT_API_KEY")
-        gigachat_enabled = os.getenv("GIGACHAT_ENABLED", "false").lower() == "true" or config_manager.get("GIGACHAT_ENABLED", False)
+        gigachat_key = os.getenv("GIGACHAT_API_KEY") or config_manager.get(
+            "GIGACHAT_API_KEY"
+        )
+        gigachat_enabled = (
+            os.getenv("GIGACHAT_ENABLED", "false").lower() == "true"
+            or config_manager.get("GIGACHAT_ENABLED", False)
+        )
         if gigachat_key and gigachat_enabled:
             self.register(GigaChatProvider(gigachat_key, True))
         
         # Gemini
         gemini_key = os.getenv("GOOGLE_API_KEY") or config_manager.get("GOOGLE_API_KEY")
-        gemini_enabled = os.getenv("GEMINI_ENABLED", "false").lower() == "true" or config_manager.get("GEMINI_ENABLED", False)
+        gemini_enabled = (
+            os.getenv("GEMINI_ENABLED", "false").lower() == "true"
+            or config_manager.get("GEMINI_ENABLED", False)
+        )
         if gemini_key and gemini_enabled:
             self.register(GeminiProvider(gemini_key, True))
         
         # OpenRouter
-        openrouter_key = os.getenv("OPENROUTER_API_KEY") or config_manager.get("OPENROUTER_API_KEY")
-        openrouter_enabled = os.getenv("OPENROUTER_ENABLED", "false").lower() == "true" or config_manager.get("OPENROUTER_ENABLED", False)
+        openrouter_key = os.getenv("OPENROUTER_API_KEY") or config_manager.get(
+            "OPENROUTER_API_KEY"
+        )
+        openrouter_enabled = (
+            os.getenv("OPENROUTER_ENABLED", "false").lower() == "true"
+            or config_manager.get("OPENROUTER_ENABLED", False)
+        )
         if openrouter_key and openrouter_enabled:
-            model = config_manager.get("OPENROUTER_MODEL") or os.getenv("OPENROUTER_MODEL", "google/gemma-7b-it")
+            model = config_manager.get("OPENROUTER_MODEL") or os.getenv(
+                "OPENROUTER_MODEL", "google/gemma-7b-it"
+            )
             self.register(OpenRouterProvider(openrouter_key, True, model))
     
     async def generate(self, prompt: str, context: str = "") -> LLMResponse:
         """Генерирует ответ через каскад провайдеров"""
-        last_error = None
-        
         for name in self.order:
             provider = self.providers.get(name)
             if provider and provider.enabled:
@@ -352,8 +368,7 @@ class ProviderManager:
                     # Сохраняем успешный ответ в fallback
                     self.fallback.save_response(prompt, response.text, response.confidence)
                     return response
-                except Exception as e:
-                    last_error = e
+                except Exception:
                     continue
         
         # Используем fallback

@@ -23,7 +23,13 @@ services:
       - key: OPENROUTER_MODEL
         value: "google/gemma-7b-it"
       - key: GIGACHAT_ENABLED
-        value: "false"
+        value: "true"
+      - key: GIGACHAT_CLIENT_ID
+        sync: false
+      - key: GIGACHAT_AUTHORIZATION_KEY
+        sync: false
+      - key: GIGACHAT_SCOPE
+        value: "GIGACHAT_API_PERS"
       - key: DEBUG
         value: "false"
       - key: RENDER
