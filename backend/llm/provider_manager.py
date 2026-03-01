@@ -152,7 +152,10 @@ class OpenRouterProvider(BaseProvider):
     name = "openrouter"
     API_URL = "https://openrouter.ai/api/v1/chat/completions"
     
-    def __init__(self, api_key: str = None, enabled: bool = False, model: str = None):
+    def __init__(self, api_key: str = None, enabled: bool = True, model: str = None):
+        # Если api_key не передан, пытаемся получить из переменной окружения
+        if api_key is None:
+            api_key = os.getenv("OPENROUTER_API_KEY")
         super().__init__(api_key, enabled)
         self.model = model or os.getenv("OPENROUTER_MODEL", "openai/gpt-3.5-turbo")
     
@@ -198,6 +201,53 @@ class OpenRouterProvider(BaseProvider):
                 )
             else:
                 raise Exception(f"OpenRouter error: {response.status_code}")
+    
+    async def test_connection(self) -> dict:
+        """Тестирует подключение к OpenRouter"""
+        if not self.enabled:
+            return {
+                "success": False,
+                "error": "OpenRouter отключен"
+            }
+        
+        if not self.api_key:
+            return {
+                "success": False,
+                "error": "OpenRouter API ключ не настроен"
+            }
+        
+        try:
+            # Тестируем аутентификацию
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://openrouter.ai/api/v1/auth",
+                    headers=headers,
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    self.healthy = True
+                    return {
+                        "success": True,
+                        "message": "OpenRouter API ключ действителен"
+                    }
+                else:
+                    self.healthy = False
+                    return {
+                        "success": False,
+                        "error": f"Ошибка аутентификации: {response.status_code}"
+                    }
+        except Exception as e:
+            self.healthy = False
+            return {
+                "success": False,
+                "error": f"Ошибка подключения: {str(e)}"
+            }
 
 
 class SQLiteFallbackProvider(BaseProvider):
