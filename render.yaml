@@ -2,6 +2,24 @@
 # https://render.com/docs/blueprint-spec
 
 services:
+  # PostgreSQL Database
+  - type: postgres
+    name: padplus-ai-db
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: DATABASE_URL
+        fromDatabaseUrl: true
+
+  # Redis Cache
+  - type: redis
+    name: padplus-ai-redis
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: REDIS_URL
+        fromRedisUrl: true
+
   # Backend - Web Service
   - type: web
     name: padplus-ai-backend
@@ -37,12 +55,20 @@ services:
       - key: LOG_LEVEL
         value: "info"
       - key: DATABASE_URL
-        value: "postgresql://postgres:TiMuPom13Q5OfKBi@db.hgjbjccpeirwrabbcjhr.supabase.co:5432/postgres"
+        fromDatabaseUrl: true
+      - key: REDIS_URL
+        fromRedisUrl: true
       # Новые переменные для сессионной системы
       - key: SESSION_TTL_HOURS
         value: "24"
       - key: ENABLE_SESSION_MANAGEMENT
         value: "true"
+      - key: CACHE_TTL
+        value: "3600"
+      - key: RATE_LIMIT_REQUESTS
+        value: "100"
+      - key: RATE_LIMIT_WINDOW
+        value: "60"
 
   # Frontend - Static Site
   - type: web
@@ -59,4 +85,6 @@ services:
       - key: VITE_APP_TITLE
         value: "PAD+ AI v3.5"
       - key: VITE_SESSION_ENABLED
+        value: "true"
+      - key: VITE_CDN_ENABLED
         value: "true"
