@@ -5,7 +5,6 @@ PAD+ AI v3.5 — Главный модуль
 PAD+ = Pleasure, Arousal, Dominance + Curiosity, Confidence, Social Connection
 """
 
-import asyncio
 import json
 import logging
 import os
@@ -35,6 +34,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 
 from core.anti_directive import ANTI_DIRECTIVE, check_integrity
+from core.cache_manager import get_cache_manager
+from core.monitoring import get_monitoring_system
 from api import routes
 
 
@@ -49,6 +50,16 @@ async def lifespan(app: FastAPI):
         logger.error("❌ Целостность ANTI_DIRECTIVE нарушена!")
         raise RuntimeError("Целостность ядра нарушена")
     logger.info("✅ ANTI_DIRECTIVE проверена")
+    
+    # Инициализация кэш менеджера
+    cache_manager = get_cache_manager()
+    await cache_manager.connect()
+    logger.info("✅ Cache manager инициализирован")
+    
+    # Запуск системы мониторинга
+    monitoring_system = get_monitoring_system()
+    await monitoring_system.start_monitoring()
+    logger.info("✅ Система мониторинга запущена")
     
     # Запуск импульса
     sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -75,6 +86,14 @@ async def lifespan(app: FastAPI):
     
     # === SHUTDOWN ===
     logger.info("🛑 PAD+ AI останавливается...")
+
+    # Отключение системы мониторинга
+    await monitoring_system.stop_monitoring()
+    logger.info("✅ Система мониторинга остановлена")
+    
+    # Отключение кэш менеджера
+    await cache_manager.disconnect()
+    logger.info("✅ Cache manager отключен")
 
 
 # CORS middleware — настройка для production
@@ -247,11 +266,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif msg_type == "subscribe":
                     # Подписка на обновления
                     channels = message.get("channels", ["all"])
-                    await manager.send_personal(websocket, {
-                        "type": "subscribed",
-                        "channels": channels,
-                        "timestamp": datetime.now().isoformat()
-                    })
+                    await manager.send_personal(
+                        websocket, {
+                            "type": "subscribed",
+                            "channels": channels,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    )
                 
                 elif msg_type == "chat":
                     # Обработка чата через WebSocket
@@ -275,11 +296,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif msg_type == "get_state":
                     # Получить текущее состояние
                     state = await get_mind_state()
-                    await manager.send_personal(websocket, {
-                        "type": "mind_state",
-                        "state": state,
-                        "timestamp": datetime.now().isoformat()
-                    })
+                    await manager.send_personal(
+                        websocket, {
+                            "type": "mind_state",
+                            "state": state,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    )
                 
                 else:
                     await manager.send_personal(websocket, {
