@@ -678,12 +678,24 @@ if __name__ == "__main__":
     import uvicorn
     
     # В production не используем reload
-    reload = is_production if is_production else False
+    reload = False if is_production else False  # Всегда False для стабильности
+    
+    # Получаем порт из переменной окружения PORT (стандарт для Render)
+    # Явно проверяем PORT перед использованием backend_port
+    render_port = os.getenv("PORT")
+    if render_port:
+        port = int(render_port)
+        logger.info(f"🔌 Render PORT environment variable detected: {port}")
+    else:
+        port = backend_port
+        logger.warning(f"⚠️ PORT environment variable not set, using default: {port}")
+    
+    logger.info(f"🚀 Starting server on port {port} (production: {is_production})")
     
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=backend_port,
+        port=port,
         reload=reload,
         log_level="info" if is_production else "debug"
     )
