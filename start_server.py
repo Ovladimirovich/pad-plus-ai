@@ -7,13 +7,15 @@ Simple server starter for Render
 import os
 import sys
 import logging
+import time
 
 # Добавляем backend в путь
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger("server_starter")
 
@@ -32,10 +34,25 @@ main_py = os.path.join(backend_dir, 'main.py')
 logger.info(f"📄 backend/main.py exists: {os.path.exists(main_py)}")
 logger.info(f"📁 backend/ exists: {os.path.exists(backend_dir)}")
 
-# Запускаем uvicorn
-import uvicorn
+# Проверяем что модуль main можно импортировать
+try:
+    logger.info("📦 Attempting to import main.app...")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("main", main_py)
+    main_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(main_module)
+    logger.info("✅ Successfully imported main module")
+except Exception as e:
+    logger.error(f"❌ Failed to import main: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
 
+# Запускаем uvicorn
 logger.info("⚡ Starting uvicorn...")
+logger.info(f"📌 Running uvicorn on 0.0.0.0:{port}")
+
+import uvicorn
 
 uvicorn.run(
     "main:app",
@@ -44,3 +61,5 @@ uvicorn.run(
     workers=1,
     log_level="info"
 )
+
+logger.info("✅ Server started successfully!")
