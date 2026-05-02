@@ -447,6 +447,8 @@ class PipelineExecutor:
         error_handler = get_error_handler()
 
         async def safety_step():
+            nonlocal user_message
+            
             from core.safety_layer import get_safety_layer
             safety = get_safety_layer()
             safety_check = safety.check_request(user_message)
@@ -465,7 +467,6 @@ class PipelineExecutor:
             
             # Санитизация если нужно
             if safety_check.action.value == "sanitize":
-                nonlocal user_message
                 user_message = safety.sanitize_input(user_message)
             return None
 
