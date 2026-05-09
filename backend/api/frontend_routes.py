@@ -558,12 +558,13 @@ async def list_keys(
         offset: Смещение (по умолчанию 0)
         limit: Количество результатов (1-100, по умолчанию 50)
     """
-    supabase = get_supabase()
+    from core.supabase_client import get_supabase_service
+    supabase = get_supabase_service()
     if not supabase:
         raise HTTPException(status_code=500, detail="БД не подключена")
     
     user_id = str(current_user["id"])  # Преобразуем UUID в строку
-    
+
     # Ограничиваем limit
     limit = min(max(limit, 1), 100)
 
@@ -573,7 +574,7 @@ async def list_keys(
             .select("*", count="exact")\
             .eq("user_id", user_id)\
             .execute()
-        
+
         total = count_result.count if hasattr(count_result, 'count') else 0
         
         # Получаем данные с пагинацией
@@ -594,7 +595,7 @@ async def list_keys(
                 limit=limit,
                 has_more=False
             )
-
+            
         keys = []
         for key in result.data:
             keys.append(APIKeyResponse(
@@ -617,7 +618,7 @@ async def list_keys(
             limit=limit,
             has_more=offset + limit < total
         )
-        
+
     except Exception as e:
         error_msg = str(e)
         logger.error(f"❌ Ошибка получения списка ключей: {error_msg}")
@@ -800,7 +801,8 @@ async def test_key(
     current_user: dict = Depends(get_current_user)
 ):
     """Тестирование сохранённого API ключа"""
-    supabase = get_supabase()
+    from core.supabase_client import get_supabase_service
+    supabase = get_supabase_service()
     encryptor = get_encryptor()
     user_id = current_user["id"]
     
@@ -928,8 +930,9 @@ async def chat(
     # === ЛОГИКА ЧАТА ===
     from runtime.litellm_service import get_litellm_service
     from core.pipeline import get_pipeline
+    from core.supabase_client import get_supabase_service
 
-    supabase = get_supabase()
+    supabase = get_supabase_service()
     encryptor = get_encryptor()
     user_id = current_user["id"]
 
@@ -1604,8 +1607,9 @@ async def chat_stream(
     Потоковый чат с AI (SSE - Server Sent Events)
     """
     from runtime.litellm_service import get_litellm_service
+    from core.supabase_client import get_supabase_service
 
-    supabase = get_supabase()
+    supabase = get_supabase_service()
     encryptor = get_encryptor()
     user_id = current_user["id"]
 
