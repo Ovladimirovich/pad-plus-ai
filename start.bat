@@ -44,9 +44,9 @@ echo [2/5] Запуск Backend (порт 8080)...
 cd /d "%~dp0backend"
 set "PYTHON_EXE=%~dp0venv\Scripts\python.exe"
 if exist "%PYTHON_EXE%" (
-    start "PAD+ AI Backend" cmd /k "echo Backend запускается... && set PORT=8080 && "%PYTHON_EXE%" -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
-) else (
-    start "PAD+ AI Backend" cmd /k "echo Backend запускается... && set PORT=8080 && uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
+    start "PAD+ AI Backend" cmd /k "echo Backend запускается... && set PORT=8080 && "%PYTHON_EXE%" -m uvicorn main:app --host 0.0.0.0 --port 8080"
+ ) else (
+    start "PAD+ AI Backend" cmd /k "echo Backend запускается... && set PORT=8080 && uvicorn main:app --host 0.0.0.0 --port 8080"
 )
 cd /d "%~dp0"
 

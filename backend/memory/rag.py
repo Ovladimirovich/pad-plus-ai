@@ -419,9 +419,9 @@ class RAGMemory:
 
         try:
             import psycopg2
-            conn = psycopg2.connect(db_url, connect_timeout=3)
-            cursor = conn.cursor()
-            cursor.execute("""
+            self.conn = psycopg2.connect(db_url, connect_timeout=3)
+            self.cursor = self.conn.cursor()
+            self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS rag_dialogs (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     user_message TEXT NOT NULL,

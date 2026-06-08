@@ -212,9 +212,9 @@ async def list_documents(
     
     user_id = current_user["id"]
     
-    # Строим запрос
+    # Получаем пагинированные документы (без count — отдельным запросом)
     query = db.table("documents")\
-        .select("*", count="exact")\
+        .select("*")\
         .eq("user_id", user_id)
     
     if collection_id:
@@ -225,6 +225,19 @@ async def list_documents(
     query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
     
     result = query.execute()
+    
+    # Общее количество — только если первая страница
+    total = 0
+    if offset == 0:
+        try:
+            count_result = db.table("documents")\
+                .select("id", count="exact")\
+                .eq("user_id", user_id)\
+                .limit(0)\
+                .execute()
+            total = count_result.count if count_result.count else 0
+        except Exception:
+            pass
     
     documents = []
     for doc in result.data:
@@ -242,10 +255,10 @@ async def list_documents(
     
     return {
         "data": documents,
-        "total": result.count if result.count else 0,
+        "total": total,
         "offset": offset,
         "limit": limit,
-        "has_more": offset + limit < (result.count if result.count else 0)
+        "has_more": offset + limit < total if total > 0 else len(result.data) >= limit
     }
 
 
@@ -261,39 +274,60 @@ async def get_document_stats(
     user_id = current_user["id"]
     
     # Общая статистика
-    total_result = db.table("documents")\
-        .select("id", count="exact")\
-        .eq("user_id", user_id)\
-        .execute()
-    
-    total_documents = total_result.count if total_result.count else 0
-    
-    # Статистика по статусам
-    status_stats = {}
-    for status in ["pending", "processing", "completed", "failed"]:
-        result = db.table("documents")\
+    total_result = None
+    try:
+        total_result = db.table("documents")\
             .select("id", count="exact")\
             .eq("user_id", user_id)\
-            .eq("status", status)\
+            .limit(0)\
             .execute()
-        status_stats[status] = result.count if result.count else 0
+    except Exception:
+        pass
     
-    # Общий размер
-    size_result = db.table("documents")\
-        .select("file_size")\
-        .eq("user_id", user_id)\
-        .execute()
-    total_size = sum(doc.get("file_size", 0) for doc in size_result.data)
+    total_documents = total_result.count if total_result and total_result.count else 0
     
-    # Количество коллекций
-    collections_result = db.table("document_collections")\
-        .select("id", count="exact")\
-        .eq("user_id", user_id)\
-        .execute()
-    total_collections = collections_result.count if collections_result.count else 0
+    # Статистика по статусам (один запрос вместо 4x count=exact, с лимитом)
+    status_stats = {"pending": 0, "processing": 0, "completed": 0, "failed": 0}
+    try:
+        all_docs = db.table("documents")\
+            .select("status")\
+            .eq("user_id", user_id)\
+            .limit(1000)\
+            .execute()
+        for doc in all_docs.data or []:
+            s = doc.get("status", "pending")
+            if s in status_stats:
+                status_stats[s] += 1
+    except Exception:
+        pass
+
+    # Общий размер (с лимитом)
+    total_size = 0
+    try:
+        size_result = db.table("documents")\
+            .select("file_size")\
+            .eq("user_id", user_id)\
+            .limit(1000)\
+            .execute()
+        total_size = sum(doc.get("file_size", 0) for doc in size_result.data or [])
+    except Exception:
+        pass
+
+    # Количество коллекций (count=exact with limit=0 — быстро)
+    total_collections = 0
+    try:
+        collections_result = db.table("document_collections")\
+            .select("id", count="exact")\
+            .eq("user_id", user_id)\
+            .limit(0)\
+            .execute()
+        total_collections = collections_result.count if collections_result.count else 0
+    except Exception:
+        pass
     
     return {
         "total_documents": total_documents,
+        "completed_documents": status_stats.get("completed", 0),
         "status_stats": status_stats,
         "total_size_bytes": total_size,
         "total_size_mb": round(total_size / (1024 * 1024), 2),
@@ -434,10 +468,16 @@ async def list_collections(
     collections = []
     for coll in result.data:
         # Считаем количество документов в коллекции
-        doc_count = db.table("documents")\
-            .select("id", count="exact")\
-            .eq("collection_id", coll["id"])\
-            .execute()
+        doc_count = 0
+        try:
+            dc = db.table("documents")\
+                .select("id", count="exact")\
+                .eq("collection_id", coll["id"])\
+                .limit(0)\
+                .execute()
+            doc_count = dc.count if dc.count else 0
+        except Exception:
+            pass
         
         collections.append(CollectionResponse(
             id=coll["id"],

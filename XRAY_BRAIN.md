@@ -44,3 +44,6 @@ backend/core/xray/thought_visualizer.py
 backend/core/pipeline/executor.py
 tests/test_xray/
 docs/XRAY_GUIDE.md
+
+## Текущие задачи
+См. docs/XRAY_BRAIN_TASKS.md

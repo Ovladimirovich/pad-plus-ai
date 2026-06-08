@@ -31,11 +31,19 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') 
     )
 )
 
-:: Останавливаем все процессы node и python связанные с нашим проектом
+:: Останавливаем только наши процессы (по окнам)
 echo.
-echo [3/3] Остановка оставшихся процессов...
-taskkill /F /IM node.exe >nul 2>&1
-taskkill /F /IM python.exe >nul 2>&1
+echo [3/3] Остановка окон с нашими процессами...
+taskkill /F /FI "WINDOWTITLE eq PAD+ AI Backend*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq PAD+ AI Frontend*" >nul 2>&1
+
+:: Если окна не закрылись — по портам (безопасно)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080 ^| findstr LISTENING') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
 echo   ✓ Все процессы остановлены
 
 timeout /t 2 >nul

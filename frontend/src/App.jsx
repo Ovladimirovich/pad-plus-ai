@@ -29,7 +29,7 @@ const tabs = [
   { id: 'settings', label: '⚙️ Настройки', icon: '⚙️' },
   { id: 'instructions', label: '📖 Инструкции', icon: '📖' },
   { id: 'providers', label: '⚡ Провайдеры', icon: '⚡' },
-  { id: 'connected-providers', label: '', icon: '', page: true }, // Скрытая вкладка для маршрута
+  { id: 'connected-providers', label: '', icon: '', page: true },
 ];
 
 function App() {
