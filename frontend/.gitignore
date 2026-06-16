@@ -4,8 +4,6 @@ node_modules/
 .pnp.js
 
 # Build output
-dist/
-dist-ssr/
 build/
 
 # Local env files
