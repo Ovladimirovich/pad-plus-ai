@@ -125,3 +125,4 @@ healer_viewer*.png
 /archive/
 !docs/archive/
 !docs/archive/**
+# Git filter-repo temp.git-rewrite/
