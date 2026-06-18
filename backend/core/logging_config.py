@@ -90,6 +90,29 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_data, ensure_ascii=False, default=str)
 
 
+class SafeStreamHandler(logging.StreamHandler):
+    """StreamHandler, защищённый от UnicodeEncodeError.
+    При ошибке кодировки — записывает с заменой не-ASCII символов на '?'.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            self.stream.write(msg + self.terminator)
+            self.flush()
+        except UnicodeEncodeError:
+            try:
+                msg = self.format(record)
+                enc = self.stream.encoding or "utf-8"
+                safe = msg.encode(enc, errors="replace").decode(enc, errors="replace")
+                self.stream.write(safe + self.terminator)
+                self.flush()
+            except Exception:
+                self.handleError(record)
+        except Exception:
+            self.handleError(record)
+
+
 class ColoredFormatter(logging.Formatter):
     """Цветной форматтер для разработки (консоль)"""
     
@@ -158,9 +181,9 @@ def setup_logging(
             datefmt="%Y-%m-%d %H:%M:%S"
         )
     
-    # Console handler
+    # Console handler (SafeStreamHandler — никогда не падает на UnicodeEncodeError)
     if log_to_console:
-        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler = SafeStreamHandler(sys.stdout)
         console_handler.setLevel(getattr(logging, level.upper()))
         console_handler.setFormatter(formatter)
         root_logger.addHandler(console_handler)
@@ -178,7 +201,7 @@ def setup_logging(
     
     for logger in [uvicorn_logger, uvicorn_access]:
         logger.handlers.clear()
-        handler = logging.StreamHandler(sys.stdout)
+        handler = SafeStreamHandler(sys.stdout)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(getattr(logging, level.upper()))

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import os
 import asyncio
+import json
 import logging
 
 import httpx
@@ -62,7 +63,8 @@ async def acompletion(response: Any) -> Any:
                 data = await data
             return data
     except Exception as e:
-        logger.warning(f"{__name__} error: {e}")
+        safe = str(e).encode("ascii", errors="replace").decode("ascii")
+        logger.warning(f"{__name__} error: {safe}")
     return response
 
 
@@ -253,7 +255,13 @@ class LLMService:
             logger.error(f"HTTP error {status_code}: {error_text}")
             raise ValueError(f"Ошибка API: {status_code} - {error_text}")
 
-        data = await acompletion(response)
+        # Читаем content напрямую, минуя httpx.response.text (падает на \xa0)
+        try:
+            raw_bytes = getattr(response, "content", b"")
+            raw_text = raw_bytes.decode("utf-8", errors="replace")
+        except Exception:
+            raise ValueError("OpenRouter: не удалось прочитать тело ответа")
+        data = json.loads(raw_text)
         if isinstance(data, dict):
             choice = data["choices"][0]
             text = choice.get("message", {}).get("content", "") or choice.get("text", "") or ""
@@ -473,11 +481,14 @@ class LLMService:
                             delta = chunk_data.get("choices", [{}])[0].get("delta", {})
                             content = delta.get("content", "")
                             if content:
+                                content = content.encode("ascii", errors="replace").decode("ascii")
                                 yield content
                         except json_module.JSONDecodeError:
                             continue
         except httpx.TimeoutException:
             raise ValueError("OpenRouter timeout: сервер не отвечает. Попробуйте позже.")
+        except Exception as e:
+            raise ValueError(f"OpenRouter stream error: {e}") from e
 
     async def _stream_gigachat(
         self,
