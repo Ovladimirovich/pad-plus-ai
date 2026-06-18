@@ -763,7 +763,7 @@ async def update_key(
     
     # Если передан новый ключ — шифруем его
     if data.api_key is not None:
-        encrypted_key = encryptor.encrypt(data.api_key)
+        encrypted_key = encryptor.encrypt(data.api_key.strip())
         update_data["api_key_encrypted"] = encrypted_key
         logger.info(f"?? Updating key for user {user_id}: key_id={key_id}")
     

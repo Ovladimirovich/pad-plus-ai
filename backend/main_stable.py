@@ -477,7 +477,7 @@ async def create_key(request: Request, key_request: CreateKeyRequest):
         
         # Создаем ключ
         key_id = f"key_{len(keys_db.get(user_id, [])) + 1}"
-        encrypted = _encrypt_key(key_request.api_key)
+        encrypted = _encrypt_key(key_request.api_key.strip())
         new_key = {
             "id": key_id,
             "name": key_request.name,
