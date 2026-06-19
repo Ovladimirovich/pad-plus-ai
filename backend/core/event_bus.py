@@ -65,6 +65,11 @@ class EventType(Enum):
     ROUTER_INTENT_CLASSIFIED = "router.intent_classified"
     ROUTER_PIPELINE_EXECUTED = "router.pipeline_executed"
 
+    # Опыт и обучение
+    EXPERIENCE_CAPTURED = "experience.captured"
+    REFLECTION_COMPLETED = "reflection.completed"
+    STRATEGY_CHANGED = "strategy.changed"
+
 
 @dataclass
 class Event:
