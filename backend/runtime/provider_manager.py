@@ -22,15 +22,15 @@ from runtime.llm_service import LLMService, LLMResponse, get_llm_service
 
 
 FALLBACK_ORDER: Dict[str, List[str]] = {
-    "openrouter": ["openrouter", "gigachat"],
+    "openrouter": ["openrouter"],
     "gigachat": ["gigachat"],
-    "openai": ["openai", "openrouter", "gigachat"],
-    "google": ["google", "openrouter", "gigachat"],
-    "anthropic": ["anthropic", "openrouter", "gigachat"],
-    "groq": ["groq", "openrouter", "gigachat"],
+    "openai": ["openai"],
+    "google": ["google"],
+    "anthropic": ["anthropic"],
+    "groq": ["groq"],
 }
 
-DEFAULT_FALLBACK_CHAIN = ["openrouter", "gigachat"]
+DEFAULT_FALLBACK_CHAIN = ["openrouter"]
 
 
 class ProviderManagerError(Exception):
@@ -96,7 +96,7 @@ def _is_retryable_error(error: Exception) -> bool:
     
     # Non-retryable
     if any(phrase in error_str for phrase in [
-        "400", "bad request", "404", "not found",
+        "400", "bad request", "402", "payment required", "404", "not found",
     ]):
         return False
     
@@ -311,22 +311,29 @@ class ProviderManager:
             {
                 "id": "openrouter",
                 "name": "OpenRouter",
-                "has_key": False,  # Ключ пользовательский
+                "has_key": False,
                 "is_system": False,
-                "fallback_to": "gigachat",
             },
             {
                 "id": "gigachat",
                 "name": "GigaChat",
                 "has_key": gigachat_key,
                 "is_system": gigachat_key,
-                "fallback_to": None,
             },
         ]
 
     async def close(self) -> None:
         """Закрывает сессию"""
         await self._llm.close_session()
+
+    def has_active_providers(self) -> bool:
+        """Проверяет, доступен ли хотя бы один провайдер."""
+        try:
+            import os
+            gigachat_key = bool(os.getenv("GIGACHAT_AUTH_KEY", "").strip())
+            return gigachat_key
+        except Exception:
+            return False
 
     def _get_gigachat_key(self) -> Optional[str]:
         """Получает системный ключ GigaChat из .env"""
