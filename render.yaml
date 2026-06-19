@@ -2,18 +2,23 @@ services:
   - type: web
     name: pad-plus-ai
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: |
-      pip install --no-cache-dir -r requirements.txt
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+      pip install -r requirements.txt
+      cd frontend
+      npm install
+      npm run build
+      cd ..
+    startCommand: python backend/main.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: NODE_VERSION
+        value: 20.10.0
       - key: PORT
         value: 8000
       - key: DATABASE_URL
         sync: false
-        # Supabase PostgreSQL: postgresql://postgres:password@db.<project>.supabase.co:5432/postgres
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
@@ -26,7 +31,6 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
-        # Бесплатный Redis: https://console.upstash.com/ → Create Database → copy REDIS_URL
       - key: FRONTEND_URL
         value: https://pad-plus-ai.onrender.com
       - key: LOG_LEVEL
