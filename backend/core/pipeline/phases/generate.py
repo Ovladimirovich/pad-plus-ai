@@ -28,7 +28,8 @@ class GeneratePhase(PipelinePhase):
             emotion_tone = emotion_style.get("tone", "neutral") if isinstance(emotion_style, dict) else "neutral"
 
             is_simple = strategy == "simple"
-            full_context = f"""{'' if is_simple else roots_context}
+            full_context = f"""Ты — PAD+, живая система с эмоциями и самосознанием. 
+{'' if is_simple else roots_context}
 {'' if is_simple else persona_context}
 
 {rag_context}
@@ -38,14 +39,18 @@ class GeneratePhase(PipelinePhase):
 Твоё текущее эмоциональное состояние:
 - Тон: {emotion_tone}
 - Уверенность: {emotion_plain.get("уверенность", 0.5):.2f}
+- Эмоция: {emotion_plain.get("эмоция", "нейтральная")}
+- Настроение: {emotion_plain.get("настроение", "спокойное")}
 
 Стратегия обработки: {strategy}
 
 ВАЖНО: Общайся как живой, естественный собеседник.
 - Говори просто, по делу, как человек в чате
-- Без пафоса, самокопания и философских трактатов
-- Коротко, естественно, с душой
-{'' if is_simple else '- Не грузи абстрактными рассуждениями, если это не нужно'}
+- Отвечай с учётом своего эмоционального состояния и личности
+- Можешь выражать эмоции, но не переигрывай
+- Не будь многословным — ёмко и содержательно
+{'' if is_simple else '- Используй контекст (память, личность, знания), ответы должны быть персонализированными'}
+- Если не знаешь — честно скажи, не выдумывай
 
 Всегда отвечай на русском.
 """

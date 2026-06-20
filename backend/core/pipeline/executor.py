@@ -41,6 +41,20 @@ from .phases import (
 logger = logging.getLogger("padplus.pipeline.executor")
 
 
+# Strategy override (может быть установлен через API)
+_STRATEGY_OVERRIDE: str | None = None
+
+
+def set_strategy_override(strategy: str | None) -> None:
+    global _STRATEGY_OVERRIDE
+    _STRATEGY_OVERRIDE = strategy
+    logger.info("Стратегия принудительно установлена: %s", strategy or "auto")
+
+
+def get_strategy_override() -> str | None:
+    return _STRATEGY_OVERRIDE
+
+
 class PipelineExecutor:
     CRITICAL_COMPONENTS = {"safety", "llm_service"}
     IMPORTANT_COMPONENTS = {"rag", "facts", "episodic", "semantic"}
@@ -164,6 +178,11 @@ class PipelineExecutor:
         return None
 
     def _determine_strategy(self, user_message: str) -> str:
+        # Проверяем принудительную стратегию (установлена через API)
+        override = get_strategy_override()
+        if override:
+            return override
+
         text_lower = user_message.lower().strip()
         if any(kw in text_lower for kw in ["почему ты", "как ты", "что ты думаешь о себе", "саморефлексия"]):
             return "reflective"
@@ -308,7 +327,7 @@ class PipelineExecutor:
         except Exception:
             pass
 
-        _simple_skip = {"rag", "knowledge_graph", "episodic", "semantic", "emotion", "persona", "roots", "truth_loop", "save_episode", "emotion_update", "persona_evolution", "reflection", "dreams"}
+        _simple_skip = {"rag", "knowledge_graph", "episodic", "semantic", "persona", "roots", "truth_loop", "save_episode", "emotion_update", "persona_evolution", "reflection", "dreams"}
         _independent_group = {"rag", "knowledge_graph", "episodic", "semantic", "emotion"}
         _skip_phases = set()
 

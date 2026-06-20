@@ -327,3 +327,33 @@ async def get_brain_strategies():
     
     meta = get_meta_learner()
     return meta.get_stats()
+
+
+@router.post("/brain/strategy")
+async def set_brain_strategy(body: dict):
+    """Принудительно установить стратегию обработки.
+    Тело: {"strategy": "reflective"} или {"strategy": ""} для авто.
+    Доступные: simple, retrieval, reasoning, creative, reflective, learning
+    """
+    strategy = body.get("strategy", "")
+    valid = {"simple", "retrieval", "reasoning", "creative", "reflective", "learning", ""}
+
+    if strategy not in valid:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"Недопустимая стратегия. Допустимые: {', '.join(v for v in valid if v)}",
+        )
+
+    from core.pipeline.executor import set_strategy_override
+    set_strategy_override(strategy or None)
+
+    from core.xray import get_meta_learner
+    meta = get_meta_learner()
+
+    return {
+        "status": "ok",
+        "strategy": strategy or "auto",
+        "override_active": bool(strategy),
+        "strategies": meta.get_stats(),
+    }
