@@ -1,12 +1,7 @@
-"""
-🎯 Strategy Layer — выбор стратегии обработки запроса.
-
-Определяет, как pipeline будет обрабатывать запрос:
-simple / retrieval / reasoning / creative / reflective / learning
-
-Фаза 0: заглушка. Реализация — в Фазе 3.
-"""
-
 from .selector import StrategySelector
+from .event_listener import setup_strategy_listener
 
-__all__ = ["StrategySelector"]
+__all__ = [
+    "StrategySelector",
+    "setup_strategy_listener",
+]

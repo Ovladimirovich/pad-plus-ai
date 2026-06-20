@@ -30,18 +30,19 @@ class PgStorage:
         self._connected = False
 
     def _get_conn(self):
-        from core.config_manager import get_database_url
-        import psycopg2
-        if self._conn is None or self._conn.closed:
-            db_url = get_database_url()
-            if db_url and db_url.startswith("postgresql"):
-                self._conn = psycopg2.connect(db_url)
-            else:
-                env_url = os.environ.get("DATABASE_URL")
-                if env_url and env_url.startswith("postgresql"):
-                    self._conn = psycopg2.connect(env_url)
-                else:
-                    raise RuntimeError("Нет PostgreSQL подключения")
+        from .pg_pool import get_connection
+        try:
+            if self._conn is not None and not self._conn.closed:
+                self._conn.cursor().execute("SELECT 1")
+                return self._conn
+        except Exception:
+            self._conn = None
+        try:
+            self._conn = get_connection()
+        except Exception:
+            self._conn = None
+            self._connected = False
+            raise RuntimeError("Нет PostgreSQL подключения")
         return self._conn
 
     def _ensure_table(self):

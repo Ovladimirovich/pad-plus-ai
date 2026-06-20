@@ -66,7 +66,7 @@ async def get_memory_dashboard():
 
     # RAG stats
     try:
-        from memory.rag import get_rag
+        from memory import get_rag
         mem = get_rag()
         stats = mem.get_stats() if hasattr(mem, 'get_stats') else {}
         result["rag"] = {

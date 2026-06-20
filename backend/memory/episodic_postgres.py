@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import json
 import logging
+import os
 import uuid
 
 logger = logging.getLogger("PAD+.episodic_pg")
@@ -146,17 +147,34 @@ class EpisodicMemory:
 
     def _get_conn(self):
         """Получает соединение с PostgreSQL"""
+        if not postgres_available:
+            raise RuntimeError("PostgreSQL недоступен для EpisodicMemory")
         from core.config_manager import get_database_url
-        if self._conn is None or self._conn.closed:
-            db_url = get_database_url()
-            if db_url and db_url.startswith("postgresql"):
-                self._conn = psycopg2.connect(db_url)
+        try:
+            if self._conn is not None and not self._conn.closed:
+                self._conn.cursor().execute("SELECT 1")
+                return self._conn
+        except Exception:
+            self._conn = None
+        db_url = get_database_url()
+        if db_url and db_url.startswith("postgresql"):
+            self._conn = psycopg2.connect(
+                db_url,
+                keepalives=1, keepalives_idle=30,
+                keepalives_interval=10, keepalives_count=5,
+                connect_timeout=5,
+            )
+        else:
+            env_url = os.environ.get("DATABASE_URL")
+            if env_url and env_url.startswith("postgresql"):
+                self._conn = psycopg2.connect(
+                    env_url,
+                    keepalives=1, keepalives_idle=30,
+                    keepalives_interval=10, keepalives_count=5,
+                    connect_timeout=5,
+                )
             else:
-                env_url = os.environ.get("DATABASE_URL")
-                if env_url and env_url.startswith("postgresql"):
-                    self._conn = psycopg2.connect(env_url)
-                else:
-                    raise RuntimeError("Нет PostgreSQL подключения для EpisodicMemory")
+                raise RuntimeError("Нет PostgreSQL подключения для EpisodicMemory")
         return self._conn
 
     def _ensure_tables(self):
@@ -382,7 +400,7 @@ class EpisodicMemory:
             emotion_before=row[10] if isinstance(row[10], dict) else {},
             emotion_after=row[11] if isinstance(row[11], dict) else {},
             emotion_impact=row[12],
-            entities=row[12] if isinstance(row[12], list) else [],
+            entities=row[13] if isinstance(row[13], list) else [],
             concepts=row[14] if isinstance(row[14], list) else [],
             keywords=row[15] if isinstance(row[15], list) else [],
             related_episodes=row[16] if isinstance(row[16], list) else [],
@@ -593,6 +611,55 @@ class EpisodicMemory:
                 for row in most_accessed
             ]
         }
+
+    def get_related_episodes(self, episode_id: str) -> List[Episode]:
+        """Получает связанные эпизоды."""
+        episode = self.get_episode(episode_id)
+        if not episode:
+            return []
+
+        related_ids = episode.related_episodes
+
+        conn = self._get_conn()
+        cur = conn.cursor()
+
+        if related_ids:
+            placeholders = ",".join("%s" for _ in related_ids)
+            cur.execute(
+                f"SELECT * FROM episodes WHERE id IN ({placeholders})",
+                related_ids,
+            )
+            related = [self._row_to_episode(row) for row in cur.fetchall()]
+        else:
+            related = []
+
+        cur.execute(
+            "SELECT * FROM episodes WHERE continuation_of = %s",
+            (episode_id,),
+        )
+        for row in cur.fetchall():
+            rel = self._row_to_episode(row)
+            if rel.id not in related_ids:
+                related.append(rel)
+
+        cur.close()
+        return related
+
+    async def update(self, id: str, data: Dict[str, Any]) -> bool:
+        """Обновляет эпизод по ID."""
+        episode = self.get_episode(id)
+        if not episode:
+            return False
+        for key, value in data.items():
+            if hasattr(episode, key):
+                setattr(episode, key, value)
+        self._save_episode(episode)
+        return True
+
+    async def get(self, id: str) -> Optional[Dict[str, Any]]:
+        """Получает эпизод по ID как словарь."""
+        episode = self.get_episode(id)
+        return episode.to_dict() if episode else None
 
     def clear(self):
         """Очищает эпизодическую память"""

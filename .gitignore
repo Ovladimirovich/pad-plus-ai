@@ -125,3 +125,30 @@ healer_viewer*.png
 !docs/archive/
 !docs/archive/**
 # Git filter-repo temp.git-rewrite/
+
+# Diagnostic / one-off scripts
+check_*.py
+debug_*.py
+diagnostic_*.py
+monitor_*.py
+verify_*.py
+enable_rls.*
+export_*.json
+robust_migrate.py
+simple_migrate.py
+test_render_connection.py
+test_postgres_integration.py
+run_*.sh
+run_*.bat
+
+# Scratch notes
+DIAGNOSTIC_*.md
+FINAL_MIGRATION.md
+FIX_RENDER_*.md
+PLAN.md
+PRODUCTION_*.md
+RENDER_*.md
+TODO_*.md
+
+# Data exports
+exported_*.json

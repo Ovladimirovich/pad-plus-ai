@@ -300,17 +300,32 @@ class UserPersonaManager:
 
 
 # Глобальный экземпляр
-_persona_manager: Optional[UserPersonaManager] = None
+_persona_manager: Optional[Any] = None
 
 
-def get_user_persona_manager() -> UserPersonaManager:
+def get_user_persona_manager() -> Any:
     """
-    Возвращает глобальный менеджер персонажей
-    
-    Returns:
-        UserPersonaManager
+    Фабрика: возвращает менеджер персонажей.
+
+    Если настроен DATABASE_URL или SUPABASE_URL — использует
+    UserPersonaPostgresManager, иначе — JSON-файл (UserPersonaManager).
     """
     global _persona_manager
-    if _persona_manager is None:
-        _persona_manager = UserPersonaManager()
+    if _persona_manager is not None:
+        return _persona_manager
+
+    import os
+
+    if os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_URL"):
+        try:
+            from memory.user_persona_postgres import UserPersonaPostgresManager
+
+            _persona_manager = UserPersonaPostgresManager()
+            logger.info("UserPersona: PostgreSQL режим")
+            return _persona_manager
+        except Exception as e:
+            logger.warning(f"UserPersonaPostgresManager недоступен: {e}, падаем на JSON")
+
+    _persona_manager = UserPersonaManager()
+    logger.info("UserPersona: JSON-файл режим")
     return _persona_manager

@@ -217,9 +217,7 @@ class PersonaMemory:
             except Exception as e:
                 logger.warning(f"PostgreSQL save failed: {e}")
         
-        # Fallback: файл (для локальной разработки)
-        with open(self.storage_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.debug(f"Persona saved to PostgreSQL")
     
     def _to_dict(self) -> dict:
         """Сериализация"""

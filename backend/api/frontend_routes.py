@@ -1409,7 +1409,7 @@ async def get_mind_state():
     
     # === MEMORY SYSTEMS ===
     try:
-        from memory.rag import get_rag
+        from memory import get_rag
         rag = get_rag()
         state["memory"]["rag"] = rag.get_stats()
     except Exception as e:
@@ -1596,7 +1596,7 @@ async def get_full_system_status():
     
     # === MEMORY SYSTEMS ===
     try:
-        from memory.rag import get_rag
+        from memory import get_rag
         rag = get_rag()
         rag_stats = rag.get_stats() if hasattr(rag, 'get_stats') else {}
         status["memory"]["rag"] = {

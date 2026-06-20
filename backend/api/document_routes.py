@@ -30,6 +30,8 @@ logger = logging.getLogger("padplus")
 
 from core.supabase_client import get_db_client, get_supabase
 from core.auth_manager import get_current_user_safe as get_current_user
+from core.document_processor import process_document
+import asyncio
 
 router = APIRouter(prefix="/api/v1", tags=["Document Management"])
 
@@ -141,8 +143,8 @@ async def upload_document(
         
         document_data = result.data[0]
         
-        # Запускаем обработку документа (в реальном приложении - фоновая задача)
-        # await process_document.delay(document_id)
+        # Запускаем фоновую обработку документа
+        asyncio.create_task(process_document(document_id))
         
         return {
             "id": document_id,
@@ -700,14 +702,21 @@ async def delete_collection(
 async def search_documents(
     q: str = Query(..., min_length=1),
     current_user: dict = Depends(get_current_user),
-    limit: int = Query(default=10, ge=1, le=50)
+    limit: int = Query(default=10, ge=1, le=50),
+    threshold: float = Query(default=0.5, ge=0.0, le=1.0),
 ):
-    """RAG поиск по документам пользователя"""
+    """Векторный поиск по документам пользователя.
+
+    Использует pgvector cosine similarity для поиска релевантных чанков.
+    """
     try:
-        from memory.rag import get_rag
-        rag = get_rag()
         user_id = current_user["id"]
-        results = rag.hybrid_search(q, n_results=limit, user_id=user_id)
+        results = await search_document_chunks(
+            query=q,
+            user_id=user_id,
+            limit=limit,
+            similarity_threshold=threshold,
+        )
         return {"query": q, "results": results, "total": len(results)}
     except ImportError:
         raise HTTPException(status_code=500, detail="RAG не доступен")
@@ -790,6 +799,8 @@ async def upload_from_url(
             "file_path": file_path, "collection_id": collection_id,
             "status": "pending",
         }).execute()
+
+        asyncio.create_task(process_document(document_id))
 
         return {"id": document_id, "title": filename, "status": "pending", "message": "Документ загружен из URL"}
     except Exception as e:

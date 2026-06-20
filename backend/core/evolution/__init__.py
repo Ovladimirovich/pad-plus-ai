@@ -1,12 +1,20 @@
 """
-🧬 Evolution Layer — замкнутый цикл обучения PAD+ AI.
+Эволюционный слой PAD+ AI.
 
 Отвечает за:
-- Анализ накопленного опыта (Reflection)
-- Принятие решений об изменении стратегии (MetaLearner)
-- Применение изменений через Constitution
-
-Фаза 0: каркас. Реализация — в Фазе 3.
+- Reflection — анализ накопленного опыта и эмоциональных трендов
+- MetaLearner — принятие решений об изменении личности
+- Constitution — безопасное применение изменений
 """
 
-__all__ = []
+from .constitution import Constitution
+from .meta_learner import EvolutionDecision, MetaLearner
+from .reflection import ReflectionEngine, ReflectionInsight
+
+__all__ = [
+    "Constitution",
+    "EvolutionDecision",
+    "MetaLearner",
+    "ReflectionEngine",
+    "ReflectionInsight",
+]

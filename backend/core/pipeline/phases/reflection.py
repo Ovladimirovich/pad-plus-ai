@@ -21,13 +21,17 @@ class ReflectionPhase(PipelinePhase):
         except Exception as e:
             logger.warning(f"{__name__} error: {e}")
 
-        # MetaController temporarily disabled — module not yet implemented
-        # try:
-        #     from core.meta_controller import get_meta_controller, CognitiveState
-        #     meta = get_meta_controller()
-        #     meta.adapt({...})
-        #     meta.set_state(CognitiveState.IDLE)
-        # except Exception as e:
-        #     logger.warning(f"{__name__} error: {e}")
+        try:
+            from core.meta_controller import get_meta_controller
+            meta = get_meta_controller()
+            meta.adapt({
+                "strategy_success": ctx.context.get("pipeline_result", {}).get("success", False),
+                "interaction_type": ctx.context.get("experience_interaction_type", "new_knowledge"),
+                "significance": ctx.context.get("experience_significance", 0.0),
+                "emotion": ctx.context.get("emotion_style", {}),
+                "impulse_primary": ctx.context.get("impulse_primary", ""),
+            })
+        except Exception as e:
+            logger.warning(f"{__name__} error: {e}")
 
         return PhaseResult(success=True)

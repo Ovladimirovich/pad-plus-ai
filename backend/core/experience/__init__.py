@@ -12,6 +12,7 @@ from .models import ExperienceRecord, InteractionType, ExperienceSignals, Experi
 from .extractor import ExperienceExtractor
 from .store import ExperienceStore
 from .experience import capture_experience, get_extractor, get_store
+from .listener import setup_experience_listener
 
 __all__ = [
     "ExperienceRecord",
@@ -23,4 +24,5 @@ __all__ = [
     "capture_experience",
     "get_extractor",
     "get_store",
+    "setup_experience_listener",
 ]

@@ -236,44 +236,31 @@ class LLMService:
             "X-Title": "PAD+ AI",
         }
 
-        import json as _json
-        raw_request_body = _json.dumps(body, ensure_ascii=True).encode("utf-8")
-
-        # httpx может упасть с UnicodeEncodeError при чтении ответа.
-        # Используем прямой http.client, чтобы гарантировать бинарную обработку.
-        import urllib.request
-        import ssl
-
-        _req = urllib.request.Request(
-            f"{base_url}/chat/completions",
-            data=raw_request_body,
-            headers=headers,
-            method="POST",
-        )
         try:
-            _ctx = ssl.create_default_context()
-            _resp = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: urllib.request.urlopen(_req, context=_ctx, timeout=self._timeout)
+            _resp = await self._session.post(
+                f"{base_url}/chat/completions",
+                json=body,
+                headers=headers,
+                timeout=self._timeout,
             )
-            _raw = _resp.read()
-            _status = _resp.status
-            _resp.close()
+            _status = _resp.status_code
+            _raw = await _resp.aread()
+        except httpx.TimeoutException as _e:
+            raise ValueError(f"OpenRouter timeout: {_e}")
         except Exception as _e:
             _err_str = str(_e)
             raise ValueError(f"OpenRouter HTTP error: {_err_str[:500]}")
-        response = _raw  # теперь response = raw bytes
+        response = _raw
         status_code = _status
 
-        if isinstance(status_code, int) and status_code != 200:
+        if status_code != 200:
             try:
                 raw = response.decode("utf-8", errors="replace")[:500]
             except Exception:
                 raw = ""
-            error_text = raw.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
-            logger.error(f"HTTP error {status_code}: {error_text}")
-            raise ValueError(f"Ошибка API: {status_code} - {error_text}")
+            logger.error(f"HTTP error {status_code}: {raw}")
+            raise ValueError(f"Ошибка API: {status_code} - {raw}")
 
-        # response уже raw bytes (не httpx.Response), декодируем напрямую
         try:
             raw_text = response.decode("utf-8", errors="replace")
         except Exception:
@@ -330,6 +317,77 @@ class LLMService:
             finish_reason=result.get("finish_reason"),
             metadata={"raw_response": result.get("raw_response", {})},
         )
+
+    async def get_embeddings(
+        self,
+        texts: List[str],
+        api_key: Optional[str] = None,
+        model: str = "text-embedding-3-small",
+    ) -> List[List[float]]:
+        """
+        Получает эмбеддинги для списка текстов через OpenRouter embeddings API.
+
+        Args:
+            texts: Список текстов для векторизации
+            api_key: API ключ OpenRouter
+            model: Модель эмбеддингов (по умолчанию text-embedding-3-small)
+
+        Returns:
+            Список векторов (каждый вектор — список float)
+        """
+        key = api_key or self.default_api_key
+        if not key:
+            raise ValueError("API ключ не настроен для получения эмбеддингов.")
+
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        }
+
+        body = {
+            "model": model,
+            "input": texts,
+        }
+
+        for attempt in range(3):
+            try:
+                _resp = await self._session.post(
+                    f"{OPENROUTER_BASE}/embeddings",
+                    json=body,
+                    headers=headers,
+                    timeout=self._timeout,
+                )
+                _status = _resp.status_code
+                _raw = await _resp.aread()
+            except httpx.TimeoutException:
+                if attempt < 2:
+                    await asyncio.sleep(1)
+                    continue
+                raise ValueError(f"OpenRouter embeddings timeout после {attempt+1} попыток")
+            except Exception as _e:
+                if attempt < 2:
+                    await asyncio.sleep(1)
+                    continue
+                raise ValueError(f"OpenRouter embeddings error: {str(_e)[:500]}")
+
+            if _status != 200:
+                raw_text = _raw.decode("utf-8", errors="replace")[:500]
+                if attempt < 2:
+                    await asyncio.sleep(2)
+                    continue
+                raise ValueError(f"OpenRouter embeddings HTTP {_status}: {raw_text}")
+
+            try:
+                data = json.loads(_raw.decode("utf-8", errors="replace"))
+            except Exception as _e:
+                raise ValueError(f"OpenRouter embeddings: не удалось прочитать ответ: {_e}")
+
+            embeddings = []
+            for item in data.get("data", []):
+                embeddings.append(item.get("embedding", []))
+            return embeddings
+
+        raise ValueError("OpenRouter embeddings: все попытки исчерпаны")
 
     def _resolve_gigachat_model(self, model_name: str) -> str:
         """

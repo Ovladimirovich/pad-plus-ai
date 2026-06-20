@@ -20,10 +20,17 @@ import logging
 import json
 import os
 
-from .episodic import get_episodic_memory, Episode
-from .semantic import get_semantic_memory, SemanticMemory, KnowledgeType
+import os as _os
+
+if _os.environ.get("DATABASE_URL", "").startswith("postgresql") or _os.environ.get("SUPABASE_URL"):
+    from .episodic_postgres import get_episodic_memory, Episode
+    from .semantic_postgres import get_semantic_memory, KnowledgeType
+    from .rag_postgres import get_rag as get_rag_memory
+else:
+    from .episodic import get_episodic_memory, Episode
+    from .semantic import get_semantic_memory, SemanticMemory, KnowledgeType
+    from .rag import get_rag as get_rag_memory
 from .roots import get_roots_memory
-from .rag import get_rag as get_rag_memory
 
 logger = logging.getLogger("PAD+.consolidation")
 

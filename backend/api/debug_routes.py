@@ -77,7 +77,7 @@ async def debug_gigachat():
     result["steps"].append(env_check)
 
     # === ШАГ 2: Проверка URL ===
-    from runtime.llm_service import GIGACHAT_AUTH_URL, GIGACHAT_API_URL
+    from adapters.gigachat_client import GIGACHAT_AUTH_URL, GIGACHAT_API_URL
 
     url_check = {
         "name": "URL конфигурация",

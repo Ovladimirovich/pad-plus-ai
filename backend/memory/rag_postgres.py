@@ -182,6 +182,35 @@ def summarize_text_simple(text: str, max_length: int = 200) -> str:
     return shortened + ' [...]'
 
 
+def calculate_keyword_score(query_keywords: List[str], doc_keywords: List[str]) -> float:
+    if not query_keywords or not doc_keywords:
+        return 0.0
+    query_set = set(query_keywords)
+    doc_set = set(doc_keywords)
+    intersection = len(query_set & doc_set)
+    union = len(query_set | doc_set)
+    if union == 0:
+        return 0.0
+    return intersection / union
+
+
+def calculate_recency_score(timestamp: str, now: datetime = None) -> float:
+    if not timestamp:
+        return 0.5
+    try:
+        doc_time = datetime.fromisoformat(timestamp)
+        now = now or datetime.now()
+        age_days = (now - doc_time).days
+        score = math.exp(-age_days / 7.0)
+        return max(0.1, min(1.0, score))
+    except Exception:
+        return 0.5
+
+
+def summarize_text_sync(text: str, max_length: int = 200) -> str:
+    return summarize_text_simple(text, max_length)
+
+
 class RAGMemory:
     """
     🧠 RAG Memory v3.0 — продвинутая семантическая память (PostgreSQL)
@@ -413,6 +442,87 @@ class RAGMemory:
         context_parts.append("\nИспользуй этот контекст для ответа.\n")
         return "\n".join(context_parts)
     
+    def search_by_topic(self, topic: str, n_results: int = 5) -> List[Dict[str, Any]]:
+        return self.hybrid_search("", n_results=n_results, topic_filter=topic)
+
+    def search_by_keywords(self, keywords: List[str], n_results: int = CONTEXT_WINDOW) -> List[Dict[str, Any]]:
+        if not keywords:
+            return []
+        query = " ".join(keywords)
+        return self.hybrid_search(query, n_results, use_keywords=True, use_recency=False)
+
+    def get_recent(self, days: int = 7, n_results: int = 10) -> List[Dict[str, Any]]:
+        try:
+            cutoff = datetime.now() - timedelta(days=days)
+            self.cursor.execute(
+                "SELECT id, user_message, ai_response, metadata, created_at FROM rag_dialogs WHERE created_at >= %s ORDER BY created_at DESC LIMIT %s",
+                (cutoff, n_results),
+            )
+            rows = self.cursor.fetchall()
+            recent = []
+            now = datetime.now()
+            for row in rows:
+                doc_id = row[0]
+                user_message = row[1]
+                ai_response = row[2]
+                meta = row[3] if isinstance(row[3], dict) else json.loads(row[3]) if row[3] else {}
+                created_at = row[4].isoformat() if row[4] else datetime.now().isoformat()
+                try:
+                    doc_time = datetime.fromisoformat(created_at)
+                    age_hours = (now - doc_time).total_seconds() / 3600
+                    recent.append({
+                        "id": doc_id,
+                        "document": f"Вопрос: {user_message}\nОтвет: {ai_response}",
+                        "metadata": meta,
+                        "timestamp": created_at,
+                        "topic": meta.get('topic', 'общее'),
+                        "age_hours": round(age_hours, 1),
+                    })
+                except Exception:
+                    continue
+            return recent
+        except Exception as e:
+            logger.error(f"Ошибка получения недавних диалогов: {e}")
+            return []
+
+    def get_topic_stats(self) -> Dict[str, int]:
+        try:
+            self.cursor.execute("SELECT topic, COUNT(*) FROM rag_dialogs GROUP BY topic ORDER BY count DESC")
+            return {row[0]: row[1] for row in self.cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"Ошибка статистики по темам: {e}")
+            return {}
+
+    def get_entity_index(self) -> Dict[str, List[str]]:
+        try:
+            self.cursor.execute("SELECT id, entities FROM rag_dialogs WHERE entities IS NOT NULL AND entities != '[]'::jsonb")
+            rows = self.cursor.fetchall()
+            entity_index = {}
+            for row in rows:
+                doc_id = row[0]
+                entities_json = row[1]
+                try:
+                    entities = json.loads(entities_json) if isinstance(entities_json, str) else entities_json
+                    for entity in entities:
+                        value = entity.get('value', '')
+                        if value:
+                            entity_index.setdefault(value, []).append(doc_id)
+                except Exception:
+                    continue
+            return entity_index
+        except Exception as e:
+            logger.error(f"Ошибка индекса сущностей: {e}")
+            return {}
+
+    def clear(self):
+        try:
+            self.cursor.execute("TRUNCATE TABLE rag_dialogs RESTART IDENTITY")
+            self.conn.commit()
+            self._keywords_cache.clear()
+            logger.info("RAG Memory очищена")
+        except Exception as e:
+            logger.error(f"Ошибка очистки RAG: {e}")
+
     def get_stats(self) -> Dict[str, Any]:
         """Расширенная статистика RAG"""
         self.cursor.execute("SELECT COUNT(*) FROM rag_dialogs")

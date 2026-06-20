@@ -12,7 +12,7 @@ async def test_episodic_with_similar():
     mock_ep.user_message = "Hello, how are you?"
     mock_ep.ai_response = "Hello! I'm fine!"
 
-    with patch("memory.episodic.get_episodic_memory") as mock_get:
+    with patch("memory.get_episodic_memory") as mock_get:
         mock_mem = MagicMock()
         mock_mem.search_episodes.return_value = [mock_ep]
         mock_get.return_value = mock_mem
@@ -23,12 +23,12 @@ async def test_episodic_with_similar():
 
     assert result.success
     assert result.data["count"] == 1
-    assert "greeting" in result.data["context"]
+    assert "greeting" in result.data["episodic_context"]
 
 
 @pytest.mark.asyncio
 async def test_episodic_no_similar():
-    with patch("memory.episodic.get_episodic_memory") as mock_get:
+    with patch("memory.get_episodic_memory") as mock_get:
         mock_mem = MagicMock()
         mock_mem.search_episodes.return_value = None
         mock_get.return_value = mock_mem
@@ -38,13 +38,13 @@ async def test_episodic_no_similar():
         result = await phase.execute(ctx)
 
     assert result.success
-    assert result.data["context"] == ""
+    assert result.data["episodic_context"] == ""
     assert result.data["count"] == 0
 
 
 @pytest.mark.asyncio
 async def test_episodic_fallback():
-    with patch("memory.episodic.get_episodic_memory") as mock_get:
+    with patch("memory.get_episodic_memory") as mock_get:
         mock_get.side_effect = Exception("episodic unavailable")
 
         phase = EpisodicPhase()
@@ -52,4 +52,4 @@ async def test_episodic_fallback():
         result = await phase.execute(ctx)
 
     assert result.success
-    assert result.data["context"] == ""
+    assert result.data["episodic_context"] == ""

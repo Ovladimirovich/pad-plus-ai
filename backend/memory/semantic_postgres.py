@@ -11,6 +11,7 @@ from typing import Optional, List, Dict, Any
 from enum import Enum
 import json
 import logging
+import os
 import uuid
 
 logger = logging.getLogger("PAD+.semantic_pg")
@@ -136,22 +137,39 @@ class SemanticMemory:
 
     def __init__(self):
         self._conn = None
+        self._procedures_cache: Dict[str, SemanticKnowledge] = {}
         self._ensure_tables()
+        self._load_procedures_cache()
         logger.info("✅ SemanticMemory PostgreSQL инициализирована")
 
     def _get_conn(self):
         """Получает соединение с PostgreSQL"""
         from core.config_manager import get_database_url
-        if self._conn is None or self._conn.closed:
-            db_url = get_database_url()
-            if db_url and db_url.startswith("postgresql"):
-                self._conn = psycopg2.connect(db_url)
+        try:
+            if self._conn is not None and not self._conn.closed:
+                self._conn.cursor().execute("SELECT 1")
+                return self._conn
+        except Exception:
+            self._conn = None
+        db_url = get_database_url()
+        if db_url and db_url.startswith("postgresql"):
+            self._conn = psycopg2.connect(
+                db_url,
+                keepalives=1, keepalives_idle=30,
+                keepalives_interval=10, keepalives_count=5,
+                connect_timeout=5,
+            )
+        else:
+            env_url = os.environ.get("DATABASE_URL")
+            if env_url and env_url.startswith("postgresql"):
+                self._conn = psycopg2.connect(
+                    env_url,
+                    keepalives=1, keepalives_idle=30,
+                    keepalives_interval=10, keepalives_count=5,
+                    connect_timeout=5,
+                )
             else:
-                env_url = os.environ.get("DATABASE_URL")
-                if env_url and env_url.startswith("postgresql"):
-                    self._conn = psycopg2.connect(env_url)
-                else:
-                    raise RuntimeError("Нет PostgreSQL подключения для SemanticMemory")
+                raise RuntimeError("Нет PostgreSQL подключения для SemanticMemory")
         return self._conn
 
     def _ensure_tables(self):
@@ -528,6 +546,156 @@ class SemanticMemory:
             }
             for row in rows
         ]
+
+    # === Процедурные знания ===
+
+    def _load_procedures_cache(self):
+        """Загружает кэш процедур из PostgreSQL."""
+        self._procedures_cache: Dict[str, SemanticKnowledge] = {}
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT * FROM semantic_knowledge WHERE knowledge_type = %s",
+                (KnowledgeType.PROCEDURAL.value,),
+            )
+            for row in cur.fetchall():
+                k = self._row_to_knowledge(row)
+                self._procedures_cache[k.id] = k
+            cur.close()
+            logger.debug(f"Загружено {len(self._procedures_cache)} процедур в кэш")
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить кэш процедур: {e}")
+            self._procedures_cache = {}
+
+    def learn_procedure(
+        self,
+        name: str,
+        steps: List[str],
+        triggers: List[str],
+        domain: str = "general",
+        confidence: float = 0.5,
+    ) -> SemanticKnowledge:
+        knowledge = self.add_knowledge(
+            content=name,
+            knowledge_type=KnowledgeType.PROCEDURAL,
+            summary=f"Процедура: {name}",
+            procedure_steps=steps,
+            triggers=triggers,
+            domain=domain,
+            confidence=confidence,
+            source="learned",
+        )
+        self._procedures_cache[knowledge.id] = knowledge
+        return knowledge
+
+    def find_applicable_procedure(self, context: str) -> Optional[SemanticKnowledge]:
+        context_lower = context.lower()
+        best_match = None
+        best_score = 0
+        for proc in self._procedures_cache.values():
+            for trigger in proc.triggers:
+                if trigger.lower() in context_lower:
+                    score = proc.success_rate * proc.confidence
+                    if score > best_score:
+                        best_score = score
+                        best_match = proc
+        return best_match
+
+    def apply_procedure(
+        self,
+        procedure_id: str,
+        context: str,
+        success: bool = True,
+        feedback: str = None,
+    ) -> Dict[str, Any]:
+        procedure = self.get_knowledge(procedure_id)
+        if not procedure or procedure.knowledge_type != KnowledgeType.PROCEDURAL:
+            return {"error": "Procedure not found"}
+
+        self.record_procedure_application(procedure_id, context, success, feedback)
+
+        conn = self._get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT AVG(success::int) FROM procedure_applications WHERE procedure_id = %s",
+            (procedure_id,),
+        )
+        new_success_rate = cur.fetchone()[0] or 0.5
+        cur.execute(
+            "UPDATE semantic_knowledge SET success_rate = %s, access_count = access_count + 1, last_accessed = NOW() WHERE id = %s",
+            (new_success_rate, procedure_id),
+        )
+        conn.commit()
+        cur.close()
+
+        if procedure_id in self._procedures_cache:
+            self._procedures_cache[procedure_id].success_rate = new_success_rate
+            self._procedures_cache[procedure_id].access_count += 1
+
+        return {
+            "procedure_id": procedure_id,
+            "steps": procedure.procedure_steps,
+            "success_rate": new_success_rate,
+            "recorded": True,
+        }
+
+    def improve_procedure(
+        self,
+        procedure_id: str,
+        new_steps: List[str] = None,
+        new_triggers: List[str] = None,
+    ) -> Optional[SemanticKnowledge]:
+        procedure = self.get_knowledge(procedure_id)
+        if not procedure:
+            return None
+        if new_steps:
+            procedure.procedure_steps = new_steps
+        if new_triggers:
+            procedure.triggers = list(set(procedure.triggers + new_triggers))
+        procedure.last_modified = datetime.now(timezone.utc)
+        self._save_knowledge(procedure)
+        self._procedures_cache[procedure_id] = procedure
+        logger.info(f"🔧 Процедура улучшена: {procedure_id}")
+        return procedure
+
+    # === Концептуальные знания ===
+
+    def add_concept(
+        self,
+        name: str,
+        definition: str,
+        examples: List[str] = None,
+        related_concepts: List[str] = None,
+        domain: str = "general",
+    ) -> SemanticKnowledge:
+        return self.add_knowledge(
+            content=definition,
+            knowledge_type=KnowledgeType.CONCEPTUAL,
+            summary=f"Концепция: {name}",
+            examples=examples,
+            related_concepts=related_concepts,
+            domain=domain,
+            tags=[name],
+        )
+
+    # === Метакогнитивные знания ===
+
+    def add_self_knowledge(self, content: str, confidence: float = 0.5) -> SemanticKnowledge:
+        return self.add_knowledge(
+            content=content,
+            knowledge_type=KnowledgeType.METACOGNITIVE,
+            source="self_reflection",
+            confidence=confidence,
+        )
+
+    def get_self_knowledge(self) -> List[SemanticKnowledge]:
+        return self.search_knowledge(
+            knowledge_type=KnowledgeType.METACOGNITIVE.value,
+            limit=50,
+        )
+
+    # === Статистика ===
 
     def get_stats(self) -> Dict[str, Any]:
         """Статистика семантической памяти"""

@@ -21,7 +21,7 @@ async def test_persona_with_user():
         result = await phase.execute(ctx)
 
     assert result.success
-    assert result.data["context"] == "РєРѕРЅС‚РµРєСЃС‚ Р»РёС‡РЅРѕСЃС‚Рё"
+    assert result.data["persona_context"] == "РєРѕРЅС‚РµРєСЃС‚ Р»РёС‡РЅРѕСЃС‚Рё"
     assert result.data["user_id"] == "user_1"
     mock_persona.record_interaction.assert_called_once()
 
@@ -37,5 +37,5 @@ async def test_persona_without_user():
         result = await phase.execute(ctx)
 
     assert result.success
-    assert result.data["context"] == "РѕР±С‰Р°СЏ Р»РёС‡РЅРѕСЃС‚СЊ"
+    assert result.data["persona_context"] == "РѕР±С‰Р°СЏ Р»РёС‡РЅРѕСЃС‚СЊ"
     assert result.data["user_id"] is None

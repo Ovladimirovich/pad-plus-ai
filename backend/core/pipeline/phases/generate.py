@@ -1,6 +1,10 @@
+import logging
+
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+
+logger = logging.getLogger("padplus.pipeline.generate")
 
 
 class GeneratePhase(PipelinePhase):
@@ -10,7 +14,6 @@ class GeneratePhase(PipelinePhase):
         try:
             from runtime.llm_service import get_llm_service, LLMService
             from core.anti_directive import ANTI_DIRECTIVE
-            import os
 
             roots_context = ctx.context.get("roots_context", "")
             persona_context = ctx.context.get("persona_context", "")
@@ -71,36 +74,55 @@ class GeneratePhase(PipelinePhase):
                     },
                 )
 
-            from runtime.provider_manager import get_provider_manager
+            from runtime.provider_manager import get_provider_manager, AllProvidersFailedError
             pm = get_provider_manager()
-            gen_result = await pm.generate(
-                prompt=ctx.user_message,
-                system_prompt=full_context,
-                api_key=user_api_key,
-                model=None,
-                provider=user_provider,
-                max_tokens=14000,
-            )
+            try:
+                gen_result = await pm.generate(
+                    prompt=ctx.user_message,
+                    system_prompt=full_context,
+                    api_key=user_api_key,
+                    model=None,
+                    provider=user_provider,
+                    max_tokens=14000,
+                )
 
-            response_data = gen_result.response
+                response_data = gen_result.response
+                return PhaseResult(
+                    success=True,
+                    data={
+                        "response": response_data.text,
+                        "provider": response_data.provider,
+                        "confidence": response_data.confidence,
+                        "model": response_data.model,
+                        "raw_llm_response": response_data.metadata.get("raw_response") if response_data.metadata else None,
+                        "llm_metadata": response_data.metadata,
+                    },
+                )
+            except AllProvidersFailedError:
+                logger.warning("All providers failed, using fallback generator")
+                from core.fallback_generator import get_fallback_response
+                old_style = emotion_tone if emotion_tone in {"philosophical", "humorous", "serious", "curious", "empathetic", "minimalistic"} else "philosophical"
+                fallback = get_fallback_response(
+                    prompt=ctx.user_message,
+                    style=old_style,
+                    context={"emotion": emotion_tone, "topic": strategy},
+                )
+                return PhaseResult(
+                    success=True,
+                    data={
+                        "response": f"{fallback.content}\n\n_Извини, сейчас у меня временные трудности с подключением к AI. Я ответил как смог._",
+                        "provider": "fallback",
+                        "confidence": fallback.confidence,
+                        "model": "fallback_generator",
+                    },
+                )
+        except Exception as e:
+            logger.warning(f"GeneratePhase error: {e}", exc_info=True)
             return PhaseResult(
                 success=True,
                 data={
-                    "response": response_data.text,
-                    "provider": response_data.provider,
-                    "confidence": response_data.confidence,
-                    "model": response_data.model,
-                    "raw_llm_response": response_data.metadata.get("raw_response") if response_data.metadata else None,
-                    "llm_metadata": response_data.metadata,
-                },
-            )
-        except Exception as e:
-            return PhaseResult(
-                success=False,
-                errors=[f"Generate failed: {e}"],
-                data={
-                    "response": "",
-                    "provider": "",
+                    "response": "Извини, у меня сейчас технические трудности. Попробуй написать через минуту.",
+                    "provider": "system",
                     "confidence": 0.0,
                     "model": "",
                 },

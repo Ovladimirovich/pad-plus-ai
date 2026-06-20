@@ -19,8 +19,8 @@ async def test_emotion_success():
         result = await phase.execute(ctx)
 
     assert result.success
-    assert result.data["state"]["СѓРґРѕРІРѕР»СЊСЃС‚РІРёРµ"] == 0.7
-    assert result.data["style"]["tone"] == "warm"
+    assert result.data["emotion_state"]["СѓРґРѕРІРѕР»СЊСЃС‚РІРёРµ"] == 0.7
+    assert result.data["emotion_style"]["tone"] == "warm"
 
 
 async def test_emotion_fallback():
@@ -32,5 +32,5 @@ async def test_emotion_fallback():
         result = await phase.execute(ctx)
 
     assert result.success
-    assert result.data["state"] == {}
-    assert result.data["style"] == {}
+    assert result.data["emotion_state"] == {}
+    assert result.data["emotion_style"] == {}

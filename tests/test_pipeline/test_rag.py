@@ -5,7 +5,7 @@ from core.pipeline.phases.rag import RagPhase
 
 
 async def test_rag_with_context():
-    with patch("memory.rag.get_rag") as mock_get:
+    with patch("memory.get_rag") as mock_get:
         mock_rag = MagicMock()
         mock_rag.get_context.return_value = "СЂРµР»РµРІР°РЅС‚РЅС‹Р№ РєРѕРЅС‚РµРєСЃС‚"
         mock_get.return_value = mock_rag
@@ -17,11 +17,11 @@ async def test_rag_with_context():
     assert result.success
     assert result.data["rag_used"] is True
     assert result.data["sources"]["count"] == 1
-    assert result.data["context"] == "СЂРµР»РµРІР°РЅС‚РЅС‹Р№ РєРѕРЅС‚РµРєСЃС‚"
+    assert result.data["rag_context"] == "СЂРµР»РµРІР°РЅС‚РЅС‹Р№ РєРѕРЅС‚РµРєСЃС‚"
 
 
 async def test_rag_no_context():
-    with patch("memory.rag.get_rag") as mock_get:
+    with patch("memory.get_rag") as mock_get:
         mock_rag = MagicMock()
         mock_rag.get_context.return_value = None
         mock_get.return_value = mock_rag
@@ -32,11 +32,11 @@ async def test_rag_no_context():
 
     assert result.success
     assert result.data["rag_used"] is False
-    assert result.data["context"] == ""
+    assert result.data["rag_context"] == ""
 
 
 async def test_rag_fallback():
-    with patch("memory.rag.get_rag") as mock_get:
+    with patch("memory.get_rag") as mock_get:
         mock_get.side_effect = Exception("rag unavailable")
 
         phase = RagPhase()

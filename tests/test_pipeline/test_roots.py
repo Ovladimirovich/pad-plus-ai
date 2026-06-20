@@ -15,7 +15,7 @@ async def test_roots_success():
         result = await phase.execute(ctx)
 
     assert result.success
-    assert "РєРѕСЂРЅРµРІС‹Рµ РїСЂРёРЅС†РёРїС‹" in result.data["context"]
+    assert "РєРѕСЂРЅРµРІС‹Рµ РїСЂРёРЅС†РёРїС‹" in result.data["roots_context"]
 
 
 async def test_roots_fallback():
@@ -27,4 +27,4 @@ async def test_roots_fallback():
         result = await phase.execute(ctx)
 
     assert result.success
-    assert result.data["context"] == ""
+    assert result.data["roots_context"] == ""

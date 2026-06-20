@@ -265,17 +265,7 @@ class RootsMemory:
             except Exception as e:
                 logger.warning(f"PostgreSQL save roots failed: {e}")
         
-        # Fallback: файл
-        os.makedirs(os.path.dirname(self.data_path), exist_ok=True)
-        
-        data = {
-            "version": "1.0",
-            "updated": datetime.now().isoformat(),
-            "roots": [r.to_dict() for r in self._roots.values()]
-        }
-        
-        with open(self.data_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.debug(f"Roots saved to PostgreSQL")
     
     def get(self, root_id: str) -> Optional[RootKnowledge]:
         """Получает знание по ID"""

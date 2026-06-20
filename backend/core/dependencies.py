@@ -134,8 +134,7 @@ container = DependencyContainer()
 def register_dependencies() -> None:
     """Регистрирует все зависимости приложения"""
 
-    from memory import EpisodicMemory, SemanticMemory
-    from memory.rag import RAGMemory
+    from memory import EpisodicMemory, SemanticMemory, RAGMemory
     from memory.persona import PersonaMemory
     from memory.roots import RootsMemory
     from runtime.llm_service import LLMService

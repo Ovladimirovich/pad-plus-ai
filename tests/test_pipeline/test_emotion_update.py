@@ -11,8 +11,8 @@ async def test_emotion_update_success():
 
         phase = EmotionUpdatePhase()
         ctx = PipelineContext(
-            user_message="СЃРїР°СЃРёР±Рѕ",
-            context={"response": "Р’СЃРµРіРґР° РїРѕР¶Р°Р»СѓР№СЃС‚Р°!"},
+            user_message="расскажи подробнее про квантовую физику",
+            context={"response": "квантовая физика изучает микромир"},
         )
         result = await phase.execute(ctx)
 

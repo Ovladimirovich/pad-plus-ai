@@ -15,7 +15,7 @@ except Exception as e:
 
 print('=== RAG ===', flush=True)
 try:
-    from memory.rag import get_rag
+    from memory import get_rag
     rag = get_rag()
     print(f'OK: {rag.get_stats()}', flush=True)
 except Exception as e:

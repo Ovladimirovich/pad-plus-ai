@@ -8,7 +8,7 @@ async def test_save_episode_success():
     mock_episode = MagicMock()
     mock_episode.id = "ep_123"
 
-    with patch("memory.episodic.get_episodic_memory") as mock_get:
+    with patch("memory.get_episodic_memory") as mock_get:
         mock_mem = MagicMock()
         mock_mem.add_episode.return_value = mock_episode
         mock_get.return_value = mock_mem
@@ -32,7 +32,7 @@ async def test_save_episode_success():
 
 
 async def test_save_episode_fallback():
-    with patch("memory.episodic.get_episodic_memory") as mock_get:
+    with patch("memory.get_episodic_memory") as mock_get:
         mock_get.side_effect = Exception("episodic unavailable")
 
         phase = SaveEpisodePhase()
