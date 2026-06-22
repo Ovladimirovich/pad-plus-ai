@@ -422,8 +422,8 @@ class MetaLearner:
             "total_success": total_success,
             "overall_success_rate": round(total_success / max(1, total_decisions), 3),
             "strategies": self.get_all_stats(),
-            "best_strategy": self.get_best_strategy(),
-            "worst_strategy": self.get_worst_strategy(),
+            "best_strategy": self.get_best_strategy(min_samples=1),
+            "worst_strategy": self.get_worst_strategy(min_samples=1),
             "patterns": self.analyze_patterns()
         }
     
