@@ -52,6 +52,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         "/metrics",
         "/docs",
         "/api/v1/chat",
+        "/api/v1/debug/test-pool",
         "/openapi.json",
         "/redoc",
         "/ws",
