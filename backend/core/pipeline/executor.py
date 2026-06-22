@@ -576,6 +576,17 @@ class PipelineExecutor:
         except Exception as e:
             logger.warning(f"X-Ray session complete error: {e}")
 
+        # Meta-Learner: запись результата стратегии
+        try:
+            from core.xray import get_meta_learner
+            ml = get_meta_learner()
+            ml.record_outcome(result.strategy, {
+                "success": result.success,
+                "confidence": result.confidence if hasattr(result, "confidence") else 0.5,
+            })
+        except Exception as e:
+            logger.warning(f"MetaLearner record error: {e}")
+
         # Event Bus: публикация dialog_completed
         try:
             from core.events import get_events
