@@ -227,13 +227,19 @@ class MetaLearner:
         if not candidates:
             return None
         
-        # Возвращаем стратегию с highest success rate
-        best_strategy = max(candidates.items(), key=lambda x: x[1].success_rate)
+        # Лучшая: highest success_rate → при равенстве больше sample'ов → выше confidence
+        best_strategy = max(
+            candidates.items(),
+            key=lambda x: (x[1].success_rate, x[1].count, x[1].avg_confidence),
+        )
         return best_strategy[0]
     
     def get_worst_strategy(self, min_samples: int = None) -> Optional[str]:
         """
         Возвращает худшую стратегию по success rate
+        
+        При равенстве success_rate — меньше sample'ов (менее проверенная).
+        Это даёт адекватный результат когда все стратегии на 100%.
         
         Args:
             min_samples: минимальное количество примеров для учёта
@@ -254,8 +260,11 @@ class MetaLearner:
         if not candidates:
             return None
         
-        # Возвращаем стратегию с lowest success rate
-        worst_strategy = min(candidates.items(), key=lambda x: x[1].success_rate)
+        # Худшая: lowest success_rate → при равенстве меньше sample'ов
+        worst_strategy = min(
+            candidates.items(),
+            key=lambda x: (x[1].success_rate, x[1].count, x[1].avg_confidence),
+        )
         return worst_strategy[0]
     
     def should_adjust_strategy(self, current: str) -> Optional[str]:
