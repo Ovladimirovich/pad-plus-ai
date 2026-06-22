@@ -16,6 +16,8 @@ from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, asdict
 from collections import defaultdict, deque
 
+import os
+
 # Пытаемся импортировать psutil
 try:
     import psutil
@@ -76,20 +78,20 @@ class MonitoringSystem:
         self._connections_getter: Optional[Callable[[], int]] = None
         self._queue_size_getter: Optional[Callable[[], int]] = None
         
-        # Пороги для алертов
+        # Пороги для алертов (из .env или по умолчанию)
         self.thresholds = {
-            "cpu_critical": 90.0,
-            "cpu_warning": 70.0,
-            "memory_critical": 90.0,
-            "memory_warning": 70.0,
-            "disk_critical": 95.0,
-            "disk_warning": 80.0,
-            "response_time_critical": 5.0,  # seconds
-            "response_time_warning": 2.0,
-            "error_rate_critical": 0.1,  # 10%
-            "error_rate_warning": 0.05,  # 5%
-            "cache_hit_rate_critical": 0.3,  # 30%
-            "cache_hit_rate_warning": 0.5,  # 50%
+            "cpu_critical": float(os.getenv("MON_CPU_CRITICAL", "90.0")),
+            "cpu_warning": float(os.getenv("MON_CPU_WARNING", "70.0")),
+            "memory_critical": float(os.getenv("MON_MEM_CRITICAL", "90.0")),
+            "memory_warning": float(os.getenv("MON_MEM_WARNING", "70.0")),
+            "disk_critical": float(os.getenv("MON_DISK_CRITICAL", "95.0")),
+            "disk_warning": float(os.getenv("MON_DISK_WARNING", "80.0")),
+            "response_time_critical": float(os.getenv("MON_RESP_TIME_CRITICAL", "5.0")),
+            "response_time_warning": float(os.getenv("MON_RESP_TIME_WARNING", "2.0")),
+            "error_rate_critical": float(os.getenv("MON_ERROR_RATE_CRITICAL", "0.1")),
+            "error_rate_warning": float(os.getenv("MON_ERROR_RATE_WARNING", "0.05")),
+            "cache_hit_rate_critical": float(os.getenv("MON_CACHE_HIT_CRITICAL", "0.3")),
+            "cache_hit_rate_warning": float(os.getenv("MON_CACHE_HIT_WARNING", "0.5")),
         }
     
     def _load_alert_rules(self) -> Dict[str, Any]:
@@ -116,7 +118,7 @@ class MonitoringSystem:
                 "severity": "critical"
             },
             "cache_hit_rate_low": {
-                "condition": lambda m: m.cache_hit_rate < self.thresholds["cache_hit_rate_critical"],
+                "condition": lambda m: m.cache_hit_rate < self.thresholds["cache_hit_rate_critical"] and self._cache_total_lookups() >= 20,
                 "message": "Low cache hit rate detected",
                 "severity": "warning"
             }
@@ -231,6 +233,16 @@ class MonitoringSystem:
         if self._queue_size_getter:
             return self._queue_size_getter()
         return 0
+    
+    def _cache_total_lookups(self) -> int:
+        """Общее количество обращений к кэшу (для фильтрации ложных алертов)"""
+        try:
+            stats = self.cache_manager.get_stats()
+            mem = stats.get("memory", {})
+            redis = stats.get("redis", {})
+            return mem.get("hits", 0) + mem.get("misses", 0) + redis.get("hits", 0) + redis.get("misses", 0)
+        except Exception:
+            return 0
     
     async def _check_alerts(self):
         """Проверяет условия для алертов"""
