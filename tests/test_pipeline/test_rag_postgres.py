@@ -38,11 +38,17 @@ class TestRagFunctions:
 
 @pytest.fixture
 def mock_rag():
-    with patch("memory.rag_postgres.psycopg2.connect") as mock_conn:
+    with patch("memory.rag_postgres.RAGMemory._get_conn") as mock_get_conn, \
+         patch("memory.rag_postgres.RAGMemory._init_db") as mock_init:
         mock_cursor = MagicMock()
-        mock_conn.return_value.cursor.return_value = mock_cursor
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_conn.closed = False
+        mock_get_conn.return_value = mock_conn
         rag = RAGMemory()
         rag._keywords_cache = {}
+        rag._get_conn = lambda: mock_conn
+        rag._put_conn = lambda c: None
         yield rag
 
 
@@ -70,7 +76,8 @@ class TestRAGMemoryPostgres:
 
     def test_get_recent(self, mock_rag):
         rag = mock_rag
-        rag.cursor.fetchall.return_value = [
+        mock_cursor = rag._get_conn().cursor()
+        mock_cursor.fetchall.return_value = [
             ("id1", "user msg", "ai msg", json.dumps({"topic": "tech"}), datetime.now()),
         ]
         result = rag.get_recent(days=7, n_results=10)
@@ -80,19 +87,22 @@ class TestRAGMemoryPostgres:
 
     def test_get_recent_empty(self, mock_rag):
         rag = mock_rag
-        rag.cursor.fetchall.return_value = []
+        mock_cursor = rag._get_conn().cursor()
+        mock_cursor.fetchall.return_value = []
         result = rag.get_recent()
         assert result == []
 
     def test_get_topic_stats(self, mock_rag):
         rag = mock_rag
-        rag.cursor.fetchall.return_value = [("tech", 10), ("science", 5)]
+        mock_cursor = rag._get_conn().cursor()
+        mock_cursor.fetchall.return_value = [("tech", 10), ("science", 5)]
         result = rag.get_topic_stats()
         assert result == {"tech": 10, "science": 5}
 
     def test_get_entity_index(self, mock_rag):
         rag = mock_rag
-        rag.cursor.fetchall.return_value = [
+        mock_cursor = rag._get_conn().cursor()
+        mock_cursor.fetchall.return_value = [
             ("id1", json.dumps([{"value": "Python"}, {"value": "AI"}])),
             ("id2", json.dumps([{"value": "Python"}])),
         ]
@@ -104,5 +114,6 @@ class TestRAGMemoryPostgres:
 
     def test_clear(self, mock_rag):
         rag = mock_rag
+        mock_cursor = rag._get_conn().cursor()
         rag.clear()
-        rag.cursor.execute.assert_called_with("TRUNCATE TABLE rag_dialogs RESTART IDENTITY")
+        mock_cursor.execute.assert_called_with("TRUNCATE TABLE rag_dialogs RESTART IDENTITY")

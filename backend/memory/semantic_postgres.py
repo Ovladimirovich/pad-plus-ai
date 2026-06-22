@@ -136,41 +136,24 @@ class SemanticMemory:
     """
 
     def __init__(self):
-        self._conn = None
         self._procedures_cache: Dict[str, SemanticKnowledge] = {}
         self._ensure_tables()
         self._load_procedures_cache()
         logger.info("✅ SemanticMemory PostgreSQL инициализирована")
 
     def _get_conn(self):
-        """Получает соединение с PostgreSQL"""
-        from core.config_manager import get_database_url
-        try:
-            if self._conn is not None and not self._conn.closed:
-                self._conn.cursor().execute("SELECT 1")
-                return self._conn
-        except Exception:
-            self._conn = None
-        db_url = get_database_url()
-        if db_url and db_url.startswith("postgresql"):
-            self._conn = psycopg2.connect(
-                db_url,
-                keepalives=1, keepalives_idle=30,
-                keepalives_interval=10, keepalives_count=5,
-                connect_timeout=5,
-            )
-        else:
-            env_url = os.environ.get("DATABASE_URL")
-            if env_url and env_url.startswith("postgresql"):
-                self._conn = psycopg2.connect(
-                    env_url,
-                    keepalives=1, keepalives_idle=30,
-                    keepalives_interval=10, keepalives_count=5,
-                    connect_timeout=5,
-                )
-            else:
-                raise RuntimeError("Нет PostgreSQL подключения для SemanticMemory")
-        return self._conn
+        """Получает соединение из пула."""
+        from core.pg_pool import get_connection
+        return get_connection()
+
+    def _put_conn(self, conn):
+        """Возвращает соединение в пул."""
+        from core.pg_pool import put_connection
+        if conn is not None:
+            try:
+                put_connection(conn)
+            except Exception:
+                pass
 
     def _ensure_tables(self):
         """Создаёт таблицы, если их нет"""
@@ -229,6 +212,7 @@ class SemanticMemory:
             raise
         finally:
             cur.close()
+            self._put_conn(conn)
 
     def add_knowledge(
         self,
@@ -324,6 +308,7 @@ class SemanticMemory:
         ))
         conn.commit()
         cur.close()
+        self._put_conn(conn)
 
     def get_knowledge(self, knowledge_id: str) -> Optional[SemanticKnowledge]:
         """Получает знание по ID"""
@@ -333,6 +318,7 @@ class SemanticMemory:
         cur.execute("SELECT * FROM semantic_knowledge WHERE id = %s", (knowledge_id,))
         row = cur.fetchone()
         cur.close()
+        self._put_conn(conn)
 
         if row:
             return self._row_to_knowledge(row)
@@ -406,6 +392,7 @@ class SemanticMemory:
         cur.execute(sql, params)
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
 
         knowledge_list = [self._row_to_knowledge(row) for row in rows]
 
@@ -431,6 +418,7 @@ class SemanticMemory:
 
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
         return [self._row_to_knowledge(row) for row in rows]
 
     def get_high_confidence(self, min_confidence: float = 0.8, limit: int = 20) -> List[SemanticKnowledge]:
@@ -447,6 +435,7 @@ class SemanticMemory:
 
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
         return [self._row_to_knowledge(row) for row in rows]
 
     def get_recent(self, days: int = 7, limit: int = 20) -> List[SemanticKnowledge]:
@@ -466,6 +455,7 @@ class SemanticMemory:
 
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
         return [self._row_to_knowledge(row) for row in rows]
 
     def get_frequently_accessed(self, min_accesses: int = 3, limit: int = 20) -> List[SemanticKnowledge]:
@@ -482,6 +472,7 @@ class SemanticMemory:
 
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
         return [self._row_to_knowledge(row) for row in rows]
 
     def record_procedure_application(
@@ -517,6 +508,7 @@ class SemanticMemory:
 
         conn.commit()
         cur.close()
+        self._put_conn(conn)
 
         logger.info(f"🔧 Процедура применена: {procedure_id} ({'успешно' if success else 'неудачно'})")
 
@@ -534,6 +526,7 @@ class SemanticMemory:
 
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
 
         return [
             {
@@ -552,8 +545,8 @@ class SemanticMemory:
     def _load_procedures_cache(self):
         """Загружает кэш процедур из PostgreSQL."""
         self._procedures_cache: Dict[str, SemanticKnowledge] = {}
+        conn = self._get_conn()
         try:
-            conn = self._get_conn()
             cur = conn.cursor()
             cur.execute(
                 "SELECT * FROM semantic_knowledge WHERE knowledge_type = %s",
@@ -567,6 +560,8 @@ class SemanticMemory:
         except Exception as e:
             logger.warning(f"Не удалось загрузить кэш процедур: {e}")
             self._procedures_cache = {}
+        finally:
+            self._put_conn(conn)
 
     def learn_procedure(
         self,
@@ -628,6 +623,7 @@ class SemanticMemory:
         )
         conn.commit()
         cur.close()
+        self._put_conn(conn)
 
         if procedure_id in self._procedures_cache:
             self._procedures_cache[procedure_id].success_rate = new_success_rate
@@ -736,6 +732,7 @@ class SemanticMemory:
         most_accessed = cur.fetchall()
 
         cur.close()
+        self._put_conn(conn)
 
         return {
             "total_knowledge": total,
@@ -759,13 +756,12 @@ class SemanticMemory:
         cur.execute("DELETE FROM procedure_applications")
         conn.commit()
         cur.close()
+        self._put_conn(conn)
 
         logger.info("🗑️ SemanticMemory PostgreSQL очищена")
 
     def close(self):
-        """Закрывает соединение"""
-        if self._conn and not self._conn.closed:
-            self._conn.close()
+        """Пул управляет соединениями — ничего не делаем."""
 
 
 # Глобальный экземпляр

@@ -3,7 +3,7 @@ from datetime import datetime
 import logging
 
 from memory.user_persona import UserPersona
-from core.supabase_client import get_supabase
+from core.supabase_client import get_supabase, get_supabase_service
 
 logger = logging.getLogger("PAD+.user_persona_postgres")
 
@@ -46,7 +46,7 @@ class UserPersonaPostgresManager:
 
     def _upsert_db(self, persona: UserPersona) -> None:
         try:
-            client = get_supabase()
+            client = get_supabase_service() or get_supabase()
             if client is None:
                 logger.warning("Supabase клиент недоступен, сохранение в кэш")
                 return

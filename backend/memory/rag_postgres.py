@@ -220,27 +220,39 @@ class RAGMemory:
         if not postgres_available or psycopg2 is None:
             raise RuntimeError("❌ PostgreSQL не доступен! Установите psycopg2-binary")
         
-        db_url = os.getenv("DATABASE_URL")
-        if not db_url:
+        if not os.getenv("DATABASE_URL"):
             raise RuntimeError("❌ DATABASE_URL не настроен! Добавьте в .env")
         
         logger.info(f"📁 Инициализация RAG Memory v3.0 (PostgreSQL)")
         
         self.use_llm_summarization = use_llm_summarization
+        self._keywords_cache: Dict[str, List[str]] = {}
         
+        self._init_db()
+
+    def _get_conn(self):
+        from core.pg_pool import get_connection
+        return get_connection()
+
+    def _put_conn(self, conn):
+        from core.pg_pool import put_connection
+        if conn is not None:
+            put_connection(conn)
+
+    def _init_db(self):
+        """Создаёт таблицы RAG, если их нет."""
+        conn = self._get_conn()
         try:
-            self.conn = psycopg2.connect(db_url)
-            self.cursor = self.conn.cursor()
+            cur = conn.cursor()
             
             # Проверка расширения vector
-            self.cursor.execute("""
+            cur.execute("""
                 SELECT EXISTS (SELECT FROM pg_extension WHERE extname = 'vector')
             """)
-            if not self.cursor.fetchone()[0]:
+            if not cur.fetchone()[0]:
                 raise RuntimeError("❌ pgvector расширение не найдено! Выполните: CREATE EXTENSION vector;")
             
-            # Создание таблицы
-            self.cursor.execute("""
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS rag_dialogs (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     user_message TEXT NOT NULL,
@@ -258,14 +270,14 @@ class RAGMemory:
                 )
             """)
             
-            self.conn.commit()
+            conn.commit()
+            cur.close()
             logger.info("✅ RAG Memory PostgreSQL инициализирован")
-            
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации PostgreSQL: {e}")
             raise
-        
-        self._keywords_cache: Dict[str, List[str]] = {}
+        finally:
+            self._put_conn(conn)
     
     def add_dialog(
         self,
@@ -303,22 +315,27 @@ class RAGMemory:
             "user_id": user_id
         })
         
-        self.cursor.execute("""
-            INSERT INTO rag_dialogs 
-            (id, user_message, ai_response, summary, keywords, topic, topic_confidence, 
-             sentiment, entities, relations, metadata, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            doc_id, user_message, ai_response,
-            f"{user_summary}\n{ai_summary}",
-            keywords, topic_info["primary_topic"], topic_info["confidence"],
-            topic_info["sentiment"],
-            json.dumps(entities, ensure_ascii=False),
-            json.dumps(relations, ensure_ascii=False),
-            Json(meta), user_id
-        ))
-        
-        self.conn.commit()
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO rag_dialogs 
+                (id, user_message, ai_response, summary, keywords, topic, topic_confidence, 
+                 sentiment, entities, relations, metadata, user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                doc_id, user_message, ai_response,
+                f"{user_summary}\n{ai_summary}",
+                keywords, topic_info["primary_topic"], topic_info["confidence"],
+                topic_info["sentiment"],
+                json.dumps(entities, ensure_ascii=False),
+                json.dumps(relations, ensure_ascii=False),
+                Json(meta), user_id
+            ))
+            conn.commit()
+            cur.close()
+        finally:
+            self._put_conn(conn)
         
         logger.info(f"📝 Диалог добавлен: {doc_id[:8]}... (тема: {topic_info['primary_topic']})")
         return doc_id
@@ -348,16 +365,21 @@ class RAGMemory:
         query_keywords = extract_keywords(query) if use_keywords else []
         now = datetime.now(timezone.utc)
         
-        self.cursor.execute(f"""
-            SELECT id, user_message, ai_response, summary, keywords, topic, 
-                   topic_confidence, sentiment, entities, relations, metadata, created_at
-            FROM rag_dialogs
-            WHERE TRUE {filter_clause}
-            ORDER BY created_at DESC
-            LIMIT %s
-        """, params + [n_results * 3])
-        
-        rows = self.cursor.fetchall()
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute(f"""
+                SELECT id, user_message, ai_response, summary, keywords, topic, 
+                       topic_confidence, sentiment, entities, relations, metadata, created_at
+                FROM rag_dialogs
+                WHERE TRUE {filter_clause}
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, params + [n_results * 3])
+            rows = cur.fetchall()
+            cur.close()
+        finally:
+            self._put_conn(conn)
         
         ranked_results = []
         for row in rows:
@@ -454,11 +476,17 @@ class RAGMemory:
     def get_recent(self, days: int = 7, n_results: int = 10) -> List[Dict[str, Any]]:
         try:
             cutoff = datetime.now() - timedelta(days=days)
-            self.cursor.execute(
-                "SELECT id, user_message, ai_response, metadata, created_at FROM rag_dialogs WHERE created_at >= %s ORDER BY created_at DESC LIMIT %s",
-                (cutoff, n_results),
-            )
-            rows = self.cursor.fetchall()
+            conn = self._get_conn()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id, user_message, ai_response, metadata, created_at FROM rag_dialogs WHERE created_at >= %s ORDER BY created_at DESC LIMIT %s",
+                    (cutoff, n_results),
+                )
+                rows = cur.fetchall()
+                cur.close()
+            finally:
+                self._put_conn(conn)
             recent = []
             now = datetime.now()
             for row in rows:
@@ -487,16 +515,29 @@ class RAGMemory:
 
     def get_topic_stats(self) -> Dict[str, int]:
         try:
-            self.cursor.execute("SELECT topic, COUNT(*) FROM rag_dialogs GROUP BY topic ORDER BY count DESC")
-            return {row[0]: row[1] for row in self.cursor.fetchall()}
+            conn = self._get_conn()
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT topic, COUNT(*) FROM rag_dialogs GROUP BY topic ORDER BY count DESC")
+                result = {row[0]: row[1] for row in cur.fetchall()}
+                cur.close()
+            finally:
+                self._put_conn(conn)
+            return result
         except Exception as e:
             logger.error(f"Ошибка статистики по темам: {e}")
             return {}
 
     def get_entity_index(self) -> Dict[str, List[str]]:
         try:
-            self.cursor.execute("SELECT id, entities FROM rag_dialogs WHERE entities IS NOT NULL AND entities != '[]'::jsonb")
-            rows = self.cursor.fetchall()
+            conn = self._get_conn()
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT id, entities FROM rag_dialogs WHERE entities IS NOT NULL AND entities != '[]'::jsonb")
+                rows = cur.fetchall()
+                cur.close()
+            finally:
+                self._put_conn(conn)
             entity_index = {}
             for row in rows:
                 doc_id = row[0]
@@ -516,8 +557,14 @@ class RAGMemory:
 
     def clear(self):
         try:
-            self.cursor.execute("TRUNCATE TABLE rag_dialogs RESTART IDENTITY")
-            self.conn.commit()
+            conn = self._get_conn()
+            try:
+                cur = conn.cursor()
+                cur.execute("TRUNCATE TABLE rag_dialogs RESTART IDENTITY")
+                conn.commit()
+                cur.close()
+            finally:
+                self._put_conn(conn)
             self._keywords_cache.clear()
             logger.info("RAG Memory очищена")
         except Exception as e:
@@ -525,18 +572,25 @@ class RAGMemory:
 
     def get_stats(self) -> Dict[str, Any]:
         """Расширенная статистика RAG"""
-        self.cursor.execute("SELECT COUNT(*) FROM rag_dialogs")
-        total = self.cursor.fetchone()[0]
-        
-        self.cursor.execute("""
-            SELECT topic, COUNT(*) FROM rag_dialogs GROUP BY topic
-        """)
-        topic_counts = {row[0]: row[1] for row in self.cursor.fetchall()}
-        
-        self.cursor.execute("""
-            SELECT sentiment, COUNT(*) FROM rag_dialogs GROUP BY sentiment
-        """)
-        sentiment_counts = {row[0]: row[1] for row in self.cursor.fetchall()}
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM rag_dialogs")
+            total = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT topic, COUNT(*) FROM rag_dialogs GROUP BY topic
+            """)
+            topic_counts = {row[0]: row[1] for row in cur.fetchall()}
+            
+            cur.execute("""
+                SELECT sentiment, COUNT(*) FROM rag_dialogs GROUP BY sentiment
+            """)
+            sentiment_counts = {row[0]: row[1] for row in cur.fetchall()}
+            
+            cur.close()
+        finally:
+            self._put_conn(conn)
         
         return {
             "total_dialogs": total,
@@ -547,10 +601,7 @@ class RAGMemory:
         }
     
     def close(self):
-        """Закрытие соединения"""
-        if hasattr(self, 'conn'):
-            self.conn.close()
-            logger.info("✅ PostgreSQL соединение закрыто")
+        """Пул управляет соединениями — ничего не делаем."""
     
     def __del__(self):
         try:

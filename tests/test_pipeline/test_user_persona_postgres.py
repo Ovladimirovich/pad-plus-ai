@@ -8,7 +8,8 @@ from memory.user_persona_postgres import UserPersonaPostgresManager
 
 @pytest.fixture
 def mock_supabase():
-    with patch("memory.user_persona_postgres.get_supabase") as mock_get:
+    with patch("memory.user_persona_postgres.get_supabase") as mock_get, \
+         patch("memory.user_persona_postgres.get_supabase_service", return_value=None):
         mock_client = MagicMock()
         mock_client.table.return_value.select.return_value.execute.return_value.data = []
         mock_get.return_value = mock_client

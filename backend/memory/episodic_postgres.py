@@ -141,41 +141,22 @@ class EpisodicMemory:
     """
 
     def __init__(self):
-        self._conn = None
         self._ensure_tables()
         logger.info("✅ EpisodicMemory PostgreSQL инициализирована")
 
     def _get_conn(self):
-        """Получает соединение с PostgreSQL"""
-        if not postgres_available:
-            raise RuntimeError("PostgreSQL недоступен для EpisodicMemory")
-        from core.config_manager import get_database_url
-        try:
-            if self._conn is not None and not self._conn.closed:
-                self._conn.cursor().execute("SELECT 1")
-                return self._conn
-        except Exception:
-            self._conn = None
-        db_url = get_database_url()
-        if db_url and db_url.startswith("postgresql"):
-            self._conn = psycopg2.connect(
-                db_url,
-                keepalives=1, keepalives_idle=30,
-                keepalives_interval=10, keepalives_count=5,
-                connect_timeout=5,
-            )
-        else:
-            env_url = os.environ.get("DATABASE_URL")
-            if env_url and env_url.startswith("postgresql"):
-                self._conn = psycopg2.connect(
-                    env_url,
-                    keepalives=1, keepalives_idle=30,
-                    keepalives_interval=10, keepalives_count=5,
-                    connect_timeout=5,
-                )
-            else:
-                raise RuntimeError("Нет PostgreSQL подключения для EpisodicMemory")
-        return self._conn
+        """Получает соединение из пула."""
+        from core.pg_pool import get_connection
+        return get_connection()
+
+    def _put_conn(self, conn):
+        """Возвращает соединение в пул."""
+        from core.pg_pool import put_connection
+        if conn is not None:
+            try:
+                put_connection(conn)
+            except Exception:
+                pass
 
     def _ensure_tables(self):
         """Создаёт таблицы, если их нет"""
@@ -240,6 +221,7 @@ class EpisodicMemory:
             raise
         finally:
             cur.close()
+            self._put_conn(conn)
 
     def add_episode(
         self,
@@ -370,6 +352,7 @@ class EpisodicMemory:
         ))
         conn.commit()
         cur.close()
+        self._put_conn(conn)
 
     def get_episode(self, episode_id: str) -> Optional[Episode]:
         """Получает эпизод по ID"""
@@ -379,6 +362,7 @@ class EpisodicMemory:
         cur.execute("SELECT * FROM episodes WHERE id = %s", (episode_id,))
         row = cur.fetchone()
         cur.close()
+        self._put_conn(conn)
 
         if row:
             return self._row_to_episode(row)
@@ -463,6 +447,7 @@ class EpisodicMemory:
         cur.execute(sql, params)
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
 
         episodes = [self._row_to_episode(row) for row in rows]
 
@@ -491,6 +476,7 @@ class EpisodicMemory:
 
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
         return [self._row_to_episode(row) for row in rows]
 
     def link_episodes(self, episode_id: str, related_id: str, relation_type: str = "related"):
@@ -522,6 +508,7 @@ class EpisodicMemory:
 
         conn.commit()
         cur.close()
+        self._put_conn(conn)
         logger.info(f"🔗 Эпизоды связаны: {episode_id} <-> {related_id}")
 
     def get_significant_episodes(self, min_significance: float = 0.7, limit: int = 20) -> List[Episode]:
@@ -538,6 +525,7 @@ class EpisodicMemory:
 
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
         return [self._row_to_episode(row) for row in rows]
 
     def get_emotionally_charged(self, min_impact: float = 0.3, limit: int = 20) -> List[Episode]:
@@ -554,6 +542,7 @@ class EpisodicMemory:
 
         rows = cur.fetchall()
         cur.close()
+        self._put_conn(conn)
         return [self._row_to_episode(row) for row in rows]
 
     def get_stats(self) -> Dict[str, Any]:
@@ -598,6 +587,7 @@ class EpisodicMemory:
         most_accessed = cur.fetchall()
 
         cur.close()
+        self._put_conn(conn)
 
         return {
             "total_episodes": total,
@@ -643,6 +633,7 @@ class EpisodicMemory:
                 related.append(rel)
 
         cur.close()
+        self._put_conn(conn)
         return related
 
     async def update(self, id: str, data: Dict[str, Any]) -> bool:
@@ -671,13 +662,12 @@ class EpisodicMemory:
         cur.execute("DELETE FROM episode_relations")
         conn.commit()
         cur.close()
+        self._put_conn(conn)
 
         logger.info("🗑️ EpisodicMemory PostgreSQL очищена")
 
     def close(self):
-        """Закрывает соединение"""
-        if self._conn and not self._conn.closed:
-            self._conn.close()
+        """Пул управляет соединениями — ничего не делаем."""
 
 
 # Глобальный экземпляр
