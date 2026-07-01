@@ -732,6 +732,9 @@ async def set_default_key(
     current_user: dict = Depends(get_current_user)
 ):
     """Установка ключа по умолчанию"""
+    if key_id == "system-gigachat":
+        return {"success": True, "message": "Системный ключ GigaChat уже активен"}
+    
     supabase = get_db_client(current_user)
     if not supabase:
         raise HTTPException(status_code=500, detail="БД не подключена")
@@ -1027,13 +1030,22 @@ async def refresh_key_status(
     from core.encryption import get_encryptor
 
     user_id = current_user["id"]
+    
+    if key_id == "system-gigachat":
+        return {
+            "key_id": key_id,
+            "provider": "gigachat",
+            "status": "success",
+            "message": "Системный ключ",
+            "last_checked": datetime.now().isoformat()
+        }
+    
     supabase = get_db_client(current_user)
     if not supabase:
         raise HTTPException(status_code=500, detail="БД не подключена")
-
+    
     encryptor = get_encryptor()
     
-    # Получаем ключ
     key_result = supabase.table("user_api_keys")\
         .select("*")\
         .eq("id", key_id)\
@@ -1044,15 +1056,6 @@ async def refresh_key_status(
         raise HTTPException(status_code=404, detail="Ключ не найден")
     
     key_data = key_result.data[0]
-    
-    if key_id == "system-gigachat":
-        return {
-            "key_id": key_id,
-            "provider": "gigachat",
-            "status": "success",
-            "message": "Системный ключ",
-            "last_checked": datetime.now().isoformat()
-        }
     
     try:
         api_key = encryptor.decrypt(key_data["api_key_encrypted"])
