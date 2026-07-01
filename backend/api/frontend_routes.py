@@ -1146,7 +1146,16 @@ async def chat(
 
     logger.info(f"?? Chat request: key_id={request.key_id}, model={request.model}, provider={request.provider}")
 
-    if request.key_id:
+    if request.key_id == "system-gigachat":
+        import os
+        system_key = os.getenv("GIGACHAT_AUTH_KEY", "").strip()
+        if not system_key:
+            raise HTTPException(status_code=400, detail="Системный ключ GigaChat не настроен (GIGACHAT_AUTH_KEY)")
+        api_key = system_key
+        provider = "gigachat"
+        model = request.model or "GigaChat-2-Lite"
+        logger.info(f"? Using system-gigachat key, model={model}")
+    elif request.key_id:
         # Конкретный ключ
         logger.info(f"?? Looking up key_id: {request.key_id}")
         result = supabase.table("user_api_keys")\
@@ -1183,12 +1192,21 @@ async def chat(
             model = key_data.get("model_preference") or "auto"
 
     if not api_key:
-        # Нет ключа у пользователя — ошибка!
-        logger.error("? No API key found for user")
-        raise HTTPException(
-            status_code=400,
-            detail="API ключ не настроен. Добавьте ключ в настройках."
-        )
+        # Fallback на системный GigaChat
+        import os
+        system_key = os.getenv("GIGACHAT_AUTH_KEY", "").strip()
+        if system_key:
+            logger.info("? Falling back to system-gigachat key")
+            api_key = system_key
+            provider = "gigachat"
+            model = request.model or "GigaChat-2-Lite"
+        else:
+            # Нет ключа у пользователя — ошибка!
+            logger.error("? No API key found for user")
+            raise HTTPException(
+                status_code=400,
+                detail="API ключ не настроен. Добавьте ключ в настройках."
+            )
 
     logger.info(f"?? Using: provider={provider}, model={model}")
 
@@ -1247,8 +1265,8 @@ async def chat(
                 except Exception:
                     pass
                 
-                # Обновляем last_used_at у ключа
-                if request.key_id:
+                # Обновляем last_used_at у ключа (не для system-gigachat)
+                if request.key_id and request.key_id != "system-gigachat":
                     get_db_client(current_user).table("user_api_keys").update({
                         "last_used_at": datetime.now().isoformat()
                     }).eq("id", request.key_id).execute()
@@ -1270,8 +1288,8 @@ async def chat(
                     } if provider_result.fallback_used else None,
                 )
             
-            # Обновляем last_used_at у ключа
-            if request.key_id:
+            # Обновляем last_used_at у ключа (не для system-gigachat)
+            if request.key_id and request.key_id != "system-gigachat":
                 get_db_client(current_user).table("user_api_keys").update({
                     "last_used_at": datetime.now().isoformat()
                 }).eq("id", request.key_id).execute()
