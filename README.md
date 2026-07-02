@@ -134,7 +134,7 @@ PAD+ AI построен на другой идее.
 
 <dl>
 <dt><strong>Observability</strong></dt>
-<dd>Каждый шаг обработки трассируется в реальном времени. X-Ray фиксирует все 22 фазы pipeline, решения о стратегии, изменения эмоций и результаты верификации. Система не имеет «тёмных» участков.</dd>
+<dd>Каждый шаг обработки трассируется в реальном времени. X-Ray фиксирует все 24 фазы pipeline, решения о стратегии, изменения эмоций и результаты верификации. Система не имеет «тёмных» участков.</dd>
 
 <dt><strong>Cognitive Predisposition</strong></dt>
 <dd>Перед генерацией ответа система определяет направленность мышления через Impulse Core — четыре ортогональных измерения, смещающих априорные вероятности ответа без прямых инструкций.</dd>
@@ -152,7 +152,7 @@ PAD+ AI построен на другой идее.
 <dd>Каждое утверждение в ответе проходит через Truth Loop — проверку на противоречия с внутренней памятью и оценку достоверности. Система может указать на неуверенность в ответе.</dd>
 
 <dt><strong>Modularity</strong></dt>
-<dd>Pipeline состоит из 22 независимых фаз. Каждая фаза — класс с единым интерфейсом. Фазы могут быть заменены, переставлены или отключены без изменения соседних компонентов.</dd>
+<dd>Pipeline состоит из 24 независимых фаз. Каждая фаза — класс с единым интерфейсом. Фазы могут быть заменены, переставлены или отключены без изменения соседних компонентов.</dd>
 
 <dt><strong>Reflection</strong></dt>
 <dd>После каждого ответа система анализирует результат: сравнивает ожидаемую и фактическую уверенность, извлекает уроки, обновляет MetaLearner. Отдельный Dream System обрабатывает память в фоновом режиме.</dd>
@@ -189,7 +189,7 @@ graph TB
     end
 
     subgraph CognitiveCore ["Когнитивное ядро"]
-        Pipeline[Pipeline v4.0 — 22 phases]
+        Pipeline[Pipeline v4.0 — 24 phases]
         Impulse[Impulse Core — 4 dimensions]
         Persona[Persona — 8 traits]
         Emotions[Emotion Engine — PAD+ 6D]
@@ -210,8 +210,6 @@ graph TB
         PM[Provider Manager]
         OR[OpenRouter]
         GC[GigaChat]
-        GP[Google Gemini]
-        AN[Anthropic Claude]
     end
 
     subgraph Observability ["Наблюдаемость"]
@@ -312,7 +310,7 @@ flowchart LR
     Evolve --> Emit
 ```
 
-Pipeline включает 22 фазы, сгруппированные в 8 этапов: Safety → Intent → Retrieve → Persona → Generate → Truth → Remember → Evolve → Emit.
+Pipeline включает 24 фазы, сгруппированные в 8 этапов: Safety → Intent → Retrieve → Persona → Generate → Truth → Remember → Evolve → Emit.
 
 ---
 
@@ -356,7 +354,7 @@ X-Ray — система полной наблюдаемости, встроен
 **Что логируется:**
 
 - Выбор стратегии и причина
-- Каждая из 22 фаз pipeline с длительностью
+- Каждая из 24 фаз pipeline с длительностью
 - Изменения эмоций
 - Результаты верификации Truth Loop
 - Ошибки и деградации
@@ -455,14 +453,10 @@ ProviderManager — единый интерфейс ко всем LLM-прова
 
 | Провайдер | Аутентификация | Бесплатный доступ |
 |---|---|---|
-| OpenRouter | API Key | Частично |
+| OpenRouter | API Key | Частично (зависит от модели) |
 | GigaChat | OAuth (системный ключ) | ✅ |
-| OpenAI | API Key | ❌ |
-| Google Gemini | API Key | ✅ |
-| Anthropic Claude | API Key | ❌ |
-| Groq | API Key | ✅ |
 
-**Fallback-логика:** Если первый провайдер недоступен (401, 429, 5xx, timeout), система пробует следующий по цепочке. Для OpenRouter fallback — GigaChat, для OpenAI — OpenRouter → GigaChat, и т.д.
+**Fallback-логика:** Если первый провайдер недоступен (401, 429, 5xx, timeout), система пробует следующий по цепочке. Для OpenRouter fallback — GigaChat, и наоборот.
 
 ---
 
@@ -571,9 +565,9 @@ Consolidation Engine переносит знания снизу вверх: эп
 | **Vector Search** | pgvector (PostgreSQL extension) |
 | **Auth** | Supabase Auth (JWT) |
 | **Cache** | Redis 7 (опционально) |
-| **LLM Providers** | OpenRouter, GigaChat, OpenAI, Google Gemini, Anthropic Claude, Groq |
+| **LLM Providers** | OpenRouter, GigaChat |
 | **LLM Interface** | ProviderManager (единый SDK-интерфейс) |
-| **Pipeline** | PipelineExecutor v4.0, 22 stages |
+| **Pipeline** | PipelineExecutor v4.0, 24 stages |
 | **X-Ray** | TraceCollector + WebSocket Broadcaster + ThoughtVisualizer |
 | **HEALER** | Self-contained module, zero external dependencies |
 | **CI** | GitHub Actions (pytest, ruff, black, mypy) |

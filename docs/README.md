@@ -69,10 +69,6 @@ PAD+ AI/
 
 - **GigaChat** — OAuth, бесплатно с лимитами
 - **OpenRouter** — API Key, есть бесплатные модели
-- **Groq** — API Key, бесплатно с лимитами
-- **Google Gemini** — API Key, бесплатно с лимитами
-- **OpenAI** — API Key, платно
-- **Anthropic Claude** — API Key, платно
 
 ---
 
