@@ -28,11 +28,13 @@ if _project_root not in sys.path:
 
 # Настройка логирования (единожды)
 # Принудительно UTF-8 для stdout/stderr (нужно на Render/Linux где LANG=C)
-import io
-if hasattr(sys.stdout, 'buffer') and sys.stdout.buffer is not None:
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-if hasattr(sys.stderr, 'buffer') and sys.stderr.buffer is not None:
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+# Не делаем в тестовом режиме — ломает pytest
+if os.getenv("TEST_MODE", "false").lower() != "true":
+    import io
+    if hasattr(sys.stdout, 'buffer') and sys.stdout.buffer is not None:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'buffer') and sys.stderr.buffer is not None:
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,6 +74,18 @@ async def lifespan(app: FastAPI):
     logger.info("📦 Регистрация зависимостей...")
     register_dependencies()
     logger.info(f"✅ Dependency Injection инициализирован ({time.time()-start_time:.2f}s)")
+
+    # Запуск миграций БД (Alembic)
+    logger.info("🗄️ Запуск миграций БД...")
+    try:
+        from scripts.migrate import migrate_at_startup
+        migrated = migrate_at_startup()
+        if migrated:
+            logger.info(f"✅ Миграции БД применены ({time.time()-start_time:.2f}s)")
+        else:
+            logger.warning(f"⚠️ Миграции БД не выполнены ({time.time()-start_time:.2f}s)")
+    except Exception as e:
+        logger.warning(f"⚠️ Ошибка при запуске миграций: {e}")
 
     # Проверка целостности ANTI_DIRECTIVE
     logger.info("🔒 Проверка ANTI_DIRECTIVE...")

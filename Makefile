@@ -1,6 +1,7 @@
 # Makefile для тестирования PAD+ AI
 
 .PHONY: test test-unit test-integration test-coverage test-clean help
+.PHONY: test-fast migrate migrate-check db-check precommit
 
 # Все тесты
 test:
@@ -21,6 +22,10 @@ test-coverage:
 # Быстрые тесты (без медленных)
 test-fast:
 	pytest -m "not slow" -v
+
+# Новые критические тесты (app startup, migrations, auth, keys, docs)
+test-core:
+	pytest tests/test_app_startup.py tests/test_migrations.py tests/test_auth_flow.py tests/test_keys_endpoint.py tests/test_document_upload.py -v
 
 # Тесты памяти
 test-memory:
@@ -45,6 +50,20 @@ test-autonomy:
 # API тесты (требуют запущенный сервер)
 test-api:
 	pytest -m api -v
+
+# Миграции БД
+migrate:
+	python -m scripts.migrate
+
+migrate-check:
+	python -m scripts.migrate --check
+
+# Проверка существования таблиц БД
+db-check:
+	python -c "from scripts.migrate import run_migrations; run_migrations(check=True)"
+
+# Pre-commit проверка (быстрые тесты + миграции)
+precommit: test-fast migrate-check
 
 # Очистка кэша тестов
 test-clean:
@@ -71,12 +90,17 @@ help:
 	@echo "  test-integration - Запустить только интеграционные тесты"
 	@echo "  test-coverage - Запустить тесты с покрытием"
 	@echo "  test-fast     - Запустить быстрые тесты (без медленных)"
+	@echo "  test-core     - Критические тесты (app startup, migrations, auth)"
 	@echo "  test-memory   - Запустить тесты памяти"
 	@echo "  test-llm      - Запустить тесты LLM"
 	@echo "  test-emotion  - Запустить тесты эмоций"
 	@echo "  test-knowledge - Запустить тесты знаний"
 	@echo "  test-autonomy - Запустить тесты автономии"
 	@echo "  test-api      - Запустить API тесты (требует сервер)"
+	@echo "  migrate       - Применить миграции БД (Alembic upgrade head)"
+	@echo "  migrate-check - Проверить статус миграций"
+	@echo "  db-check      - Проверить существование таблиц"
+	@echo "  precommit     - Pre-commit проверка (тесты + миграции)"
 	@echo "  test-clean    - Очистить кэш тестов"
 	@echo "  install       - Установить зависимости"
 	@echo "  run-server    - Запустить сервер"
