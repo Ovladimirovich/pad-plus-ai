@@ -1,7 +1,3 @@
-Here's the translated README in full markdown, ready to paste:
-
----
-
 # PAD+ AI v4.0
 
 <p align="center">
