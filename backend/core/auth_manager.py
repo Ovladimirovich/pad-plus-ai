@@ -170,7 +170,6 @@ def get_auth_manager() -> AuthManager:
 async def get_current_user_safe(
     authorization: Optional[str] = Header(None),
     x_refresh_token: Optional[str] = Header(None, alias="X-Refresh-Token"),
-    request: Optional[Request] = None,
 ) -> Dict[str, Any]:
     """
     Улучшенная версия get_current_user с обработкой refresh_token
@@ -285,10 +284,6 @@ async def get_current_user_safe(
         profile = None
     
     # Сохраняем результат refresh в кэш для параллельных запросов
-    if new_access_token:
-        if request is not None:
-            request.state.new_access_token = new_access_token
-
     if new_access_token and cache_key:
         async with _refresh_cache_lock:
             _refresh_cache[cache_key] = {
