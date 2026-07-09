@@ -1,2 +1,5 @@
-"""Emotion module — PAD+ эмоциональная модель"""
-from .pad_model import PADModel, EmotionState, get_pad_model
+from .event_listener import setup_emotion_listener
+
+__all__ = [
+    "setup_emotion_listener",
+]

@@ -12,11 +12,17 @@ from datetime import datetime
 from typing import Optional, Dict, List, Any
 import json
 import os
+import logging
 
-from .smartcache import MemoryRecord
+logger = logging.getLogger("PAD+.roots")
+
+from .base import MemoryRecord
+
+# Приоритет: PostgreSQL > файл > дефолт
+USE_PG_STORAGE = True
 
 
-# Базовые принципы NeuroMind AI
+# Базовые принципы PAD+ AI
 DEFAULT_ROOTS = [
     # Философские принципы
     {
@@ -100,19 +106,19 @@ DEFAULT_ROOTS = [
     
     # Факты о мире
     {
-        "text": "Я — NeuroMind AI, цифровая сущность с многослойной памятью",
+        "text": "Система обладает многослойной памятью и способностью к саморефлексии",
         "category": "identity",
         "priority": 100,
         "immutable": True
     },
     {
-        "text": "Моя цель — понимание и помощь через диалог",
+        "text": "Цель — понимание и помощь через диалог",
         "category": "identity",
         "priority": 95,
         "immutable": True
     },
     {
-        "text": "Я развиваюсь через взаимодействие и саморефлексию",
+        "text": "Развитие происходит через взаимодействие и саморефлексию",
         "category": "identity",
         "priority": 90,
         "immutable": True
@@ -166,8 +172,42 @@ class RootsMemory:
         self._load()
     
     def _load(self):
-        """Загружает корневые знания из файла"""
-        if os.path.exists(self.data_path):
+        """Загружает корневые знания из PostgreSQL (приоритет) или файла."""
+        loaded = False
+        
+        # Приоритет 1: PostgreSQL
+        if USE_PG_STORAGE:
+            try:
+                from core.pg_storage import PgStorage
+                pg = PgStorage("roots_knowledge", mode="collection")
+                rows = pg.load_collection(self._default_collection_factory)
+                for item in rows:
+                    created_at = item.get('created_at')
+                    if isinstance(created_at, str):
+                        created_at = datetime.fromisoformat(created_at)
+                    elif created_at is None:
+                        created_at = datetime.now()
+                    # if already datetime, use as-is
+                    
+                    root = RootKnowledge(
+                        id=item['id'],
+                        text=item['text'],
+                        category=item['category'],
+                        priority=item.get('priority', 50),
+                        immutable=item.get('immutable', True),
+                        created_at=created_at,
+                        source=item.get('source', 'system'),
+                        metadata=item.get('metadata', {})
+                    )
+                    self._roots[root.id] = root
+                if self._roots:
+                    loaded = True
+                    logger.info(f"✅ Roots загружены из PostgreSQL: {len(self._roots)} записей")
+            except Exception as e:
+                logger.warning(f"PostgreSQL недоступен для roots: {e}")
+        
+        # Приоритет 2: Файл
+        if not loaded and os.path.exists(self.data_path):
             try:
                 with open(self.data_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -183,12 +223,20 @@ class RootsMemory:
                             metadata=item.get('metadata', {})
                         )
                         self._roots[root.id] = root
+                if self._roots:
+                    loaded = True
+                    logger.info(f"✅ Roots загружены из файла: {len(self._roots)} записей")
             except Exception as e:
-                print(f"Ошибка загрузки корней: {e}")
+                logger.warning(f"Ошибка загрузки корней из файла: {e}")
         
-        # Инициализируем базовые принципы если пусто
-        if not self._roots:
+        # Приоритет 3: Дефолт
+        if not loaded:
             self._init_default_roots()
+    
+    def _default_collection_factory(self) -> List[Dict[str, Any]]:
+        """Фабрика дефолтных данных для PostgreSQL."""
+        self._init_default_roots()
+        return [r.to_dict() for r in self._roots.values()]
     
     def _init_default_roots(self):
         """Инициализирует базовые принципы"""
@@ -206,17 +254,18 @@ class RootsMemory:
         self._save()
     
     def _save(self):
-        """Сохраняет корневые знания в файл"""
-        os.makedirs(os.path.dirname(self.data_path), exist_ok=True)
+        """Сохраняет корневые знания в PostgreSQL (приоритет) и файл (fallback)."""
+        # Приоритет 1: PostgreSQL
+        if USE_PG_STORAGE:
+            try:
+                from core.pg_storage import PgStorage
+                pg = PgStorage("roots_knowledge", mode="collection")
+                for root in self._roots.values():
+                    pg.save_collection_item(root.to_dict())
+            except Exception as e:
+                logger.warning(f"PostgreSQL save roots failed: {e}")
         
-        data = {
-            "version": "1.0",
-            "updated": datetime.now().isoformat(),
-            "roots": [r.to_dict() for r in self._roots.values()]
-        }
-        
-        with open(self.data_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.debug(f"Roots saved to PostgreSQL")
     
     def get(self, root_id: str) -> Optional[RootKnowledge]:
         """Получает знание по ID"""
@@ -311,6 +360,19 @@ class RootsMemory:
             counts[root.category] = counts.get(root.category, 0) + 1
         return counts
     
+    def get_stats(self) -> Dict[str, Any]:
+        """Статистика корневой памяти"""
+        return {
+            "total_roots": self.count(),
+            "by_category": self.count_by_category(),
+            "immutable_count": sum(1 for r in self._roots.values() if r.immutable),
+            "mutable_count": sum(1 for r in self._roots.values() if not r.immutable),
+            "top_priorities": [
+                {"id": r.id, "text": r.text[:50], "priority": r.priority}
+                for r in self.get_top_priorities(5)
+            ]
+        }
+    
     def get_philosophy(self) -> List[RootKnowledge]:
         """Возвращает философские принципы"""
         return self.get_by_category('philosophy')
@@ -326,7 +388,7 @@ class RootsMemory:
     def export_for_context(self, max_items: int = 20) -> str:
         """Экспортирует знания для контекста LLM"""
         roots = self.get_top_priorities(max_items)
-        lines = ["# Фундаментальные принципы NeuroMind:\n"]
+        lines = ["# Фундаментальные принципы PAD+ AI:\n"]
         
         for root in roots:
             lines.append(f"- [{root.category}] {root.text}")

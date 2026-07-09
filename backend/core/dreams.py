@@ -15,9 +15,10 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 import logging
 import asyncio
+import os
 import random
 
-logger = logging.getLogger("neuromind.dreams")
+logger = logging.getLogger("PAD+.dreams")
 
 
 @dataclass
@@ -57,8 +58,7 @@ class DreamSystem:
     
     def __init__(self):
         from memory.consolidation import get_consolidator
-        from memory.episodic import get_episodic_memory
-        from memory.semantic import get_semantic_memory
+        from memory import get_episodic_memory, get_semantic_memory
         from memory.persona import get_persona
         from emotion.pad_model import get_pad_model
         from knowledge.graph import get_knowledge_graph
@@ -73,13 +73,13 @@ class DreamSystem:
         # История снов
         self._dream_history: List[DreamReport] = []
         
-        # Конфигурация
+        # Конфигурация (из .env или по умолчанию)
         self.config = {
-            "min_idle_minutes": 30,      # Минимальное время простоя
-            "dream_duration": 60,         # Длительность сна (секунды)
-            "episodes_per_dream": 50,     # Эпизодов за сон
-            "connection_threshold": 0.6,  # Порог для связей
-            "emotion_decay_dream": 0.5    # Затухание эмоций во сне
+            "min_idle_minutes": int(os.getenv("DREAM_MIN_IDLE_MINUTES", "30")),
+            "dream_duration": int(os.getenv("DREAM_DURATION", "60")),
+            "episodes_per_dream": int(os.getenv("DREAM_EPISODES_PER_DREAM", "50")),
+            "connection_threshold": float(os.getenv("DREAM_CONNECTION_THRESHOLD", "0.6")),
+            "emotion_decay_dream": float(os.getenv("DREAM_EMOTION_DECAY", "0.5")),
         }
         
         # Флаг активности
@@ -249,8 +249,8 @@ class DreamSystem:
             if cleanup.get("duplicates", {}).get("found", 0) > 10:
                 hygiene.cleanup()
                 insights.append("Очистка памяти выполнена")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"{__name__} error: {e}")
         
         duration = (datetime.now() - start_time).total_seconds()
         
@@ -283,6 +283,32 @@ class DreamSystem:
             limit=50
         )
         
+        # Синхронизируем семантические концепции с Knowledge Graph
+        # и строим маппинг semantic_id -> KG concept
+        semantic_to_kg = {}
+        existing_kg_names = {c.name for c in self.knowledge._concepts.values()}
+        for sc in concepts:
+            concept_name = sc.tags[0] if sc.tags else sc.content[:50]
+            if concept_name not in existing_kg_names:
+                try:
+                    kg_concept = self.knowledge.add_concept(
+                        name=concept_name,
+                        concept_type="concept",
+                        confidence=sc.confidence,
+                        source="dream_integration",
+                        metadata={"definition": sc.content, "domain": sc.domain}
+                    )
+                    existing_kg_names.add(concept_name)
+                    semantic_to_kg[sc.id] = kg_concept
+                except Exception as e:
+                    logger.warning(f"KG sync error in integration: {e}")
+            else:
+                # Находим существующий KG concept по имени
+                for c in self.knowledge._concepts.values():
+                    if c.name == concept_name:
+                        semantic_to_kg[sc.id] = c
+                        break
+        
         # Находим похожие концепции для связывания
         for i, concept1 in enumerate(concepts):
             for concept2 in concepts[i+1:]:
@@ -290,16 +316,19 @@ class DreamSystem:
                 common_tags = set(concept1.tags) & set(concept2.tags)
                 
                 if common_tags and concept2.id not in concept1.related_concepts:
-                    # Создаём связь в Knowledge Graph
-                    try:
-                        self.knowledge.add_relation(
-                            concept1.id, concept2.id,
-                            relation_type="related",
-                            weight=len(common_tags) * 0.3
-                        )
-                        connections_made += 1
-                    except Exception:
-                        pass
+                    # Создаём связь в Knowledge Graph (используем KG IDs)
+                    kg_id1 = semantic_to_kg.get(concept1.id)
+                    kg_id2 = semantic_to_kg.get(concept2.id)
+                    if kg_id1 and kg_id2:
+                        try:
+                            self.knowledge.add_relation(
+                                kg_id1.id, kg_id2.id,
+                                relation_type="related",
+                                weight=len(common_tags) * 0.3
+                            )
+                            connections_made += 1
+                        except Exception as e:
+                            logger.warning(f"{__name__} error: {e}")
                     
                     # Добавляем в related_concepts
                     concept1.related_concepts.append(concept2.id)
@@ -332,8 +361,8 @@ class DreamSystem:
                     action="Интеграция во время сна",
                     confidence=0.7
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"{__name__} error: {e}")
         
         duration = (datetime.now() - start_time).total_seconds()
         

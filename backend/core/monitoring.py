@@ -11,11 +11,20 @@
 
 import asyncio
 import logging
-import psutil
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, asdict
 from collections import defaultdict, deque
+
+import os
+
+# Пытаемся импортировать psutil
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
+    psutil = None
 
 from core.config_manager import get_config
 from core.cache_manager import get_cache_manager
@@ -59,28 +68,30 @@ class MonitoringSystem:
     def __init__(self):
         self.config = get_config()
         self.cache_manager = get_cache_manager()
-        self.metrics_history: deque = deque(maxlen=1000)  # Последние 1000 метрик
+        self.metrics_history: deque = deque(maxlen=1000)
         self.alerts: List[Alert] = []
         self.alert_rules = self._load_alert_rules()
         self.performance_stats = defaultdict(list)
         self.error_counts = defaultdict(int)
         self.start_time = datetime.now()
         self.monitoring_task: Optional[asyncio.Task] = None
+        self._connections_getter: Optional[Callable[[], int]] = None
+        self._queue_size_getter: Optional[Callable[[], int]] = None
         
-        # Пороги для алертов
+        # Пороги для алертов (из .env или по умолчанию)
         self.thresholds = {
-            "cpu_critical": 90.0,
-            "cpu_warning": 70.0,
-            "memory_critical": 90.0,
-            "memory_warning": 70.0,
-            "disk_critical": 95.0,
-            "disk_warning": 80.0,
-            "response_time_critical": 5.0,  # seconds
-            "response_time_warning": 2.0,
-            "error_rate_critical": 0.1,  # 10%
-            "error_rate_warning": 0.05,  # 5%
-            "cache_hit_rate_critical": 0.3,  # 30%
-            "cache_hit_rate_warning": 0.5,  # 50%
+            "cpu_critical": float(os.getenv("MON_CPU_CRITICAL", "90.0")),
+            "cpu_warning": float(os.getenv("MON_CPU_WARNING", "70.0")),
+            "memory_critical": float(os.getenv("MON_MEM_CRITICAL", "90.0")),
+            "memory_warning": float(os.getenv("MON_MEM_WARNING", "70.0")),
+            "disk_critical": float(os.getenv("MON_DISK_CRITICAL", "95.0")),
+            "disk_warning": float(os.getenv("MON_DISK_WARNING", "80.0")),
+            "response_time_critical": float(os.getenv("MON_RESP_TIME_CRITICAL", "5.0")),
+            "response_time_warning": float(os.getenv("MON_RESP_TIME_WARNING", "2.0")),
+            "error_rate_critical": float(os.getenv("MON_ERROR_RATE_CRITICAL", "0.1")),
+            "error_rate_warning": float(os.getenv("MON_ERROR_RATE_WARNING", "0.05")),
+            "cache_hit_rate_critical": float(os.getenv("MON_CACHE_HIT_CRITICAL", "0.3")),
+            "cache_hit_rate_warning": float(os.getenv("MON_CACHE_HIT_WARNING", "0.5")),
         }
     
     def _load_alert_rules(self) -> Dict[str, Any]:
@@ -107,7 +118,7 @@ class MonitoringSystem:
                 "severity": "critical"
             },
             "cache_hit_rate_low": {
-                "condition": lambda m: m.cache_hit_rate < self.thresholds["cache_hit_rate_critical"],
+                "condition": lambda m: m.cache_hit_rate < self.thresholds["cache_hit_rate_critical"] and self._cache_total_lookups() >= 20,
                 "message": "Low cache hit rate detected",
                 "severity": "warning"
             }
@@ -147,16 +158,22 @@ class MonitoringSystem:
         """Собирает системные метрики"""
         try:
             # Системные метрики
-            cpu_percent = psutil.cpu_percent(interval=1)
-            memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
-            network = psutil.net_io_counters()
+            if HAS_PSUTIL:
+                cpu_percent = psutil.cpu_percent(interval=1)
+                memory = psutil.virtual_memory()
+                disk = psutil.disk_usage('/')
+                network = psutil.net_io_counters()
+            else:
+                cpu_percent = 0.0
+                memory = type('obj', (object,), {'percent': 0.0})()
+                disk = type('obj', (object,), {'percent': 0.0})()
+                network = type('obj', (object,), {'bytes_sent': 0, 'bytes_recv': 0})()
             
             # Прикладные метрики
             cache_stats = self.cache_manager.get_stats()
             response_time_avg = self._calculate_avg_response_time()
             error_rate = self._calculate_error_rate()
-            active_connections = len(self._get_active_connections())
+            active_connections = self._get_active_connections()
             queue_size = self._get_queue_size()
             
             # Создаем метрики
@@ -180,12 +197,21 @@ class MonitoringSystem:
         except Exception as e:
             logger.error(f"Ошибка сбора метрик: {e}")
     
+    def set_connections_getter(self, getter: Callable[[], int]) -> None:
+        """Регистрирует функцию получения активных соединений"""
+        self._connections_getter = getter
+
+    def set_queue_size_getter(self, getter: Callable[[], int]) -> None:
+        """Регистрирует функцию получения размера очереди"""
+        self._queue_size_getter = getter
+
     def _calculate_avg_response_time(self) -> float:
-        """Рассчитывает среднее время ответа"""
-        # Здесь можно интегрировать с вашей системой логирования запросов
-        # Пока возвращаем заглушку
-        return 0.5
-    
+        """Рассчитывает среднее время ответа по реальным данным"""
+        response_times = self.performance_stats.get("response_times", [])
+        if response_times:
+            return sum(response_times) / len(response_times)
+        return 0.0
+
     def _calculate_error_rate(self) -> float:
         """Рассчитывает rate ошибок"""
         total_requests = sum(self.error_counts.values()) + sum(
@@ -195,18 +221,28 @@ class MonitoringSystem:
             return 0.0
         error_count = sum(self.error_counts.values())
         return error_count / total_requests
-    
-    def _get_active_connections(self) -> List:
-        """Получает активные соединения"""
-        # Здесь можно интегрировать с вашим WebSocket менеджером
-        # Пока возвращаем заглушку
-        return []
-    
+
+    def _get_active_connections(self) -> int:
+        """Получает количество активных соединений"""
+        if self._connections_getter:
+            return self._connections_getter()
+        return 0
+
     def _get_queue_size(self) -> int:
         """Получает размер очереди задач"""
-        # Здесь можно интегрировать с вашей системой очередей
-        # Пока возвращаем заглушку
+        if self._queue_size_getter:
+            return self._queue_size_getter()
         return 0
+    
+    def _cache_total_lookups(self) -> int:
+        """Общее количество обращений к кэшу (для фильтрации ложных алертов)"""
+        try:
+            stats = self.cache_manager.get_stats()
+            mem = stats.get("memory", {})
+            redis = stats.get("redis", {})
+            return mem.get("hits", 0) + mem.get("misses", 0) + redis.get("hits", 0) + redis.get("misses", 0)
+        except Exception:
+            return 0
     
     async def _check_alerts(self):
         """Проверяет условия для алертов"""

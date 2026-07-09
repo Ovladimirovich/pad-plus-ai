@@ -15,7 +15,7 @@ import time
 from typing import Any, Dict, Optional, List
 from datetime import datetime
 
-import aioredis
+from redis.asyncio import Redis as AsyncRedis
 from cachetools import TTLCache
 
 from core.config_manager import get_config
@@ -35,7 +35,7 @@ class CacheManager:
     def __init__(self):
         self.config = get_config()
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        self.redis: Optional[aioredis.Redis] = None
+        self.redis: Optional[AsyncRedis] = None
         
         # In-memory cache (L1)
         self.memory_cache = TTLCache(
@@ -56,10 +56,12 @@ class CacheManager:
     async def connect(self):
         """Подключается к Redis"""
         try:
-            self.redis = await aioredis.from_url(
+            self.redis = await AsyncRedis.from_url(
                 self.redis_url,
                 encoding="utf-8",
-                decode_responses=True
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
             )
             logger.info("🗄️ Redis подключен")
         except Exception as e:

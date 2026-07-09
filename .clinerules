@@ -1,0 +1,40 @@
+# PAD+ AI — Единые правила для всех AI-ассистентов
+
+## Проект
+PAD+ AI — AI-ассистент с когнитивной архитектурой.
+- **Домен:** https://pad-plus-ai.onrender.com
+- **Бэкенд:** Python 3.11+, FastAPI, Uvicorn
+- **Фронтенд:** React 18, Vite, Tailwind CSS
+- **БД:** Supabase (PostgreSQL)
+- **Хостинг:** Render (авто-деплой из main)
+- **Провайдеры:** OpenRouter, GigaChat (оба — только пользовательские ключи)
+
+## Управление ключами
+- Системных ключей нет. Каждый пользователь добавляет свои ключи в разделе «Провайдеры» (⚡).
+- Ключи шифруются в БД. Очищаются от не-ASCII символов при сохранении и использовании.
+
+## Известные проблемы
+
+### OpenRouter model_preference format
+- DB column `user_api_keys.model_preference` для OpenRouter: полный ID модели (`openai/gpt-4o-mini`), не просто имя.
+- Некорректно: `gpt-4o-mini` → код строит `openrouter/gpt-4o-mini` (невалидно)
+- Некорректно: `openrouter/openrouter/auto` (дублирование провайдера)
+- Корректно: `openai/gpt-4o-mini`, `anthropic/claude-sonnet-4-20250514`
+
+### Прокси (Hiddify) блокирует localhost
+- Не использовать `urllib.request.urlopen` для localhost
+- Использовать `backend/ai/core_client.py` (http.client, без прокси)
+
+### Кодировка ключей
+- `\xa0` (неразрывный пробел) ломает Authorization header
+- Фикс: `.encode("ascii", errors="ignore")` при сохранении и чтении ключа
+
+## Граф знаний (Knowledge Graph)
+Подробная документация в `.ai/knowledge-graph.md`. Кратко:
+- **Хранение:** Supabase (PostgreSQL) — продакшн, SQLite (`data/knowledge.db`) — локально. Авто-определение.
+- **Supabase таблицы:** `knowledge_concepts`, `knowledge_relations` (создаются автоматически если есть DATABASE_URL)
+- **Миграция:** `python scripts/migrate_to_supabase.py` — переносит данные из SQLite в Supabase
+- **API:** `/api/v1/knowledge/stats`, `/graph`, `/search`, `/related`, `/concepts`, `/relations`, `/extract`
+- **Извлечение:** `/extract` — keyword extraction из текста (стоп-слова + частотный анализ + шаблоны связей)
+- **Визуализация:** ReactFlow (ConceptNode с цветами по типу, auto-layout, MiniMap, Controls)
+- **Важный баг (исправлен):** `if self.graph:` → `if self.graph is not None:` (nx.DiGraph() falsy при пустом)

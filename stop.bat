@@ -1,33 +1,85 @@
 @echo off
 chcp 65001 >nul
-title 🧠 PAD+ AI - Остановка
+title PAD+ AI - Остановка системы
 
+echo ============================================
+echo   PAD+ AI v4.0 - Остановка системы...
+echo ============================================
 echo.
-echo  ╔═══════════════════════════════════════════════════════════╗
-echo  ║           🧠 PAD+ AI v3.5 - Остановка системы              ║
-echo  ╚═══════════════════════════════════════════════════════════╝
-echo.
 
-echo 🛑 Остановка Backend (uvicorn)...
-taskkill /f /im python.exe /fi "WINDOWTITLE eq PAD+ Backend*" >nul 2>&1
-
-echo 🛑 Остановка Frontend (node)...
-taskkill /f /im node.exe /fi "WINDOWTITLE eq PAD+ Frontend*" >nul 2>&1
-
-:: Дополнительная очистка портов
-echo.
-echo 🧹 Освобождение портов...
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') do (
-    taskkill /f /pid %%a >nul 2>&1
-)
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5173 ^| findstr LISTENING') do (
-    taskkill /f /pid %%a >nul 2>&1
+:: Находим и останавливаем процессы по PID
+echo [1/3] Остановка Backend (порт 8080)...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080 ^| findstr LISTENING') do (
+    echo   - Найден процесс PID %%a, останавливаем...
+    taskkill /F /PID %%a >nul 2>&1
+    if errorlevel 1 (
+        echo     ✗ Не удалось остановить процесс
+    ) else (
+        echo     ✓ Процесс остановлен
+    )
 )
 
 echo.
-echo  ╔═══════════════════════════════════════════════════════════╗
-echo  ║                  ✅ Система остановлена!                   ║
-echo  ╚═══════════════════════════════════════════════════════════╝
-echo.
+echo [2/3] Остановка Frontend (порт 5174)...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do (
+    echo   - Найден процесс PID %%a, останавливаем...
+    taskkill /F /PID %%a >nul 2>&1
+    if errorlevel 1 (
+        echo     ✗ Не удалось остановить процесс
+    ) else (
+        echo     ✓ Процесс остановлен
+    )
+)
 
-timeout /t 2 /nobreak >nul
+:: Останавливаем только наши процессы (по окнам)
+echo.
+echo [3/3] Остановка окон с нашими процессами...
+taskkill /F /FI "WINDOWTITLE eq PAD+ AI Backend*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq PAD+ AI Frontend*" >nul 2>&1
+
+:: Если окна не закрылись — по портам (безопасно)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080 ^| findstr LISTENING') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+echo   ✓ Все процессы остановлены
+
+timeout /t 2 >nul
+
+:: Проверяем что порты свободны
+echo.
+echo ============================================
+echo   Проверка освобождения портов:
+echo ============================================
+
+set PORTS_FREE=1
+
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080 ^| findstr LISTENING') do (
+    echo   ✗ Порт 8080 всё ещё занят (PID %%a)
+    set PORTS_FREE=0
+)
+
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') do (
+    echo   ✗ Порт 5174 всё ещё занят (PID %%a)
+    set PORTS_FREE=0
+)
+
+if "%PORTS_FREE%"=="1" (
+    echo   ✓ Порт 8080 - свободен
+    echo   ✓ Порт 5174 - свободен
+    echo.
+    echo ============================================
+    echo   ✓ Система PAD+ AI полностью остановлена!
+    echo ============================================
+) else (
+    echo.
+    echo ============================================
+    echo   ⚠ Некоторые процессы всё ещё активны
+    echo   Попробуйте перезагрузить компьютер
+    echo ============================================
+)
+
+echo.
+pause

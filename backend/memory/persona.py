@@ -1,5 +1,5 @@
 """
-🎭 PersonaMemory — Ядро личности NeuroMind AI
+🎭 PersonaMemory — Ядро личности PAD+ AI
 
 Хранит "Я" системы — отдельно от знаний о мире.
 НЕ смешивается с фактами, RAG, графом знаний.
@@ -14,7 +14,10 @@ from pathlib import Path
 import json
 import logging
 
-logger = logging.getLogger("neuromind.persona")
+logger = logging.getLogger("PAD+.persona")
+
+# Приоритет: PostgreSQL > файл > дефолт
+USE_PG_STORAGE = True
 
 
 @dataclass
@@ -81,9 +84,11 @@ class PersonaMemory:
     - Предпочтения в стиле общения
     - Историю саморефлексий
     - Ценности и принципы
+    
+    Хранилище: PostgreSQL (Supabase) по умолчанию, fallback на файл.
     """
     
-    # Базовые черты личности NeuroMind
+    # Базовые черты личности PAD+
     DEFAULT_TRAITS = {
         "curiosity": ("Любопытство", "Стремление исследовать неизвестное"),
         "skepticism": ("Скептицизм", "Критическое отношение к утверждениям"),
@@ -128,20 +133,40 @@ class PersonaMemory:
     
     def _load_or_init(self) -> None:
         """Загружает персону или создаёт новую"""
+        # Приоритет 1: PostgreSQL (Supabase)
+        if USE_PG_STORAGE:
+            try:
+                from core.pg_storage import PgStorage
+                pg = PgStorage("persona_state", mode="singleton")
+                data = pg.load_singleton(self._default_factory)
+                self._from_dict(data)
+                logger.info(f"✅ Persona загружена из PostgreSQL: {len(self.traits)} черт, "
+                           f"{len(self.users)} пользователей")
+                return
+            except Exception as e:
+                logger.warning(f"PostgreSQL недоступен, fallback на файл: {e}")
+        
+        # Приоритет 2: Файл
         if self.storage_path.exists():
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self._from_dict(data)
-                logger.info(f"✅ Persona загружена: {len(self.traits)} черт, "
+                logger.info(f"✅ Persona загружена из файла: {len(self.traits)} черт, "
                            f"{len(self.users)} пользователей")
+                return
             except Exception as e:
-                logger.warning(f"Ошибка загрузки persona: {e}")
-                self._init_defaults()
-        else:
-            self._init_defaults()
-            self._save()
-            logger.info("✅ Persona инициализирована с базовыми чертами")
+                logger.warning(f"Ошибка загрузки persona из файла: {e}")
+        
+        # Приоритет 3: Дефолт
+        self._init_defaults()
+        self._save()
+        logger.info("✅ Persona инициализирована с базовыми чертами")
+    
+    def _default_factory(self) -> dict:
+        """Фабрика дефолтных данных для PostgreSQL."""
+        self._init_defaults()
+        return self._to_dict()
     
     def _init_defaults(self) -> None:
         """Инициализирует базовые черты"""
@@ -182,8 +207,17 @@ class PersonaMemory:
         """Сохраняет персону"""
         self.last_updated = datetime.now().isoformat()
         data = self._to_dict()
-        with open(self.storage_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        # Приоритет 1: PostgreSQL
+        if USE_PG_STORAGE:
+            try:
+                from core.pg_storage import PgStorage
+                pg = PgStorage("persona_state", mode="singleton")
+                pg.save_singleton(data)
+            except Exception as e:
+                logger.warning(f"PostgreSQL save failed: {e}")
+        
+        logger.debug(f"Persona saved to PostgreSQL")
     
     def _to_dict(self) -> dict:
         """Сериализация"""

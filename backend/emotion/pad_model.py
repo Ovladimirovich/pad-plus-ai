@@ -1,5 +1,5 @@
 """
-PAD+ Эмоциональная модель NeuroMind AI
+PAD+ Эмоциональная модель PAD+ AI
 
 Базовые параметры (PAD):
 - Pleasure (Удовольствие): -1 до +1
@@ -18,6 +18,9 @@ from typing import Optional, Dict, List, Tuple
 import json
 import os
 import threading
+
+# Приоритет: PostgreSQL > файл > дефолт
+USE_PG_STORAGE = True
 
 
 @dataclass
@@ -121,7 +124,27 @@ class PADModel:
         self._start_decay_thread()
     
     def _load_or_create(self) -> EmotionState:
-        """Загружает или создаёт состояние эмоций"""
+        """Загружает или создаёт состояние эмоций (PostgreSQL → файл → дефолт)"""
+        # Приоритет 1: PostgreSQL
+        if USE_PG_STORAGE:
+            try:
+                from core.pg_storage import PgStorage
+                pg = PgStorage("emotion_state", mode="singleton")
+                data = pg.load_singleton(lambda: {})
+                if data:
+                    return EmotionState(
+                        pleasure=data.get("удовольствие", 0.0),
+                        arousal=data.get("возбуждение", 0.0),
+                        dominance=data.get("доминирование", 0.0),
+                        curiosity=data.get("любопытство", 0.5),
+                        confidence=data.get("уверенность", 0.5),
+                        social_connection=data.get("социальная_связь", 0.0),
+                        trigger=data.get("trigger", "loaded")
+                    )
+            except Exception as e:
+                logger.warning(f"PostgreSQL emotion load failed: {e}")
+        
+        # Приоритет 2: Файл
         if os.path.exists(self.state_file):
             try:
                 with open(self.state_file, 'r', encoding='utf-8') as f:
@@ -135,12 +158,23 @@ class PADModel:
                     social_connection=data.get("социальная_связь", 0.0),
                     trigger=data.get("trigger", "loaded")
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"{__name__} file error: {e}")
+        
         return EmotionState()
     
     def _save(self):
-        """Сохраняет состояние в файл"""
+        """Сохраняет состояние в PostgreSQL (приоритет) и файл (fallback)."""
+        # Приоритет 1: PostgreSQL
+        if USE_PG_STORAGE:
+            try:
+                from core.pg_storage import PgStorage
+                pg = PgStorage("emotion_state", mode="singleton")
+                pg.save_singleton(self._state.to_dict())
+            except Exception as e:
+                logger.warning(f"PostgreSQL emotion save failed: {e}")
+        
+        # Fallback: файл
         os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
         with open(self.state_file, 'w', encoding='utf-8') as f:
             json.dump(self._state.to_dict(), f, ensure_ascii=False, indent=2)

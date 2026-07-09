@@ -1,7 +1,11 @@
 # Environment
 .env
 .env.local
+.env.*.local
 *.env
+.env.test
+!.env.example
+!.env.test.example
 
 # Python
 __pycache__/
@@ -11,47 +15,140 @@ __pycache__/
 .Python
 venv/
 .venv/
+env/
+ENV/
 *.egg-info/
 dist/
+!frontend/dist/
 build/
+.eggs/
+*.egg
 
 # Node
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
+yarn.lock
 
 # Build
-frontend/dist/
 
 # Data & Databases
 data/
 *.db
+*.sqlite
 *.sqlite3
 *.json.bak
+*.backup
 
 # IDE
 .idea/
 .vscode/
+.vs/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+.kilo/
 
 # OS
 .DS_Store
 Thumbs.db
+*.swp
+.AppleDouble
+.LSOverride
 
 # Logs
 *.log
 logs/
+.log
 
-# Test
+# Test & Coverage
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+test-results.xml
 
-# Chroma
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Type checking
+.pyre/
+
+# Chroma & RAG
 data/chroma/
+*.chroma
+chroma_data/
 
 # Temporary
 *.tmp
 *.temp
+*.bak
+*.swp
+*~
+.~*
+
+# Dev & session artifacts
+.playwright-mcp/
+traces/
+spans/
+experiments/
+index.json
+healer_viewer*.png
+
+# IDE Caches
+.mypy_cache/
+.qoder/
+.ai/
+.vs/
+
+# Production
+.env.production
+.env.staging
+
+# Large files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.zip
+*.tar.gz
+*.rar
+ 
+# Archive created by cleanup scripts
+/archive/
+!docs/archive/
+!docs/archive/**
+# Git filter-repo temp.git-rewrite/
+
+# Diagnostic / one-off scripts
+check_*.py
+debug_*.py
+diagnostic_*.py
+monitor_*.py
+verify_*.py
+enable_rls.*
+export_*.json
+robust_migrate.py
+simple_migrate.py
+test_render_connection.py
+test_postgres_integration.py
+run_*.sh
+run_*.bat
+
+# Scratch notes
+DIAGNOSTIC_*.md
+FINAL_MIGRATION.md
+FIX_RENDER_*.md
+PLAN.md
+PRODUCTION_*.md
+RENDER_*.md
+TODO_*.md
+
+# Data exports
+exported_*.json

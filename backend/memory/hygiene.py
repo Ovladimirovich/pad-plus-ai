@@ -1,5 +1,5 @@
 """
-🧹 Memory Hygiene — Гигиена памяти NeuroMind AI
+🧹 Memory Hygiene — Гигиена памяти PAD+ AI
 
 Ключ к реальной памяти — не просто сохранять всё, а:
 - Dedupe (удаление дубликатов)
@@ -18,7 +18,7 @@ import json
 import logging
 import re
 
-logger = logging.getLogger("neuromind.hygiene")
+logger = logging.getLogger("PAD+.hygiene")
 
 
 @dataclass
@@ -196,8 +196,8 @@ class MemoryHygiene:
                 accessed = datetime.fromisoformat(item.last_accessed)
                 if accessed < cutoff and item.access_count == 0:
                     obsolete.append(item)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"{__name__} error: {e}")
         
         return obsolete
     
@@ -356,8 +356,8 @@ class MemoryHygiene:
             age_days = (datetime.now() - created).days
             if age_days > 60:
                 reasons.append(f"устарело ({age_days} дней)")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"{__name__} error: {e}")
         
         if item.confidence < 0.3:
             reasons.append("низкая уверенность")

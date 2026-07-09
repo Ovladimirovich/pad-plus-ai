@@ -1,0 +1,33 @@
+{
+  "updated": 1783376623.4809194,
+  "interactions": [
+    {
+      "timestamp": 1783376623.4794457,
+      "prompt": "test",
+      "strategy": "reasoning",
+      "evaluation": {
+        "overall": 0.85
+      },
+      "context": {
+        "topic_complexity": "short",
+        "message_length": 4,
+        "has_question": false
+      },
+      "context_key": "len=short"
+    },
+    {
+      "timestamp": 1783376623.4805691,
+      "prompt": "test2",
+      "strategy": "simple",
+      "evaluation": {
+        "overall": 0.7
+      },
+      "context": {
+        "topic_complexity": "short",
+        "message_length": 5,
+        "has_question": false
+      },
+      "context_key": "len=short"
+    }
+  ]
+}

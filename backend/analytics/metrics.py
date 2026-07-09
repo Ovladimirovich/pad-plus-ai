@@ -14,12 +14,12 @@ from typing import Dict, List, Any, Optional
 from collections import Counter, defaultdict
 import logging
 
-logger = logging.getLogger("neuromind.analytics")
+logger = logging.getLogger("PAD+.analytics")
 
 
 class Analytics:
     """
-    📊 Аналитика использования NeuroMind AI
+    📊 Аналитика использования PAD+ AI
     
     - Подсчёт сообщений и сессий
     - Граф активностей по времени
@@ -207,8 +207,8 @@ class Analytics:
                 if role in by_role:
                     by_role[role] += 1
                 total_tokens += data.get('tokens', 0)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"{__name__} error: {e}")
         
         # Количество сессий
         cursor.execute("""
@@ -261,8 +261,8 @@ class Analytics:
                 hourly[ts.hour] += 1
                 weekday[ts.weekday()] += 1
                 daily[ts.strftime("%Y-%m-%d")] += 1
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"{__name__} error: {e}")
         
         conn.close()
         
@@ -314,8 +314,8 @@ class Analytics:
                 topic = data.get('topic')
                 if topic:
                     topics[topic] += 1
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"{__name__} error: {e}")
         
         conn.close()
         
@@ -372,6 +372,45 @@ class Analytics:
         
         return deleted
 
+    def get_activity_data(self, hours: int = 24) -> Dict[str, Any]:
+        """Метрики активности для графиков (для dashboard)"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+
+        # Данные по часам
+        cursor.execute("""
+            SELECT timestamp FROM analytics_events
+            WHERE event_type = 'message' AND timestamp >= ?
+        """, (cutoff,))
+
+        hourly_data = defaultdict(int)
+        for row in cursor.fetchall():
+            try:
+                ts = datetime.fromisoformat(row['timestamp'])
+                hour_key = ts.strftime("%H:00")
+                hourly_data[hour_key] += 1
+            except Exception as e:
+                logger.warning(f"{__name__} error: {e}")
+
+        conn.close()
+
+        # Формируем ответ для фронтенда
+        hours_list = []
+        dialogs_list = []
+        for i in range(hours):
+            hour_ts = datetime.now() - timedelta(hours=i)
+            hour_key = hour_ts.strftime("%H:00")
+            hours_list.insert(0, hour_key)
+            dialogs_list.insert(0, hourly_data.get(hour_key, 0))
+
+        return {
+            "dialogs_per_hour": [{"hour": h, "count": c} for h, c in zip(hours_list, dialogs_list)],
+            "avg_confidence": [],
+            "emotion_history": []
+        }
+
 
 # Глобальный экземпляр
 _analytics: Optional[Analytics] = None
@@ -383,3 +422,8 @@ def get_analytics() -> Analytics:
     if _analytics is None:
         _analytics = Analytics()
     return _analytics
+
+
+def get_metrics() -> Analytics:
+    """Алиас для get_analytics() - для совместимости с frontend_routes"""
+    return get_analytics()

@@ -1,34 +1,76 @@
 ---
-name: Bug report
-about: Report a bug to help us improve PAD+ AI
-title: "[Bug] "
-labels: bug
+name: "🐛 Bug Report (PAD+ AI)"
+about: "Сообщить об ошибке в когнитивном пайплайне, X-Ray, HEALER или интерфейсе"
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
 assignees: ""
 ---
 
-## Describe the bug
-A clear and concise description of what the bug is.
+## Описание проблемы
 
-## To Reproduce
-Steps to reproduce the behavior:
+Кратко опишите, что пошло не так. Какая часть системы отказала?
 
-```python
-# Minimal reproduction script
-```
+## Шаги для воспроизведения
 
-## Expected behavior
-A clear and concise description of what you expected to happen.
+1. Открыл приложение по адресу: `https://pad-plus-ai.onrender.com`
+2. Выбрал провайдера: (OpenRouter / GigaChat / другой)
+3. Ввёл запрос: `...`
+4. Выбрал модель: (например, `openai/gpt-4o-mini`, `anthropic/claude-sonnet-4-20250514`)
+5. Ошибка проявилась на этапе (фазе): (выбрать из списка ниже)
 
-## Actual behavior
-What actually happened. Include error output if applicable.
+**Фазы пайплайна:**  
+`safety` → `intent` → `retrieve` → `persona` → `generate` → `verify` → `remember` → `emit` → `complete`  
+Дополнительные: `TruthLoop`, `AntiDirective`, `ResponseGuard`, `EmotionUpdate`
 
-## Environment
+## Данные из X-Ray (ОБЯЗАТЕЛЬНО)
 
-- Python version:
-- Node.js version:
-- OS:
-- PAD+ AI version (or commit hash):
-- Browser (if frontend issue):
+Поскольку PAD+ AI имеет систему наблюдаемости **X-Ray**, укажите максимум из доступного:
+- **Trace ID** (если доступен):
+- **Фаза сбоя** (какая именно фаза пайплайна упала):
+- **Thought Stream** (что AI «думал» на этом этапе — если есть):
 
-## Additional context
-Add any other context about the problem here.
+> Если X-Ray панель в интерфейсе недоступна, проверьте **консоль браузера (F12 → Console)** или **логи бэкенда**. Любая информация поможет.
+
+## HEALER — самодиагностика
+
+Если ошибка связана с самодиагностикой, мета-обучением или восстановлением системы:
+
+- **Что показал HEALER** (если доступен):
+- **Была ли попытка самовосстановления?** (Да / Нет / Неизвестно)
+- **Результат самовосстановления** (успешно / частично / не сработало):
+
+## Ожидаемое поведение
+
+Что должно было произойти по логике когнитивного пайплайна?
+
+## Фактическое поведение
+
+Что произошло на самом деле? (Текст ошибки, пустой ответ, зависание, неверные данные и т.д.)
+
+## Скриншоты
+
+Приложите скриншоты интерфейса, панели X-Ray, HEALER или консоли браузера.
+
+> Перетащите изображения сюда или вставьте из буфера (Ctrl+V)
+
+## Окружение
+
+- **Браузер**: (Chrome / Firefox / Safari / Edge, версия)
+- **Версия приложения**: v4.0
+- **LLM-провайдер**: (OpenRouter / GigaChat / другой)
+- **Модель**: (например, `openai/gpt-4o-mini`, `gigachat-pro`)
+- **Тип ключа**: (собственный пользовательский)
+
+## Дополнительный контекст
+
+- **URL страницы** (если не основная):
+- **Была ли ошибка до этого?** (Да / Нет / Иногда)
+- **Частота воспроизведения**: (всегда / иногда / один раз)
+- **Логи (если есть доступ)**:
+
+## Чеклист перед отправкой
+
+- [ ] Я проверил, что такой баг ещё не сообщался (поиск по Issues)
+- [ ] Я указал Trace ID или объяснил, почему его нет
+- [ ] Я указал провайдера и модель
+- [ ] Я приложил скриншот, если это проблема интерфейса
