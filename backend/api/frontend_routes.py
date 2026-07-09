@@ -1396,8 +1396,10 @@ async def chat(
             )
 
     except ValueError as e:
+        logger.error(f"Chat 500 (ValueError): {e}")
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
+        logger.error(f"Chat 500: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Ошибка генерации: {str(e)}")
 
 
