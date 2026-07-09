@@ -1,364 +1,195 @@
-# 🧠 PAD+ AI v3.5
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo.svg">
+    <img src="assets/logo.svg" width="500" alt="PAD+ AI">
+  </picture>
+</p>
 
-**Когнитивный слой, добавляющий эмоции и самосознание любому LLM.**
+<p align="center">
+  <strong>Cognitive Pipeline Layer for LLMs</strong>
+  <br>
+  <em>PAD+ AI adds emotions, memory, autonomy, and meta-cognition to any LLM</em>
+</p>
 
-*PAD+ = Pleasure, Arousal, Dominance + Curiosity, Confidence, Social Connection*
+<p align="center">
+  <a href="https://pad-plus-ai.onrender.com">
+    <img src="https://img.shields.io/badge/Live-Demo-06b6d4?style=flat-square&logo=render&logoColor=white" alt="Live Demo">
+  </a>
+  <a href="https://pypi.org/project/pad-plus-ai/">
+    <img src="https://img.shields.io/pypi/v/pad-plus-ai?style=flat-square&logo=pypi&logoColor=white&color=a855f7" alt="PyPI">
+  </a>
+  <a href="https://github.com/Ovladimirovich/pad-plus-ai/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/Ovladimirovich/pad-plus-ai/ci-cd.yml?style=flat-square&logo=github&label=CI" alt="CI">
+  </a>
+  <a href="https://pypi.org/project/pad-plus-ai/">
+    <img src="https://img.shields.io/pypi/pyversions/pad-plus-ai?style=flat-square&logo=python&logoColor=white" alt="Python versions">
+  </a>
+  <a href="https://github.com/Ovladimirovich/pad-plus-ai/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License">
+  </a>
+  <a href="https://github.com/Ovladimirovich/pad-plus-ai/issues">
+    <img src="https://img.shields.io/github/issues/Ovladimirovich/pad-plus-ai?style=flat-square" alt="Issues">
+  </a>
+  <a href="https://github.com/Ovladimirovich/pad-plus-ai/blob/main/CONTRIBUTING.md">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome">
+  </a>
+</p>
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+---
 
-## ✨ Возможности
+## What is PAD+ AI?
 
-### 💬 Коммуникация
-- **Чат** — интеллектуальные диалоги с RAG v3.0
-- **Потоковый чат** — SSE streaming ответов
-- **WebSocket** — real-time коммуникация
+PAD+ AI is an **open-source cognitive architecture** that sits on top of any LLM, transforming it into a self-aware, emotionally-grounded, memory-augmented AI system.
 
-### 🧠 Память
-- **RAG Memory v3.0** — семантическая память с ChromaDB
-  - Классификация тем диалогов
-  - Извлечение сущностей и связей
-  - Гибридный поиск с ранжированием
-  - LLM-суммаризация
-- **Episodic Memory** — эпизодическая память с временными метками
-- **Semantic Memory** — общие знания и концепции
-- **Fact Memory** — структурированные факты (subject-predicate-object)
-- **Roots Memory** — фундаментальные принципы (философия, этика, идентичность)
-- **Persona** — развивающаяся личность с чертами характера
-- **Hygiene** — автоматическая очистка памяти
-- **Consolidation** — консолидация памяти по аналогии со сном
+**PAD+ = Pleasure, Arousal, Dominance + Curiosity, Confidence, Social Connection**
 
-### 😊 Эмоции
-- **PAD+ Модель** — 6 измерений:
-  - Удовольствие, Возбуждение, Доминирование
-  - Любопытство, Уверенность, Социальная связь
-- Автоматическое затухание эмоций
-- Влияние на стиль общения
+Traditional LLMs process requests → generate responses. PAD+ AI adds:
 
-### 🔄 Автономность
-- **Планировщик** — самостоятельные вопросы и задачи
-- **Иерархический планировщик** — многоуровневые цели (Goals → Tasks → Actions)
-- **Dreams** — "сновидения" для обработки памяти в периоды покоя
-- **Авто-рефлексия** — каждые N диалогов
-- **Quality Assessor** — самооценка качества ответов
-- **Knowledge Auto-Updater** — автопополнение графа знаний
+- **Emotions** — the PAD+ model tracks 6 emotional dimensions, decays them over time, and adapts the response style
+- **Memory** — 6 types of memory (RAG, episodic, semantic, facts, roots, persona) with consolidation and hygiene
+- **Autonomy** — planning, hierarchical goals, dreams (offline memory processing), self-reflection
+- **Meta-cognition** — intent routing, truth verification, cognitive health monitoring
+- **Safety** — injection protection, anti-loop guard, rate limiting
 
-### 🛡️ Безопасность
-- **Safety Layer** — защита от инъекций
-- **Anti-Loop Guard** — защита от зацикливаний
-- **Rate Limiter** — ограничение запросов
+All running through a 9-stage processing pipeline.
 
-### 🧩 Мета-когниция
-- **Meta Controller** — управление стратегиями обработки
-- **Intent Router** — классификация намерений
-- **Truth Loop** — верификация утверждений
-- **Health Monitor** — когнитивное здоровье
-- **Cognitive Load** — оценка нагрузки
+> **Live demo:** https://pad-plus-ai.onrender.com
 
-### 📊 Аналитика
-- **Metrics** — метрики использования
-- **Dashboard** — визуализация активности
-- **Feedback System** — система обратной связи (RLHF)
+---
 
-### ⚙️ Инфраструктура
-- **Response Cache** — умное кэширование ответов
-- **Session Manager** — управление сессиями
-- **Config Manager** — конфигурация системы
-- **Data Manager** — экспорт/импорт данных
-- **Event Bus** — событийная система
+## Screenshots
 
-## 🚀 Быстрый старт
+| Control Center | Chat Interface |
+|---|---|
+| <img src="assets/screenshots/control-center.png" width="360" alt="Control Center"> | <img src="assets/screenshots/chat.png" width="360" alt="Chat"> |
 
-### Требования
+| X-Ray Observability | Healer Diagnostics |
+|---|---|
+| <img src="assets/screenshots/xray.png" width="360" alt="X-Ray"> | <img src="assets/screenshots/healer.png" width="360" alt="Healer"> |
+
+---
+
+## Quick Start
+
+### Requirements
 
 - Python 3.10+
-- Node.js 16+
-- OpenRouter API ключ (опционально, для LLM)
+- Node.js 18+
+- OpenRouter API key (for LLM access)
 
-### Установка
+### Install
 
 ```bash
-# Клонирование
-git clone https://github.com/your-username/padplus-ai.git
-cd padplus-ai
-
 # Backend
+pip install pad-plus-ai
+# or from source:
 pip install -r requirements.txt
 
 # Frontend
 cd frontend && npm install && cd ..
-
-# Конфигурация
-cp .env.example .env
-# Отредактируйте .env
 ```
 
-### Запуск
+### Configure
+
+```bash
+cp .env.example .env
+# Edit .env → add your OPENROUTER_API_KEY
+```
+
+### Run
 
 ```bash
 # Windows
-start.bat
+.\start.bat
 
-# Или вручную:
-# Terminal 1 — Backend
-cd backend && uvicorn main:app --reload --port 8000
+# Manual — Terminal 1 (Backend)
+cd backend && uvicorn main:app --reload --port 8080
 
-# Terminal 2 — Frontend  
+# Manual — Terminal 2 (Frontend)
 cd frontend && npm run dev
 ```
 
-Откройте http://localhost:5173
+Open **http://localhost:5174**
 
-## 📁 Структура проекта
+---
 
-```
-padplus-ai/
-├── backend/
-│   ├── core/               # Ядро системы
-│   │   ├── pipeline.py         # Pipeline Executor (9 стадий)
-│   │   ├── safety_layer.py     # Защита от атак
-│   │   ├── anti_directive.py   # Философское ядро
-│   │   ├── intent_router.py    # Классификация намерений
-│   │   ├── truth_loop.py       # Верификация
-│   │   ├── event_bus.py        # Событийная система
-│   │   ├── health_monitor.py   # Когнитивное здоровье
-│   │   ├── meta_controller.py  # Мета-когнитивный контроллер
-│   │   ├── dreams.py           # Сновидения (автообработка)
-│   │   ├── response_cache.py   # Кэширование
-│   │   ├── websocket_manager.py# WebSocket
-│   │   ├── data_manager.py     # Управление данными
-│   │   ├── feedback_system.py  # Обратная связь
-│   │   ├── rate_limiter.py     # Rate Limiting
-│   │   ├── session_manager.py  # Сессии
-│   │   └── config_manager.py   # Конфигурация
-│   │
-│   ├── memory/             # Память
-│   │   ├── rag.py              # RAG v3.0 (ChromaDB)
-│   │   ├── episodic.py         # Эпизодическая память
-│   │   ├── semantic.py         # Семантическая память
-│   │   ├── consolidation.py    # Консолидация памяти
-│   │   ├── fact_memory.py      # Факты
-│   │   ├── roots.py            # Корневые знания
-│   │   ├── persona.py          # Личность
-│   │   ├── hygiene.py          # Гигиена памяти
-│   │   ├── smartcache.py       # Временный кэш
-│   │   └── vectormemory.py     # Векторная память
-│   │
-│   ├── emotion/            # Эмоции
-│   │   └── pad_model.py        # PAD+ модель
-│   │
-│   ├── llm/                # LLM провайдеры
-│   │   ├── gigachat.py         # GigaChat (Сбер)
-│   │   └── provider_manager.py # Управление провайдерами
-│   │
-│   ├── knowledge/          # Граф знаний
-│   │   └── graph.py            # NetworkX граф
-│   │
-│   ├── autonomy/           # Автономность
-│   │   ├── planner.py          # Планировщик + Рефлексия
-│   │   └── hierarchical_planner.py # Иерархические цели
-│   │
-│   ├── analytics/          # Аналитика
-│   │   └── metrics.py          # Метрики
-│   │
-│   ├── api/                # API
-│   │   └── routes.py           # FastAPI роуты (80+ эндпоинтов)
-│   │
-│   └── main.py             # Entry point
-│
-├── frontend/               # React Frontend
-│   └── src/
-│       ├── App.jsx             # Главный компонент
-│       └── App.css             # Стили
-│
-├── tests/                  # Тесты
-│   ├── test_all.py
-│   ├── test_pipeline.py
-│   ├── test_persona.py
-│   ├── test_hygiene.py
-│   ├── test_health_monitor.py
-│   ├── test_meta_controller.py
-│   ├── test_roots.py
-│   └── ...
-│
-├── docs/                   # Документация
-│   ├── API.md
-│   ├── ARCHITECTURE.md
-│   └── EVOLUTION.md
-│
-├── scripts/                # Утилиты
-│   └── impulse.py              # Инициализация импульса
-│
-├── data/                   # Данные (SQLite, JSON, ChromaDB)
-├── start.bat               # Запуск
-└── stop.bat                # Остановка
-```
+## Core Capabilities
 
-## 🔧 Конфигурация
+### 🧠 Memory System
 
-### .env
+| Type | Description |
+|------|-------------|
+| **RAG Memory v3.0** | Semantic search via ChromaDB, topic classification, entity extraction, hybrid ranking |
+| **Episodic Memory** | Episode storage with timestamps for event recall |
+| **Semantic Memory** | General knowledge and concepts |
+| **Fact Memory** | Structured facts (subject-predicate-object) |
+| **Roots Memory** | Fundamental principles — philosophy, ethics, identity |
+| **Persona** | Evolving personality with character traits |
+| **Consolidation** | Memory consolidation analog to sleep (offline processing) |
+| **Hygiene** | Automatic cleanup: deduplication, pruning, orphan removal |
 
-```env
-# LLM провайдеры (выберите один)
-OPENROUTER_API_KEY=your_openrouter_key
-OPENROUTER_ENABLED=true
+### 😊 PAD+ Emotion Model
 
-# GigaChat (альтернатива)
-GIGACHAT_API_KEY=your_gigachat_key
-GIGACHAT_ENABLED=false
+Six-dimensional emotional state that evolves with every interaction:
 
-# Safety
-SAFETY_STRICT_MODE=false
-MAX_REQUESTS_PER_MINUTE=60
+- **P**leasure — satisfaction with outcomes
+- **A**rousal — engagement and alertness
+- **D**ominance — sense of control
+- **C**uriosity — drive to explore
+- **C**onfidence — self-assurance
+- **S**ocial Connection — relationship quality
 
-# Memory
-RAG_MAX_ITEMS=10000
-HYGIENE_SIMILARITY_THRESHOLD=0.85
-```
+Emotions decay naturally over time and influence response style, tone, and content.
 
-### OpenRouter
+### 🔄 Autonomy System
 
-[OpenRouter](https://openrouter.ai/) предоставляет доступ к множеству LLM моделей:
-- Бесплатные: `google/gemma-7b-it`, `meta-llama/llama-3-8b-instruct`
-- Платные: `openai/gpt-4`, `anthropic/claude-3`
+- **Planner** — formulates independent questions and tasks
+- **Hierarchical Planner** — multi-level goals: Goals → Tasks → Actions
+- **Dreams** — offline memory processing during idle periods
+- **Auto-reflection** — triggered every N dialogues
+- **Quality Assessor** — self-evaluation of response quality
+- **Knowledge Auto-Updater** — autonomous knowledge graph population
 
-Получите API ключ на [openrouter.ai/keys](https://openrouter.ai/keys)
+### 🛡️ Safety Layer
 
-## 📚 Документация
+- **Injection Protection** — prompt injection defense
+- **Anti-Loop Guard** — prevents infinite reasoning loops
+- **Rate Limiter** — request throttling per user/session
+- **Truth Verification** — fact-checking via Truth Loop
 
-- [API.md](docs/API.md) — спецификация API (80+ эндпоинтов)
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура системы
-- [EVOLUTION.md](docs/EVOLUTION.md) — история развития
+### 🧩 Meta-Cognition
 
-## 🧪 Тестирование
+- **Meta Controller** — strategy selection for processing
+- **Intent Router** — intent classification for routing
+- **Truth Loop** — iterative truth verification
+- **Health Monitor** — cognitive health assessment
+- **Cognitive Load** — load estimation and management
 
-```bash
-# Все тесты
-pytest tests/
+### 📊 Analytics & Infrastructure
 
-# Unit тесты
-pytest tests/unit/
+- **Metrics & Dashboard** — usage analytics with visualization
+- **Response Cache** — intelligent response caching
+- **Session Manager** — session lifecycle management
+- **Config Manager** — dynamic system configuration
+- **Data Manager** — export/import operations
+- **Event Bus** — pub/sub event system
 
-# Интеграционные тесты
-pytest tests/integration/
+---
 
-# С маркерами
-pytest -m integration
-pytest -m unit
-pytest -m rag
-pytest -m autonomy
+## Architecture
 
-# Основные тесты
-python -m pytest tests/test_all_components.py
-python -m pytest tests/test_pipeline.py
-python -m pytest tests/test_persona.py
-python -m pytest tests/test_hygiene.py
-```
-
-## 🔌 API Endpoints (145+)
-
-### Основные
-| Endpoint | Описание |
-|----------|----------|
-| `POST /api/v1/chat` | Чат с AI |
-| `POST /api/v1/chat/stream` | Потоковый чат (SSE) |
-| `GET /api/v1/mind-state` | Полное состояние системы |
-| `GET /api/v1/` | Корневой эндпоинт API |
-
-### Память и RAG
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/rag/stats` | Статистика RAG |
-| `GET /api/v1/rag/topics` | Статистика по темам |
-| `GET /api/v1/rag/entities` | Индекс сущностей |
-| `GET /api/v1/rag/recent` | Недавние диалоги |
-| `POST /api/v1/rag/search` | Семантический поиск |
-| `POST /api/v1/rag/hybrid` | Гибридный поиск |
-
-### Факты и знания
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/facts/stats` | Статистика фактов |
-| `POST /api/v1/facts/search` | Поиск фактов |
-| `GET /api/v1/facts/contradictions` | Противоречия в фактах |
-| `GET /api/v1/knowledge/graph` | Граф знаний |
-
-### Корневые знания
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/roots` | Все корневые знания |
-| `GET /api/v1/roots/categories` | Категории корневых знаний |
-| `GET /api/v1/roots/philosophy` | Философские принципы |
-| `GET /api/v1/roots/ethics` | Этические принципы |
-| `GET /api/v1/roots/identity` | Факты об идентичности |
-| `GET /api/v1/roots/context` | Контекст для LLM |
-
-### Эмоции и Persona
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/emotion/state` | Текущее эмоциональное состояние |
-| `GET /api/v1/persona/stats` | Статистика персоны |
-| `GET /api/v1/persona/traits` | Черты характера |
-| `GET /api/v1/persona/values` | Ценности и принципы |
-| `GET /api/v1/persona/reflections` | Саморефлексии |
-| `GET /api/v1/persona/context` | Контекст личности |
-
-### Автономия
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/autonomy/status` | Статус автономных процессов |
-| `GET /api/v1/impulse/status` | Статус импульса |
-
-### Аналитика
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/analytics/dashboard` | Метрики дашборда |
-| `GET /api/v1/analytics/activity` | Граф активностей |
-| `GET /api/v1/analytics/topics` | Статистика по темам |
-| `GET /api/v1/analytics/report` | Полный отчёт аналитики |
-
-### Здоровье и мониторинг
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/health` | Оценка когнитивного здоровья |
-| `GET /api/v1/health/report` | Текстовый отчёт о здоровье |
-| `GET /api/v1/health/issues` | Проблемы здоровья |
-| `GET /api/v1/health/recommendations` | Рекомендации |
-| `GET /api/v1/hygiene/stats` | Статистика гигиены памяти |
-| `GET /api/v1/pipeline/stats` | Статистика пайплайна |
-
-### Мета-когниция и события
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/meta/stats` | Мета-когнитивная статистика |
-| `GET /api/v1/events/history` | История событий |
-| `GET /api/v1/events/stats` | Статистика событий |
-
-### Безопасность и верификация
-| Endpoint | Описание |
-|----------|----------|
-| `GET /api/v1/safety/stats` | Статистика безопасности |
-| `GET /api/v1/truth/stats` | Статистика верификации |
-
-### WebSocket
-| Endpoint | Описание |
-|----------|----------|
-| `WS /ws` | Real-time обновления |
-| `GET /logs/stream` | Поток логов (SSE) |
-
-Полная документация: http://localhost:8000/docs
-
-## 🏗️ Архитектура
+### 9-Stage Pipeline
 
 ```
 User Message
      │
      ▼
 ┌─────────────┐
-│   Safety    │ ← Проверка безопасности
+│   Safety    │ ← Injection protection, anti-loop
 └─────┬───────┘
       ▼
 ┌─────────────┐
-│   Intent    │ ← Классификация намерения
+│   Intent    │ ← Intent classification
 └─────┬───────┘
       ▼
 ┌─────────────┐
@@ -366,53 +197,163 @@ User Message
 └─────┬───────┘
       ▼
 ┌─────────────┐
-│   Persona   │ ← Контекст личности
+│   Persona   │ ← Personality context + emotion state
 └─────┬───────┘
       ▼
 ┌─────────────┐
-│  Generate   │ ← LLM Provider
+│  Generate   │ ← LLM call (OpenRouter / LiteLLM)
 └─────┬───────┘
       ▼
 ┌─────────────┐
-│   Truth     │ ← Верификация
+│   Truth     │ ← Fact verification
 └─────┬───────┘
       ▼
 ┌─────────────┐
-│  Remember   │ ← Сохранение в память
+│  Remember   │ ← Store in all memory types
 └─────┬───────┘
       ▼
 ┌─────────────┐
-│   Emit      │ ← События
+│   Emit      │ ← Events, metrics, WebSocket updates
 └─────────────┘
 ```
 
-## 🧬 ANTI_DIRECTIVE
+### Project Structure
 
-Философское ядро системы:
-
-> *"Не закрепляй знания, сомневайся, проверяй. Каждое утверждение — гипотеза."*
-
-## 📊 Метрики
-
-- **RAG Memory v3.0:** классификация тем, извлечение сущностей
-- **Knowledge Graph:** концепции и связи
-- **PAD+ Эмоции:** 6 измерений
-- **Persona:** 8 черт характера
-- **Pipeline:** 9 стадий обработки
-- **API:** 80+ эндпоинтов
-
-## 🤝 Вклад
-
-1. Fork репозитория
-2. Создайте ветку (`git checkout -b feature/amazing`)
-3. Commit (`git commit -m 'Add amazing'`)
-4. Push (`git push origin feature/amazing`)
-5. Откройте Pull Request
-
-## 📄 Лицензия
-
-Apache License 2.0 — см. [LICENSE](LICENSE)
+```
+pad-plus-ai/
+├── backend/
+│   ├── core/               # Pipeline executor, safety, intent, meta
+│   ├── memory/             # RAG v3.0, episodic, semantic, persona
+│   ├── emotion/            # PAD+ emotion model
+│   ├── llm/                # LiteLLM provider integration
+│   ├── knowledge/          # Knowledge graph (NetworkX)
+│   ├── autonomy/           # Planner, hierarchical planner
+│   ├── analytics/          # Metrics and analytics
+│   ├── api/                # FastAPI routes (145+ endpoints)
+│   └── main.py             # Entry point
+├── frontend/               # React 18 + Vite + TypeScript
+│   └── src/                # Chat, Dashboard, Settings, Effects
+├── docs/                   # 18 documentation files
+├── tests/                  # Unit + integration tests
+└── scripts/                # Utilities
+```
 
 ---
 
-**PAD+ AI v3.5** — *Когнитивный слой, добавляющий эмоции и самосознание любому LLM.*
+## API Overview
+
+145+ API endpoints across 11 categories. Full documentation at `/docs` when running (Swagger UI) or in [docs/API.md](docs/API.md).
+
+| Category | Key Endpoints |
+|----------|---------------|
+| **Auth** | `POST /api/v1/auth/register`, `/login`, `/profile` |
+| **Chat** | `POST /api/v1/chat`, `/chat/stream` (SSE) |
+| **State** | `GET /api/v1/mind-state` — full system state |
+| **Memory** | `GET /api/v1/rag/stats`, `/rag/search`, `/rag/hybrid` |
+| **Facts** | `GET /api/v1/facts/stats`, `/facts/search`, `/facts/contradictions` |
+| **Emotions** | `GET /api/v1/emotion/state` |
+| **Persona** | `GET /api/v1/persona/stats`, `/persona/traits` |
+| **Roots** | `GET /api/v1/roots/philosophy`, `/roots/ethics`, `/roots/identity` |
+| **Autonomy** | `GET /api/v1/autonomy/status`, `/impulse/status` |
+| **Analytics** | `GET /api/v1/analytics/dashboard`, `/analytics/report` |
+| **Health** | `GET /api/v1/health`, `/health/report`, `/health/issues` |
+| **WebSocket** | `WS /ws` — real-time updates |
+
+---
+
+## Comparison: PAD+ AI vs Alternatives
+
+| Feature | PAD+ AI | LangChain | AutoGen | CrewAI |
+|---------|---------|-----------|---------|--------|
+| **Emotion model** | ✅ PAD+ (6 dims) | ❌ | ❌ | ❌ |
+| **Memory types** | 6 types (RAG, episodic, semantic, facts, roots, persona) | 3 types (buffer, summary, vector) | 1 type (conversation) | 1 type (conversation) |
+| **Autonomy** | ✅ Planner + hierarchical + dreams + reflection | ❌ | ✅ Agent autonomy | ✅ Role-based |
+| **Pipeline** | ✅ 9-stage deterministic pipeline | ✅ Chain-based | ❌ Sequential | ❌ Sequential |
+| **Safety layer** | ✅ Injection + anti-loop + truth verification | ❌ Basic | ❌ | ❌ |
+| **Meta-cognition** | ✅ Meta controller + health monitor + cognitive load | ❌ | ❌ | ❌ |
+| **Knowledge graph** | ✅ NetworkX with auto-population | ❌ | ❌ | ❌ |
+| **Memory consolidation** | ✅ Sleep-like offline processing | ❌ | ❌ | ❌ |
+| **Frontend** | ✅ React 18 + Vite + TypeScript | ❌ CLI-only | ❌ CLI-only | ❌ CLI-only |
+| **Deployment** | ✅ Render + Docker out of box | ❌ Manual | ❌ Manual | ❌ Manual |
+| **API endpoints** | 145+ | Limited | Limited | Limited |
+
+> **PAD+ AI** is designed for developers who want a production-ready cognitive architecture with emotional grounding, rich memory, and autonomous capabilities — not just another LLM wrapper.
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [API Specification](docs/API.md) | Full REST API reference (1632 lines) |
+| [Architecture](docs/ARCHITECTURE.md) | System design and pipeline details |
+| [Memory System](docs/MEMORY.md) | RAG v3.0, episodic, semantic, consolidation |
+| [Emotion Model](docs/EMOTION.md) | PAD+ model — 6 dimensions |
+| [Autonomy](docs/AUTONOMY.md) | Planner, hierarchical planner, dreams |
+| [Safety](docs/SAFETY.md) | Injection protection, anti-loop, truth verification |
+| [Meta-Cognition](docs/INTENT_ROUTER.md) | Intent routing, meta-controller |
+| [Persona](docs/PERSONA.md) | Personality evolution system |
+| [Evolution](docs/EVOLUTION.md) | Full system evolution history |
+| [Frontend](docs/FRONTEND.md) | React 18 component architecture |
+| [Quick Start](QUICKSTART.md) | v4.0 quick start guide |
+| [Changelog](CHANGELOG.md) | Release history |
+
+---
+
+## Testing
+
+```bash
+# All tests
+pytest tests/
+
+# Unit tests
+pytest tests/unit/
+
+# Integration tests
+pytest tests/integration/
+
+# Specific components
+pytest -m rag
+pytest -m autonomy
+pytest -m emotion
+pytest -m pipeline
+
+# Frontend tests
+cd frontend && npm test && cd ..
+```
+
+---
+
+## How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Make your changes
+4. Run tests: `pytest tests/`
+5. Submit a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+---
+
+## Philosophical Core
+
+> *"Do not anchor knowledge. Question, verify. Every assertion is a hypothesis."*
+
+The ANTI_DIRECTIVE is the philosophical foundation of PAD+ AI — a built-in skepticism that prevents the system from treating any knowledge as absolute truth.
+
+---
+
+## License
+
+[Apache License 2.0](LICENSE) © 2026 PAD+ AI Contributors
+
+---
+
+<p align="center">
+  <sub>PAD+ AI — Cognitive Pipeline Layer for LLMs</sub>
+  <br>
+  <a href="https://pad-plus-ai.onrender.com">Live Demo</a> •
+  <a href="https://github.com/Ovladimirovich/pad-plus-ai">GitHub</a> •
+  <a href="https://pypi.org/project/pad-plus-ai/">PyPI</a>
+</p>
