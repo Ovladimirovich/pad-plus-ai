@@ -126,12 +126,12 @@ healer_viewer*.png
 !docs/archive/**
 # Git filter-repo temp.git-rewrite/
 
-# Diagnostic / one-off scripts
-check_*.py
-debug_*.py
-diagnostic_*.py
-monitor_*.py
-verify_*.py
+# Diagnostic / one-off scripts (только корень проекта)
+/check_*.py
+/debug_*.py
+/diagnostic_*.py
+/monitor_*.py
+/verify_*.py
 enable_rls.*
 export_*.json
 robust_migrate.py
