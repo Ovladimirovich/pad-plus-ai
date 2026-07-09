@@ -138,10 +138,8 @@ class ProviderManager:
         """
         if provider:
             unique_chain = [provider]
-            gigachat_api_key = self._get_gigachat_key()
         else:
             unique_chain = DEFAULT_FALLBACK_CHAIN.copy()
-            gigachat_api_key = None
 
         attempted_providers: List[str] = []
         provider_errors: Dict[str, str] = {}
@@ -150,10 +148,7 @@ class ProviderManager:
             attempted_providers.append(current_provider)
 
             try:
-                if current_provider == "gigachat":
-                    current_key = gigachat_api_key or api_key
-                else:
-                    current_key = api_key
+                current_key = api_key
 
                 if not current_key:
                     provider_errors[current_provider] = "API ключ не настроен"
@@ -228,10 +223,7 @@ class ProviderManager:
             chain = DEFAULT_FALLBACK_CHAIN.copy()
 
         for current_provider in chain:
-            if current_provider == "gigachat":
-                current_key = self._get_gigachat_key() or api_key
-            else:
-                current_key = api_key
+            current_key = api_key
 
             if not current_key:
                 logger.warning(f"⚠️ Stream: {current_provider} пропущен (нет ключа)")
@@ -325,13 +317,6 @@ class ProviderManager:
     def has_active_providers(self) -> bool:
         """Проверяет, доступен ли хотя бы один провайдер."""
         return True
-
-    def _get_gigachat_key(self) -> Optional[str]:
-        """Получает системный ключ GigaChat из .env"""
-        import os
-        key = os.getenv("GIGACHAT_AUTH_KEY")
-        return key.strip() if key and key.strip() else None
-
 
 # === Single instance ===
 _manager: Optional[ProviderManager] = None
