@@ -547,8 +547,28 @@ def get_config() -> ConfigManager:
     return _config_manager
 
 
+def get_app_env() -> str:
+    """
+    Определяет окружение: development или production.
+
+    Приоритет:
+    1. Явная APP_ENV (development/production)
+    2. RENDER=true → production
+    3. Иначе → development
+    """
+    env = os.getenv("APP_ENV", "").strip().lower()
+    if env in ("production", "prod"):
+        return "production"
+    if os.getenv("RENDER") == "true":
+        return "production"
+    return "development"
+
+
 def get_database_url() -> str:
     """Получить URL базы данных из переменных окружения"""
+    # В development-режиме всегда SQLite, даже если DATABASE_URL задан
+    if get_app_env() == "development":
+        return 'sqlite:///./data/memory.db'
     return os.getenv('DATABASE_URL', 'sqlite:///./data/memory.db')
 
 

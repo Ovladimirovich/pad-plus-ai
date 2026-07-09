@@ -34,6 +34,21 @@ except Exception as e:
 _supabase: Optional[Client] = None
 
 
+def _is_development() -> bool:
+    """
+    Проверяет, работаем ли мы в development-режиме.
+
+    В development-режиме Supabase отключается принудительно,
+    даже если библиотека установлена и credentials есть в .env.
+    """
+    if os.getenv("RENDER") == "true":
+        return False
+    env = os.getenv("APP_ENV", "").strip().lower()
+    if env in ("production", "prod"):
+        return False
+    return True
+
+
 def get_supabase() -> Optional[Client]:
     """
     Возвращает клиент Supabase
@@ -48,6 +63,10 @@ def get_supabase() -> Optional[Client]:
     
     if _supabase is not None:
         return _supabase
+
+    if _is_development():
+        logger.info("🔧 Локальный режим: Supabase отключён (APP_ENV=development)")
+        return None
     
     if not HAS_SUPABASE:
         logger.warning("⚠️ Supabase клиент не установлен")
@@ -112,6 +131,9 @@ def get_supabase_service() -> Optional[Client]:
     
     if '_supabase_service' in globals() and _supabase_service is not None:
         return _supabase_service
+
+    if _is_development():
+        return None
     
     if not HAS_SUPABASE:
         logger.warning("⚠️ Supabase клиент не установлен")
@@ -145,6 +167,9 @@ def create_supabase_client_with_access_token(access_token: str) -> Optional[Clie
     Создаёт новый Supabase клиент, который использует service_role или anon key
     вместе с Authorization заголовком пользователя.
     """
+    if _is_development():
+        return None
+
     if not HAS_SUPABASE:
         logger.warning("⚠️ Supabase клиент не установлен")
         return None

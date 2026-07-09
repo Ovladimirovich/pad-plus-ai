@@ -319,18 +319,28 @@ frontend_url = os.getenv("FRONTEND_URL", "")
 # CSRF защита
 csrf_secret_key = os.getenv("CSRF_SECRET_KEY")
 
-# Определение production среды
-is_production = (
-    os.getenv("RENDER") == "true" or 
-    os.getenv("RENDER_EXTERNAL_HOSTNAME") or
-    "onrender.com" in str(frontend_url) or
-    "render.app" in str(frontend_url)
-)
+# Определение режима окружения
+from core.config_manager import get_app_env
+app_env = get_app_env()
+is_production = (app_env == "production")
+
+if app_env == "production":
+    mode_icon = "🚀"
+    mode_name = "PRODUCTION"
+    db_name = "Supabase/PostgreSQL"
+else:
+    mode_icon = "🔧"
+    mode_name = "DEVELOPMENT"
+    db_name = "SQLite (data/memory.db)"
+
+logger.info("=" * 55)
+logger.info(f"  {mode_icon}  РЕЖИМ: {mode_name}")
+logger.info(f"  💾  БД:    {db_name}")
+logger.info("=" * 55)
 
 # Порт для production — читается из переменной окружения PORT
 backend_port = int(os.getenv("PORT", os.getenv("BACKEND_PORT", "8000")))
 
-logger.info(f"🏭 Production mode: {is_production}")
 logger.info(f"🌍 FRONTEND_URL: {frontend_url if frontend_url else '(not set)'}")
 logger.info(f"🔌 Backend port: {backend_port}")
 

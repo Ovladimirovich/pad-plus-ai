@@ -22,7 +22,13 @@ import os
 
 import os as _os
 
-if _os.environ.get("DATABASE_URL", "").startswith("postgresql") or _os.environ.get("SUPABASE_URL"):
+try:
+    from core.config_manager import get_app_env
+    _use_postgres = (get_app_env() == "production" and _os.environ.get("DATABASE_URL", "").startswith("postgresql"))
+except ImportError:
+    _use_postgres = False
+
+if _use_postgres or (_os.environ.get("DATABASE_URL", "").startswith("postgresql") and _os.environ.get("SUPABASE_URL")):
     from .episodic_postgres import get_episodic_memory, Episode
     from .semantic_postgres import get_semantic_memory, KnowledgeType
     from .rag_postgres import get_rag as get_rag_memory

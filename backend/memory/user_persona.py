@@ -307,24 +307,26 @@ def get_user_persona_manager() -> Any:
     """
     Фабрика: возвращает менеджер персонажей.
 
-    Если настроен DATABASE_URL или SUPABASE_URL — использует
-    UserPersonaPostgresManager, иначе — JSON-файл (UserPersonaManager).
+    В development-режиме всегда JSON-файл.
+    В production — UserPersonaPostgresManager, если есть DATABASE_URL.
     """
     global _persona_manager
     if _persona_manager is not None:
         return _persona_manager
 
-    import os
+    from core.config_manager import get_app_env
 
-    if os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_URL"):
-        try:
-            from memory.user_persona_postgres import UserPersonaPostgresManager
+    if get_app_env() == "production":
+        import os
+        if os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_URL"):
+            try:
+                from memory.user_persona_postgres import UserPersonaPostgresManager
 
-            _persona_manager = UserPersonaPostgresManager()
-            logger.info("UserPersona: PostgreSQL режим")
-            return _persona_manager
-        except Exception as e:
-            logger.warning(f"UserPersonaPostgresManager недоступен: {e}, падаем на JSON")
+                _persona_manager = UserPersonaPostgresManager()
+                logger.info("UserPersona: PostgreSQL режим")
+                return _persona_manager
+            except Exception as e:
+                logger.warning(f"UserPersonaPostgresManager недоступен: {e}, падаем на JSON")
 
     _persona_manager = UserPersonaManager()
     logger.info("UserPersona: JSON-файл режим")

@@ -12,11 +12,19 @@
 # Базовый интерфейс
 from .base import MemoryInterface, MemoryRecord
 
+# Определяем БД по окружению
+try:
+    from core.config_manager import get_app_env, get_database_url
+    APP_ENV = get_app_env()
+    db_url = get_database_url()
+    use_postgres = (APP_ENV == "production" and db_url and db_url.startswith('postgresql'))
+except ImportError:
+    APP_ENV = "development"
+    use_postgres = False
+
 # Условный импорт RAG в зависимости от конфигурации
 try:
-    from core.config_manager import get_database_url
-    db_url = get_database_url()
-    if db_url and db_url.startswith('postgresql'):
+    if use_postgres:
         from .rag_postgres import RAGMemory, get_rag
     else:
         from .rag import RAGMemory, get_rag
@@ -25,9 +33,7 @@ except ImportError:
 
 # Условный импорт EpisodicMemory в зависимости от конфигурации
 try:
-    from core.config_manager import get_database_url
-    db_url = get_database_url()
-    if db_url and db_url.startswith('postgresql'):
+    if use_postgres:
         from .episodic_postgres import EpisodicMemory, get_episodic_memory
     else:
         from .episodic import EpisodicMemory, get_episodic_memory
@@ -36,9 +42,7 @@ except ImportError:
 
 # Условный импорт SemanticMemory в зависимости от конфигурации
 try:
-    from core.config_manager import get_database_url
-    db_url = get_database_url()
-    if db_url and db_url.startswith('postgresql'):
+    if use_postgres:
         from .semantic_postgres import SemanticMemory, get_semantic_memory
     else:
         from .semantic import SemanticMemory, get_semantic_memory

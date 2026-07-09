@@ -37,10 +37,10 @@ def _init_supabase():
     if SUPABASE_AVAILABLE or _supabase_client is not None:
         return
 
-    # На Render автоматически устанавливается RENDER=true.
-    # Локально всегда используем SQLite, даже если Supabase credentials есть в .env.
-    if not os.getenv("RENDER"):
-        logger.info("Knowledge Graph: локальный режим (RENDER не задан), использую SQLite")
+    # В development-режиме всегда SQLite, даже если Supabase credentials есть.
+    from core.config_manager import get_app_env
+    if get_app_env() == "development":
+        logger.info("Knowledge Graph: локальный режим (development), использую SQLite")
         return
 
     try:
@@ -104,8 +104,9 @@ def _ensure_supabase_tables():
         except Exception as e:
             logger.warning(f"Knowledge Graph: psycopg2 ошибка: {e}")
 
-    # На Render без DATABASE_URL — таблицы должны быть созданы заранее
-    if os.getenv("RENDER"):
+    # В production без DATABASE_URL — таблицы должны быть созданы заранее
+    from core.config_manager import get_app_env
+    if get_app_env() == "production":
         logger.info("Knowledge Graph: SQL миграция недоступна на Render без DATABASE_URL")
         logger.info("Knowledge Graph: таблицы должны существовать заранее (созданы в Supabase Dashboard)")
 
