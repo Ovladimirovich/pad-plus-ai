@@ -1122,7 +1122,7 @@ async def chat(
 
     # === ПРОВЕРКА RATE LIMIT ===
     cache = get_cache_manager()
-    is_limited, remaining = await cache.is_rate_limited(
+    is_limited = await cache.is_rate_limited(
         key=f"chat:{user_id}",
         limit=10,
         window=60
