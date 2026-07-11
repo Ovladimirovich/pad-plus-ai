@@ -14,7 +14,7 @@ import json
 from datetime import datetime
 
 # Конфигурация
-BACKEND_URL = "http://localhost:8080"
+BACKEND_URL = "http://localhost:8007"
 
 class Colors:
     GREEN = '\033[92m'

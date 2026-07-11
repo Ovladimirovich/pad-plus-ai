@@ -6,7 +6,7 @@ import pytest
 import requests
 import socket
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:8007/api/v1"
 
 
 def _is_server_available():
@@ -24,7 +24,7 @@ def _is_server_available():
 def test_chat_with_quality():
     """Тест чата с самооценкой качества"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тест чата с самооценкой...")
     
     response = requests.post(
@@ -53,7 +53,7 @@ def test_chat_with_quality():
 def test_autonomy_status():
     """Тест статуса автономности"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тест статуса автономности...")
     
     response = requests.get(f"{BASE_URL}/autonomy/status")
@@ -77,7 +77,7 @@ def test_autonomy_status():
 def test_multiple_chats():
     """Несколько чатов для тестирования авто-рефлексии"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тестирование нескольких диалогов...")
     
     prompts = [

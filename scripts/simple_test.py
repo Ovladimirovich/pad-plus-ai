@@ -11,7 +11,7 @@ import os
 def test_document_endpoints():
     """Тестирование исправленных эндпоинтов документов"""
     
-    base_url = "http://localhost:8080"
+    base_url = "http://localhost:8007"
     
     print("Тестирование исправленных эндпоинтов документов...")
     

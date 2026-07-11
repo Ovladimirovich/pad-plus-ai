@@ -637,7 +637,7 @@ cd PAD-AI
 # Backend
 pip install -r requirements.txt
 cp .env.example .env   # fill in SUPABASE_*, ENCRYPTION_*, providers
-uvicorn backend.main:app --reload --port 8080
+uvicorn backend.main:app --reload --port 8007
 
 # Frontend (new terminal)
 cd frontend
@@ -680,7 +680,7 @@ Deploy button:
 
 ```bash
 docker build -t padplus-backend .
-docker run -d --name padplus -p 8080:8080 --env-file .env padplus-backend
+docker run -d --name padplus -p 8007:8007 --env-file .env padplus-backend
 ```
 
 ---

@@ -78,7 +78,7 @@ cd frontend && docker build -t padplus-frontend .
 ### Запуск
 
 ```bash
-docker run -d --name padplus-backend -p 8080:8080 --env-file .env padplus-backend
+docker run -d --name padplus-backend -p 8007:8007 --env-file .env padplus-backend
 ```
 
 ---
@@ -89,7 +89,7 @@ docker run -d --name padplus-backend -p 8080:8080 --env-file .env padplus-backen
 
 ```bash
 cd backend
-gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8080
+gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8007
 ```
 
 ### Frontend

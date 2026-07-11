@@ -86,7 +86,7 @@
 ```bash
 # Backend (порт 8080)
 cd "c:\пад ал датабаз а  чистый\PAD+ AI чистый"
-$env:PORT="8080"
+$env:PORT="8007"
 C:\Python314\python.exe backend/main_stable.py
 
 # Frontend (порт 5174 с прокси на 8080)

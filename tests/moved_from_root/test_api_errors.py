@@ -5,7 +5,7 @@
 import requests
 import json
 
-BASE_URL = "http://localhost:8080"
+BASE_URL = "http://localhost:8007"
 
 def test_endpoint(endpoint, method="GET", data=None, auth_token=None):
     """Тест эндпоинта"""

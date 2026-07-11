@@ -219,6 +219,87 @@ async def get_dialog_stats(
     }
 
 
+@router.get("/search")
+async def search_dialogs(
+    query: str = Query(..., min_length=2),
+    current_user: dict = Depends(get_current_user),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100)
+):
+    """
+    Поиск по диалогам
+    
+    Использует полнотекстовой поиск PostgreSQL
+    """
+    supabase = get_db_client(current_user)
+    user_id = current_user["id"]
+    
+    # Сначала ищем сообщения, содержащие запрос (с лимитом)
+    messages_result = supabase.table("messages")\
+        .select("id, dialog_id, role, content, created_at")\
+        .eq("role", "user")\
+        .filter("content", "ilike", f"%{query}%")\
+        .limit(200)\
+        .execute()
+    
+    # Получаем уникальные dialog_id
+    dialog_ids = list(set(msg["dialog_id"] for msg in messages_result.data))
+    
+    if not dialog_ids:
+        return {
+            "data": [],
+            "total": 0,
+            "offset": offset,
+            "limit": limit,
+            "highlights": []
+        }
+    
+    # Получаем диалоги
+    dialogs_result = supabase.table("dialogs")\
+        .select("*")\
+        .in_("id", dialog_ids)\
+        .eq("user_id", user_id)\
+        .order("updated_at", desc=True)\
+        .range(offset, offset + limit - 1)\
+        .execute()
+    
+    # Считаем общее количество
+    total = len(dialog_ids)
+    
+    dialogs = []
+    highlights = {}
+    
+    for dialog in dialogs_result.data:
+        # Находим совпадения в сообщениях этого диалога
+        dialog_messages = [m for m in messages_result.data if m["dialog_id"] == dialog["id"]]
+        
+        # Создаём подсветку
+        highlights[dialog["id"]] = []
+        for msg in dialog_messages[:3]:  # Показываем до 3 совпадений
+            content = msg["content"]
+            # Выделяем найденный текст
+            highlighted = content.replace(query, f"<mark>{query}</mark>")
+            highlights[dialog["id"]].append(highlighted)
+        
+        dialogs.append(DialogResponse(
+            id=dialog["id"],
+            title=dialog.get("title"),
+            created_at=dialog["created_at"],
+            updated_at=dialog["updated_at"],
+            message_count=dialog.get("message_count", 0),
+            is_favorite=dialog.get("is_favorite", False),
+            last_message_at=dialog.get("last_message_at")
+        ))
+    
+    return {
+        "data": dialogs,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "highlights": highlights
+    }
+
+
 @router.get("/{dialog_id}")
 async def get_dialog(
     dialog_id: str,
@@ -431,86 +512,5 @@ async def export_dialog(
                 "Content-Disposition": f"attachment; filename=dialog_{dialog_id}.txt"
             }
         )
-
-
-@router.get("/search")
-async def search_dialogs(
-    query: str = Query(..., min_length=2),
-    current_user: dict = Depends(get_current_user),
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100)
-):
-    """
-    Поиск по диалогам
-    
-    Использует полнотекстовой поиск PostgreSQL
-    """
-    supabase = get_db_client(current_user)
-    user_id = current_user["id"]
-    
-    # Сначала ищем сообщения, содержащие запрос (с лимитом)
-    messages_result = supabase.table("messages")\
-        .select("id, dialog_id, role, content, created_at")\
-        .eq("role", "user")\
-        .filter("content", "ilike", f"%{query}%")\
-        .limit(200)\
-        .execute()
-    
-    # Получаем уникальные dialog_id
-    dialog_ids = list(set(msg["dialog_id"] for msg in messages_result.data))
-    
-    if not dialog_ids:
-        return {
-            "data": [],
-            "total": 0,
-            "offset": offset,
-            "limit": limit,
-            "highlights": []
-        }
-    
-    # Получаем диалоги
-    dialogs_result = supabase.table("dialogs")\
-        .select("*")\
-        .in_("id", dialog_ids)\
-        .eq("user_id", user_id)\
-        .order("updated_at", desc=True)\
-        .range(offset, offset + limit - 1)\
-        .execute()
-    
-    # Считаем общее количество
-    total = len(dialog_ids)
-    
-    dialogs = []
-    highlights = {}
-    
-    for dialog in dialogs_result.data:
-        # Находим совпадения в сообщениях этого диалога
-        dialog_messages = [m for m in messages_result.data if m["dialog_id"] == dialog["id"]]
-        
-        # Создаём подсветку
-        highlights[dialog["id"]] = []
-        for msg in dialog_messages[:3]:  # Показываем до 3 совпадений
-            content = msg["content"]
-            # Выделяем найденный текст
-            highlighted = content.replace(query, f"<mark>{query}</mark>")
-            highlights[dialog["id"]].append(highlighted)
-        
-        dialogs.append(DialogResponse(
-            id=dialog["id"],
-            title=dialog.get("title"),
-            created_at=dialog["created_at"],
-            updated_at=dialog["updated_at"],
-            message_count=dialog.get("message_count", 0),
-            is_favorite=dialog.get("is_favorite", False),
-            last_message_at=dialog.get("last_message_at")
-        ))
-    
-    return {
-        "data": dialogs,
-        "total": total,
-        "offset": offset,
-        "limit": limit,
-        "highlights": highlights
-    }
 
 

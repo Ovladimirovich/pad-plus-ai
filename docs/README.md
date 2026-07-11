@@ -38,7 +38,7 @@
 ### Запуск backend
 ```bash
 cd backend
-uvicorn main:app --reload --port 8080
+uvicorn main:app --reload --port 8007
 ```
 
 ### Запуск frontend

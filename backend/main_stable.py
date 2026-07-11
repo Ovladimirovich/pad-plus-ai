@@ -1311,7 +1311,7 @@ if __name__ == "__main__":
     # Загружаем сохраненные данные
     load_data()
     
-    port = int(os.getenv("PORT", 8080))
+    port = int(os.getenv("PORT", 8007))
     logger.info(f"🚀 Запуск стабильного backend на порту {port}")
     logger.info("📦 Компоненты отключены для стабильности")
     logger.info("✅ Авторизация и API работают")

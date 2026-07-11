@@ -279,6 +279,16 @@ async def register(data: UserRegister):
     supabase = get_supabase()
     
     if not supabase:
+        from core.supabase_client import _is_development
+        if _is_development():
+            dev_user_id = "dev-user-" + str(uuid.uuid4())[:8]
+            logger.info(f"DEV режим: регистрация {data.email}")
+            return {
+                "id": dev_user_id,
+                "email": data.email,
+                "full_name": data.full_name,
+                "created_at": datetime.now().isoformat()
+            }
         raise HTTPException(status_code=500, detail="БД не подключена")
     
     try:
@@ -373,6 +383,23 @@ async def login(credentials: UserLogin):
     supabase = get_supabase()
     
     if not supabase:
+        from core.supabase_client import _is_development
+        if _is_development():
+            dev_user_id = "dev-user"
+            dev_token = "dev-token-" + str(uuid.uuid4())
+            logger.info(f"DEV режим: вход пользователя {credentials.email}")
+            return {
+                "access_token": dev_token,
+                "refresh_token": dev_token,
+                "token_type": "bearer",
+                "expires_in": 86400,
+                "user": {
+                    "id": dev_user_id,
+                    "email": credentials.email or "dev@local",
+                    "full_name": "Developer",
+                    "avatar_url": None
+                }
+            }
         raise HTTPException(status_code=500, detail="БД не подключена")
     
     try:
@@ -1872,7 +1899,11 @@ async def list_models(provider: Optional[str] = None):
 
 @router.get("/settings")
 async def get_settings(current_user: dict = Depends(get_current_user)):
-    supabase = get_supabase()
+    supabase = get_db_client(current_user)
+    if not supabase:
+        return {"persona": {"tone": "friendly", "detail_level": "moderate", "emotion_level": "balanced", "specialization": "general"},
+                "notifications": {"email": True, "push": False, "sound": True, "frequency": "immediate"},
+                "appearance": {"theme": "dark", "font_size": "medium", "compact_mode": False}}
     user_id = current_user["id"]
     result = supabase.table("user_settings").select("*").eq("user_id", user_id).execute()
     if not result.data:
@@ -1891,7 +1922,9 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
 
 @router.patch("/settings")
 async def update_settings(data: dict, current_user: dict = Depends(get_current_user)):
-    supabase = get_supabase()
+    supabase = get_db_client(current_user)
+    if not supabase:
+        return {"status": "ok"}
     user_id = current_user["id"]
     settings_update = {}
     for section, values in data.items():

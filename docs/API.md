@@ -5,7 +5,7 @@
 ## Base URL
 
 ```
-http://localhost:8080/api/v1
+http://localhost:8007/api/v1
 ```
 
 ## Содержание
@@ -1628,8 +1628,8 @@ Timeline эпизодов.
 
 ## Interactive Documentation
 
-- **Swagger UI:** http://localhost:8080/docs
-- **ReDoc:** http://localhost:8080/redoc
+- **Swagger UI:** http://localhost:8007/docs
+- **ReDoc:** http://localhost:8007/redoc
 
 ---
 

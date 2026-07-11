@@ -215,13 +215,13 @@ allow_origins = [
 |-------|------|----------|
 | GET | `/api/v1/health` | Проверка здоровья |
 
-Полный список: http://localhost:8080/docs
+Полный список: http://localhost:8007/docs
 
 ## Запуск
 
 ```bash
 cd backend
-uvicorn main:app --reload --host 127.0.0.1 --port 8080
+uvicorn main:app --reload --host 127.0.0.1 --port 8007
 ```
 
 ## Зависимости

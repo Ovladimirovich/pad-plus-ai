@@ -215,7 +215,7 @@ def main():
         print("✅ Инициализация завершена успешно!")
         print("\nСледующие шаги:")
         print("  1. Запустите backend: python -m uvicorn backend.main:app --reload")
-        print("  2. Протестируйте API: curl http://localhost:8080/api/v1/health")
+        print("  2. Протестируйте API: curl http://localhost:8007/api/v1/health")
         print("  3. Войдите как test@padplus.ai / test123")
         return 0
     else:

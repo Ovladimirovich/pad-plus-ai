@@ -163,7 +163,7 @@ User Message
 
 ```bash
 # Backend
-cd backend && uvicorn main:app --reload --port 8080
+cd backend && uvicorn main:app --reload --port 8007
 
 # Frontend
 cd frontend && npm run dev

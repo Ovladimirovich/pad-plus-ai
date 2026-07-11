@@ -21,20 +21,20 @@
 ### **Шаг 1: Запуск Backend**
 ```bash
 cd "c:\пад ал датабаз а  чистый\PAD+ AI чистый"
-$env:PORT="8080"
+$env:PORT="8007"
 C:\Python314\python.exe backend/main_stable.py
 ```
 
 ### **Шаг 2: Регистрация пользователя**
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8007/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"your@email.com","password":"your_password","name":"Your Name"}'
 ```
 
 ### **Шаг 3: Вход в систему**
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8007/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"your@email.com","password":"your_password"}'
 ```
@@ -42,11 +42,11 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 ### **Шаг 4: Работа с API ключами**
 ```bash
 # Получение ключей
-curl -X GET http://localhost:8080/api/v1/keys \
+curl -X GET http://localhost:8007/api/v1/keys \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Создание ключа
-curl -X POST http://localhost:8080/api/v1/keys \
+curl -X POST http://localhost:8007/api/v1/keys \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"My Key","provider":"gigachat","api_key":"your_api_key"}'

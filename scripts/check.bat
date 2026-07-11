@@ -102,8 +102,8 @@ echo ============================================
 set BACKEND_RUNNING=0
 set FRONTEND_RUNNING=0
 
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080 ^| findstr LISTENING') do (
-    echo   - Порт 8080 занят (PID %%a) - Backend работает
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8007 ^| findstr LISTENING') do (
+    echo   - Порт 8007 занят (PID %%a) - Backend работает
     set BACKEND_RUNNING=1
 )
 
@@ -113,7 +113,7 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5174 ^| findstr LISTENING') 
 )
 
 if "%BACKEND_RUNNING%"=="0" (
-    echo   - Порт 8080 свободен - Backend не запущен
+    echo   - Порт 8007 свободен - Backend не запущен
 )
 
 if "%FRONTEND_RUNNING%"=="0" (
@@ -129,7 +129,7 @@ if "%BACKEND_RUNNING%"=="1" if "%FRONTEND_RUNNING%"=="1" (
     echo   ✓ Система работает!
     echo.
     echo   Frontend: http://localhost:5174
-    echo   Backend:  http://localhost:8080
+    echo   Backend:  http://localhost:8007
     echo.
 ) else (
     echo   ⚠ Система не запущена

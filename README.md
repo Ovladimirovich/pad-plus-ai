@@ -666,7 +666,7 @@ cd PAD-AI
 # Backend
 pip install -r requirements.txt
 cp .env.example .env   # заполнить SUPABASE_*, ENCRYPTION_*, провайдеры
-uvicorn backend.main:app --reload --port 8080
+uvicorn backend.main:app --reload --port 8007
 
 # Frontend (новый терминал)
 cd frontend
@@ -709,7 +709,7 @@ npm run dev
 
 ```bash
 docker build -t padplus-backend .
-docker run -d --name padplus -p 8080:8080 --env-file .env padplus-backend
+docker run -d --name padplus -p 8007:8007 --env-file .env padplus-backend
 ```
 
 ---

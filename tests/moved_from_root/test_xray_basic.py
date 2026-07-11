@@ -16,8 +16,8 @@ import time
 from datetime import datetime
 
 # Конфигурация
-BACKEND_URL = "http://localhost:8080"
-WS_URL = "ws://localhost:8080/ws"
+BACKEND_URL = "http://localhost:8007"
+WS_URL = "ws://localhost:8007/ws"
 
 class Colors:
     GREEN = '\033[92m'

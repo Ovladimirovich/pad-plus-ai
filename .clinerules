@@ -5,9 +5,27 @@ PAD+ AI — AI-ассистент с когнитивной архитектур
 - **Домен:** https://pad-plus-ai.onrender.com
 - **Бэкенд:** Python 3.11+, FastAPI, Uvicorn
 - **Фронтенд:** React 18, Vite, Tailwind CSS
-- **БД:** Supabase (PostgreSQL)
+- **БД:** SQLite (локально) / Supabase PostgreSQL (Render)
 - **Хостинг:** Render (авто-деплой из main)
 - **Провайдеры:** OpenRouter, GigaChat (оба — только пользовательские ключи)
+
+## Режимы окружения (APP_ENV)
+
+Переменная `APP_ENV` управляет изоляцией dev/prod:
+
+| Значение | Где | БД | Supabase |
+|---|---|---|---|
+| `development` (по умолчанию) | Локально | SQLite | Отключён принудительно |
+| `production` | Render (RENDER=true) | PostgreSQL (DATABASE_URL) | Включён |
+
+**Локальная разработка:** не нужен `.env` с `DATABASE_URL`. Всё идёт на SQLite.
+**Деплой на Render:** `APP_ENV=production` уже установлен в Dashboard Render.
+
+При старте в логах виден чёткий баннер:
+```
+  🚀  РЕЖИМ: PRODUCTION     (или 🔧 РЕЖИМ: DEVELOPMENT)
+  💾  БД:    Supabase/PostgreSQL  (или SQLite)
+```
 
 ## Управление ключами
 - Системных ключей нет. Каждый пользователь добавляет свои ключи в разделе «Провайдеры» (⚡).

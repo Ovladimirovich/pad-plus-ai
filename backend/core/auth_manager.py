@@ -11,6 +11,7 @@
 import logging
 import re
 import asyncio
+from types import SimpleNamespace
 from typing import Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from functools import wraps
@@ -209,6 +210,21 @@ async def get_current_user_safe(
     
     # 3. Проверяем подключение к БД
     if not supabase:
+        # В DEV режиме принимаем локальный токен
+        if access_token and access_token.startswith("dev-token-"):
+            logger.info("🔧 DEV режим: аутентификация по локальному токену")
+            user = SimpleNamespace(
+                id="dev-user",
+                email="dev@local"
+            )
+            return {
+                "auth_user": user,
+                "profile": {"id": "dev-user", "full_name": "Developer", "email": "dev@local"},
+                "id": "dev-user",
+                "email": "dev@local",
+                "access_token": access_token,
+                "authorization": f"Bearer {access_token}"
+            }
         logger.error("БД не подключена при попытке аутентификации")
         raise HTTPException(
             status_code=500, 

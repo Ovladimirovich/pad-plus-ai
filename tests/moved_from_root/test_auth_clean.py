@@ -2,7 +2,7 @@ import os
 import random
 import requests
 
-API = os.getenv('API_URL', 'http://localhost:8080/api/v1')
+API = os.getenv('API_URL', 'http://localhost:8007/api/v1')
 
 # Генерируем уникальный email для теста
 TEST_EMAIL = f'test+{random.randint(1000, 9999)}@padplus.dev'

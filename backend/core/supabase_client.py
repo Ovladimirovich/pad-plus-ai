@@ -11,8 +11,11 @@
 
 import os
 import logging
-from typing import Optional
+import sqlite3
+import json
+from typing import Optional, Any, Dict, List
 from pathlib import Path
+from types import SimpleNamespace
 
 logger = logging.getLogger("padplus.supabase")
 
@@ -193,22 +196,333 @@ def create_supabase_client_with_access_token(access_token: str) -> Optional[Clie
         return None
 
 
-def get_db_client(current_user: Optional[dict] = None):
-    """
-    Возвращает Supabase клиент с учётом авторизации пользователя.
+class LocalDBClient:
+    """Локальный SQLite клиент с API, имитирующим Supabase для разработки."""
+    
+    def __init__(self):
+        self.db_path = Path(__file__).parent.parent.parent / "data" / "memory.db"
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"LocalDBClient init: db_path={self.db_path}")
+        self._init_db()
+    
+    def _get_conn(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+    
+    def _init_db(self):
+        conn = self._get_conn()
+        try:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS user_api_keys (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    provider_display_name TEXT,
+                    api_key_encrypted TEXT NOT NULL,
+                    name TEXT,
+                    model_preference TEXT DEFAULT 'auto',
+                    is_default INTEGER DEFAULT 0,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_used_at TIMESTAMP
+                );
+            """)
+            conn.commit()
+            # Verify
+            existing = list(conn.execute("PRAGMA table_info(user_api_keys)"))
+            logger.info(f"_init_db: created {len(existing)} columns in {self.db_path}")
+        except Exception as e:
+            logger.error(f"_init_db FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+    
+    def table(self, table_name: str):
+        return LocalTable(self, table_name)
 
-    Если есть access_token — создаёт клиент с user-контекстом (для RLS).
-    Иначе использует service_role (обходит RLS).
-    """
+
+class LocalTable:
+    """Имитация Supabase table() API."""
+
+    def __init__(self, db: LocalDBClient, table_name: str):
+        self.db = db
+        self.table_name = table_name
+        self._filters = []
+        self._select_cols = "*"
+        self._order_by = None
+        self._limit_val = None
+        self._offset_val = None
+        self._count = None
+        self._insert_data = None
+        self._update_data = None
+        self._delete_mode = False
+
+    def select(self, cols: str = "*", count: str = None):
+        self._select_cols = cols
+        self._count = count
+        return self
+
+    def eq(self, column: str, value: Any):
+        self._filters.append(("eq", column, value))
+        return self
+
+    def neq(self, column: str, value: Any):
+        self._filters.append(("neq", column, value))
+        return self
+
+    def gt(self, column: str, value: Any):
+        self._filters.append(("gt", column, value))
+        return self
+
+    def gte(self, column: str, value: Any):
+        self._filters.append(("gte", column, value))
+        return self
+
+    def lt(self, column: str, value: Any):
+        self._filters.append(("lt", column, value))
+        return self
+
+    def lte(self, column: str, value: Any):
+        self._filters.append(("lte", column, value))
+        return self
+
+    def like(self, column: str, pattern: str):
+        self._filters.append(("like", column, pattern))
+        return self
+
+    def ilike(self, column: str, pattern: str):
+        self._filters.append(("ilike", column, pattern))
+        return self
+
+    def filter(self, column: str, operator: str, value: Any):
+        op_map = {"eq": "eq", "neq": "neq", "gt": "gt", "gte": "gte",
+                  "lt": "lt", "lte": "lte", "like": "like", "ilike": "ilike", "in": "in"}
+        self._filters.append((op_map.get(operator, operator), column, value))
+        return self
+
+    def in_(self, column: str, values: List):
+        self._filters.append(("in", column, values))
+        return self
+
+    def order(self, column: str, desc: bool = False):
+        self._order_by = (column, desc)
+        return self
+
+    def limit(self, count: int):
+        self._limit_val = count
+        return self
+
+    def range(self, start: int, end: int):
+        self._limit_val = end - start + 1
+        self._offset_val = start
+        return self
+
+    def offset(self, count: int):
+        self._offset_val = count
+        return self
+
+    def _build_where(self):
+        parts = []
+        params = []
+        for op, col, val in self._filters:
+            if op == "eq":
+                parts.append(f"\"{col}\" = ?")
+                params.append(val)
+            elif op == "neq":
+                parts.append(f"\"{col}\" != ?")
+                params.append(val)
+            elif op == "gt":
+                parts.append(f"\"{col}\" > ?")
+                params.append(val)
+            elif op == "gte":
+                parts.append(f"\"{col}\" >= ?")
+                params.append(val)
+            elif op == "lt":
+                parts.append(f"\"{col}\" < ?")
+                params.append(val)
+            elif op == "lte":
+                parts.append(f"\"{col}\" <= ?")
+                params.append(val)
+            elif op == "like":
+                parts.append(f"\"{col}\" LIKE ?")
+                params.append(val)
+            elif op == "ilike":
+                parts.append(f"\"{col}\" LIKE ?")
+                params.append(val)
+            elif op == "in":
+                ph = ", ".join(["?" for _ in val])
+                parts.append(f"\"{col}\" IN ({ph})")
+                params.extend(val)
+        return parts, params
+
+    def insert(self, data: Dict):
+        from datetime import datetime
+        now = datetime.now().isoformat()
+        self._insert_data = dict(data)
+        if "created_at" not in self._insert_data:
+            self._insert_data["created_at"] = now
+        if "updated_at" not in self._insert_data:
+            self._insert_data["updated_at"] = now
+        return self
+
+    def update(self, data: Dict):
+        from datetime import datetime
+        self._update_data = dict(data)
+        self._update_data["updated_at"] = datetime.now().isoformat()
+        return self
+
+    def delete(self):
+        self._delete_mode = True
+        return self
+
+    def execute(self):
+        conn = self.db._get_conn()
+        try:
+            # INSERT
+            if self._insert_data is not None:
+                cols = ", ".join(self._insert_data.keys())
+                ph = ", ".join(["?" for _ in self._insert_data])
+                conn.execute(f"INSERT INTO {self.table_name} ({cols}) VALUES ({ph})",
+                             list(self._insert_data.values()))
+                conn.commit()
+                result_data = dict(self._insert_data)
+                self._insert_data = None
+                return SimpleNamespace(data=[result_data], count=1)
+
+            where_parts, params = self._build_where()
+
+            # UPDATE: сначала выбираем строки, потом обновляем, возвращаем данные
+            if self._update_data is not None:
+                where_clause = " AND ".join(where_parts) if where_parts else "1"
+                select_sql = f"SELECT * FROM {self.table_name} WHERE {where_clause}"
+                cursor = conn.execute(select_sql, params)
+                column_names = [desc[0] for desc in cursor.description]
+                rows_before = [dict(r) for r in cursor.fetchall()]
+
+                set_parts = [f"\"{k}\" = ?" for k in self._update_data.keys()]
+                set_values = list(self._update_data.values())
+                sql = f"UPDATE {self.table_name} SET {', '.join(set_parts)}"
+                if where_parts:
+                    sql += " WHERE " + " AND ".join(where_parts)
+                conn.execute(sql, set_values + params)
+                conn.commit()
+
+                updated = []
+                for row in rows_before:
+                    new_row = dict(row)
+                    new_row.update(self._update_data)
+                    updated.append(new_row)
+                self._update_data = None
+                return SimpleNamespace(data=updated, count=len(updated))
+
+            # DELETE: сначала выбираем строки, потом удаляем, возвращаем их
+            if self._delete_mode:
+                where_clause = " AND ".join(where_parts) if where_parts else "1"
+                select_sql = f"SELECT * FROM {self.table_name} WHERE {where_clause}"
+                cursor = conn.execute(select_sql, params)
+                column_names = [desc[0] for desc in cursor.description]
+                deleted_rows = [dict(r) for r in cursor.fetchall()]
+
+                sql = f"DELETE FROM {self.table_name}"
+                if where_parts:
+                    sql += " WHERE " + " AND ".join(where_parts)
+                conn.execute(sql, params)
+                conn.commit()
+                self._delete_mode = False
+                return SimpleNamespace(data=deleted_rows, count=len(deleted_rows))
+
+            # SELECT
+            where_clause = " WHERE " + " AND ".join(where_parts) if where_parts else ""
+
+            order_clause = ""
+            if self._order_by:
+                col, desc = self._order_by
+                order_clause = f" ORDER BY \"{col}\" {'DESC' if desc else 'ASC'}"
+
+            limit_clause = ""
+            if self._limit_val is not None:
+                limit_clause = f" LIMIT {self._limit_val}"
+            if self._offset_val is not None:
+                limit_clause += f" OFFSET {self._offset_val}"
+
+            if self._count == "exact":
+                row = conn.execute(f"SELECT COUNT(*) as cnt FROM {self.table_name}{where_clause}", params).fetchone()
+                return SimpleNamespace(data=[], count=row["cnt"] if row else 0)
+
+            sql = f"SELECT {self._select_cols} FROM {self.table_name}{where_clause}{order_clause}{limit_clause}"
+            rows = conn.execute(sql, params).fetchall()
+            data = [dict(r) for r in rows]
+
+            count = None
+            if self._count == "exact":
+                row = conn.execute(f"SELECT COUNT(*) as cnt FROM {self.table_name}{where_clause}", params).fetchone()
+                count = row["cnt"] if row else 0
+
+            return SimpleNamespace(data=data, count=count)
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e).lower():
+                return SimpleNamespace(data=[], count=0)
+            raise
+        finally:
+            conn.close()
+
+    def single(self):
+        self.limit(1)
+        result = self.execute()
+        return SimpleNamespace(data=result.data[0] if result.data else None)
+
+
+# Глобальный экземпляр для dev-режима
+_local_db_client = None
+
+def get_local_db_client() -> LocalDBClient:
+    global _local_db_client
+    if _local_db_client is None:
+        _local_db_client = LocalDBClient()
+    return _local_db_client
+
+
+def get_db_client(current_user: Optional[dict] = None):
+    from core.supabase_client import _is_development
+    logger.info(f"get_db_client called, user_keys={list(current_user.keys()) if current_user else 'None'}, dev={_is_development()}")
+    
     if current_user is not None and current_user.get("access_token"):
         client = create_supabase_client_with_access_token(current_user["access_token"])
         if client:
+            logger.info("get_db_client: using supabase with access_token")
             return client
+        logger.info("get_db_client: create_supabase_client_with_access_token returned None")
 
     db = get_supabase_service()
     if db:
+        logger.info("get_db_client: using supabase service")
         return db
-    return get_supabase()
+    logger.info("get_db_client: get_supabase_service returned None")
+    
+    supabase = get_supabase()
+    if supabase:
+        logger.info("get_db_client: using supabase")
+        return supabase
+    logger.info("get_db_client: get_supabase returned None")
+    
+    if _is_development():
+        logger.info("DEV: using local SQLite")
+        result = get_local_db_client()
+        logger.info(f"get_local_db_client returned {type(result).__name__}")
+        # Check DB
+        import sqlite3
+        try:
+            conn = sqlite3.connect(str(result.db_path))
+            existing = list(conn.execute("PRAGMA table_info(user_api_keys)"))
+            logger.info(f"DB check: table has {len(existing)} columns")
+            conn.close()
+        except Exception as e:
+            logger.error(f"DB check failed: {e}")
+        return result
+    
+    return None
 
 
 def check_database_connection() -> bool:

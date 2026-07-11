@@ -223,7 +223,7 @@
 5. **Локально протестировать**
    - Установить зависимости: `pip install -r requirements.txt`
    - Запустить: `python backend/main.py`
-   - Проверить health: `curl http://localhost:8000/health`
+   - Проверить health: `curl http://localhost:8007/health`
 
 6. **Развернуть на Render**
    - Нажать Deploy в Render Dashboard

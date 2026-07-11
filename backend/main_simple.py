@@ -53,6 +53,6 @@ async def get_keys():
     return {"detail": {"error": "authorization_required", "message": "Требуется авторизация"}}
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
+    port = int(os.getenv("PORT", 8007))
     logger.info(f"🚀 Запуск упрощенного backend на порту {port}")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

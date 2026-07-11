@@ -85,7 +85,7 @@ docker-compose -f docker-compose.monitoring.yml logs -f prometheus
 | Prometheus | http://localhost:9090 | Запросы PromQL |
 | Grafana | http://localhost:3000 | admin/admin |
 | Node Exporter | http://localhost:9100/metrics | Сырые метрики |
-| cAdvisor | http://localhost:8080 | UI + API |
+| cAdvisor | http://localhost:8007 | UI + API |
 | Alertmanager | http://localhost:9093 | Управление алертами |
 
 ## Метрики PAD+ AI
@@ -227,7 +227,7 @@ metrics.record_value("custom_duration", 123.45)
 
 1. Проверьте, что backend запущен:
    ```bash
-   curl http://localhost:8000/metrics
+   curl http://localhost:8007/metrics
    ```
 
 2. Проверьте конфигурацию Prometheus:

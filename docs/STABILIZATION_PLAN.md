@@ -152,7 +152,7 @@
 | Шаг | Действие | Инструмент |
 |-----|----------|------------|
 | 6.1 | Встроенный Health + Metrics endpoint (уже есть) | `GET /health`, `GET /metrics` |
-| 6.2 | Prometheus — установка на хост вручную или встроенный сборщик | Скачать с prometheus.io, настроить `prometheus.yml` на `localhost:8080/metrics` |
+| 6.2 | Prometheus — установка на хост вручную или встроенный сборщик | Скачать с prometheus.io, настроить `prometheus.yml` на `localhost:8007/metrics` |
 | 6.3 | Grafana — установка на хост | Скачать с grafana.com, импортировать дашборды из `monitoring/grafana/` |
 | 6.4 | Алерты — через встроенный Alertmanager на хосте | `monitoring/prometheus/alerts.yml` |
 | 6.5 | Windows-сервисы для автозапуска | `nssm` или `srvstart` для Prometheus + Grafana |

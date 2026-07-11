@@ -1558,7 +1558,7 @@ API: PUT /api/v1/config/healer`
 • Модель — фиксированная
 • Вопросы — те же 7 для всех экспериментов
 • Температура — 0.7 по умолчанию
-• Окружение — локальный сервер 127.0.0.1:8080`
+• Окружение — локальный сервер 127.0.0.1:8007`
       },
       {
         heading: '7 стандартных вопросов',
@@ -1722,7 +1722,7 @@ Q7 — Что человечество чаще всего упускает из
       {
         heading: 'Вопросы по API',
         content: `В: Где документация API?
-О: Полная документация доступна по адресу http://localhost:8080/docs (после запуска backend). Swagger UI с 145+ эндпоинтами.
+О: Полная документация доступна по адресу http://localhost:8007/docs (после запуска backend). Swagger UI с 145+ эндпоинтами.
 
 В: Сколько эндпоинтов доступно?
 О: Более 145 эндпоинтов для управления всеми аспектами системы:
@@ -2063,7 +2063,7 @@ export default function InstructionsPage() {
               <br />• <code className="text-[#6366F1]">docs/RLS_POLICIES.md</code> — RLS политики безопасности
               <br />• <code className="text-[#6366F1]">docs/PROJECT_STRUCTURE.md</code> — структура проекта
               <br />
-              🔧 <strong>API документация</strong>: <code className="text-[#6366F1]">http://localhost:8080/docs</code> (Swagger UI)
+              🔧 <strong>API документация</strong>: <code className="text-[#6366F1]">http://localhost:8007/docs</code> (Swagger UI)
               <br />
               📊 <strong>Статус системы</strong>: Базовые тесты ✅ | RLS политики ✅ | Redis кэш ✅ | WebSocket keepalive ✅
             </p>

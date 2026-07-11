@@ -339,7 +339,7 @@ logger.info(f"  💾  БД:    {db_name}")
 logger.info("=" * 55)
 
 # Порт для production — читается из переменной окружения PORT
-backend_port = int(os.getenv("PORT", os.getenv("BACKEND_PORT", "8000")))
+backend_port = int(os.getenv("PORT", os.getenv("BACKEND_PORT", "8007")))
 
 logger.info(f"🌍 FRONTEND_URL: {frontend_url if frontend_url else '(not set)'}")
 logger.info(f"🔌 Backend port: {backend_port}")

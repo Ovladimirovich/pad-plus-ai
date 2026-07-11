@@ -21,8 +21,8 @@ import time
 from datetime import datetime
 
 # Конфигурация
-BACKEND_URL = "http://localhost:8080"
-WS_URL = "ws://localhost:8080/ws"
+BACKEND_URL = "http://localhost:8007"
+WS_URL = "ws://localhost:8007/ws"
 TEST_USER_EMAIL = "test@test.com"
 TEST_USER_PASSWORD = "test123456"
 

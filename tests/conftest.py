@@ -64,7 +64,7 @@ def event_loop():
 def test_app():
     os.environ["TEST_MODE"] = "true"
     os.environ["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test"
-    os.environ["SUPABASE_URL"] = "http://localhost:8000"
+    os.environ["SUPABASE_URL"] = "http://localhost:8007"
     os.environ["SUPABASE_KEY"] = "test-key"
     os.environ["CSRF_SECRET_KEY"] = "test-csrf-key-for-testing"
 

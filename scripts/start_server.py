@@ -25,7 +25,7 @@ logger.info(f"📁 Working directory: {os.getcwd()}")
 logger.info(f"📂 Python path: {sys.path[:3]}")
 
 # Проверяем PORT
-port = os.getenv("PORT", "8000")
+port = os.getenv("PORT", "8007")
 logger.info(f"🔌 Port: {port}")
 
 # Определяем production среду

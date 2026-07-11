@@ -187,13 +187,13 @@ Cognitive UX Layer — это система полной наблюдаемос
 
 ```bash
 # Обычный запрос
-curl -X POST http://localhost:8000/api/v1/chat \
+curl -X POST http://localhost:8007/api/v1/chat \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"message": "Привет!"}'
 
 # Запрос с X-Ray данными
-curl -X POST "http://localhost:8000/api/v1/chat?explain=true" \
+curl -X POST "http://localhost:8007/api/v1/chat?explain=true" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"message": "Привет!", "explain": true}'

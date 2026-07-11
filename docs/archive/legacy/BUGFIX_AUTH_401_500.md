@@ -122,28 +122,28 @@ python scripts/seed_data.py
 ```bash
 # Остановите текущий сервер
 # Запустите заново
-python -m uvicorn backend.main:app --reload --port 8080
+python -m uvicorn backend.main:app --reload --port 8007
 ```
 
 ### Шаг 4: Протестировать аутентификацию
 
 **Регистрация:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8007/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "TestPassword123!"}'
 ```
 
 **Вход:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8007/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "TestPassword123!"}'
 ```
 
 **Получение профиля (с токеном):**
 ```bash
-curl -X GET http://localhost:8080/api/v1/auth/me \
+curl -X GET http://localhost:8007/api/v1/auth/me \
   -H "Authorization: Bearer <ваш_access_token>"
 ```
 

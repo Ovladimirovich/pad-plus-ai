@@ -11,7 +11,7 @@ import requests
 import sys
 import os
 
-API = os.getenv('API_URL', 'http://localhost:8080/api/v1')
+API = os.getenv('API_URL', 'http://localhost:8007/api/v1')
 
 # Учётные данные из переменных окружения (не хранить в репозитории!)
 EMAIL = os.getenv('TEST_EMAIL', 'test@padplus.dev')

@@ -25,7 +25,7 @@ scrape_configs:
   # PAD+ AI Backend
   - job_name: 'padplus-backend'
     static_configs:
-      - targets: ['backend:8080']
+      - targets: ['backend:8007']
         labels:
           service: 'padplus-backend'
     metrics_path: '/metrics'
@@ -42,7 +42,7 @@ scrape_configs:
   # cAdvisor (метрики контейнеров)
   - job_name: 'cadvisor'
     static_configs:
-      - targets: ['cadvisor:8080']
+      - targets: ['cadvisor:8007']
         labels:
           service: 'cadvisor'
     scrape_interval: 15s

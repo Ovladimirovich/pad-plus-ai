@@ -119,7 +119,7 @@ import requests
 @pytest.mark.integration
 @pytest.mark.api
 def test_api_endpoint():
-    response = requests.get("http://localhost:8000/api/v1/status")
+    response = requests.get("http://localhost:8007/api/v1/status")
     assert response.status_code == 200
 ```
 

@@ -65,7 +65,7 @@ WHERE tablename = 'user_api_keys';
 # Остановите текущий backend (Ctrl+C)
 # Перезапустите
 cd "c:\пад ал датабаз а  чистый\PAD+ AI чистый"
-$env:PORT="8080"
+$env:PORT="8007"
 C:\Python314\python.exe backend/main.py
 ```
 

@@ -129,7 +129,7 @@ start.bat
 **Консоль 1 — Backend:**
 ```bash
 cd backend
-uvicorn main:app --reload --host 127.0.0.1 --port 8080
+uvicorn main:app --reload --host 127.0.0.1 --port 8007
 ```
 
 **Консоль 2 — Frontend:**
@@ -192,4 +192,4 @@ python -c "from core.supabase_client import get_supabase; print(get_supabase())"
 
 ### Frontend не видит backend
 
-Проверьте что backend запущен на `http://127.0.0.1:8080` и CORS настроен для `http://localhost:5174`.
+Проверьте что backend запущен на `http://127.0.0.1:8007` и CORS настроен для `http://localhost:5174`.

@@ -3,7 +3,7 @@ import httpx
 import time
 import pytest
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:8007/api/v1"
 
 
 def _is_server_available():
@@ -18,7 +18,7 @@ def _is_server_available():
 def test_chat():
     """Тестирует чат и сохранение в RAG"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("🧪 Тест чата с RAG...")
     
     # Отправляем сообщение
@@ -42,7 +42,7 @@ def test_chat():
 def test_rag_stats():
     """Проверяет статистику RAG"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n📊 Статистика RAG...")
     
     response = httpx.get(f"{BASE_URL}/rag/stats")
@@ -62,7 +62,7 @@ def test_rag_stats():
 def test_rag_search():
     """Тестирует семантический поиск"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🔍 Семантический поиск...")
     
     response = httpx.post(

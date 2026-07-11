@@ -10,7 +10,7 @@ import requests
 import json
 import pytest
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:8007/api/v1"
 
 
 def _is_server_available():
@@ -25,7 +25,7 @@ def _is_server_available():
 def test_rag_stats():
     """Тест статистики RAG v3.0"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тест статистики RAG v3.0...")
     
     response = requests.get(f"{BASE_URL}/rag/stats")
@@ -46,7 +46,7 @@ def test_rag_stats():
 def test_chat_with_analysis():
     """Тест чата с анализом темы и сущностей"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тест чата с анализом...")
     
     prompts = [
@@ -71,7 +71,7 @@ def test_chat_with_analysis():
 def test_topics():
     """Тест получения тем"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тест тем диалогов...")
     
     response = requests.get(f"{BASE_URL}/rag/topics")
@@ -88,7 +88,7 @@ def test_topics():
 def test_entities():
     """Тест индекса сущностей"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тест сущностей...")
     
     response = requests.get(f"{BASE_URL}/rag/entities")
@@ -108,7 +108,7 @@ def test_entities():
 def test_hybrid_search():
     """Тест гибридного поиска"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тест гибридного поиска...")
     
     response = requests.post(
@@ -141,7 +141,7 @@ def test_hybrid_search():
 def test_search_by_topic():
     """Тест поиска по теме"""
     if not _is_server_available():
-        pytest.skip("Сервер не запущен на localhost:8000")
+        pytest.skip("Сервер не запущен на localhost:8007")
     print("\n🧪 Тест поиска по теме...")
     
     response = requests.post(

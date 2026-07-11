@@ -212,7 +212,7 @@ recommendations = insights.get_recommendations()
 ### WebSocket
 
 ```
-ws://localhost:8080/api/v1/xray/ws
+ws://localhost:8007/api/v1/xray/ws
 ```
 
 Каналы:

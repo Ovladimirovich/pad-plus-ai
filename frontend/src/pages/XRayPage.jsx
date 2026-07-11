@@ -34,7 +34,7 @@ export default function XRayPage() {
 
   useEffect(() => {
     // IMPORTANT:
-    // Используем относительный URL, чтобы Vite проксирал WebSocket на backend (127.0.0.1:8080).
+    // Используем относительный URL, чтобы Vite проксирал WebSocket на backend (127.0.0.1:8007).
     // Иначе при dev на 5174 браузер пытается открыть ws на 5174 и сервер закрывает соединение.
     const token = localStorage.getItem('auth_token');
 

@@ -3,7 +3,7 @@
 ## Исправленные проблемы
 
 ### 1. WebSocket подключение к X-Ray
-**Проблема**: WebSocket connection to 'ws://localhost:8080/api/v1/xray/ws' failed
+**Проблема**: WebSocket connection to 'ws://localhost:8007/api/v1/xray/ws' failed
 
 **Причина**: 
 - Vite proxy не был настроен для правильного перенаправления WebSocket запросов
@@ -14,7 +14,7 @@
 2. Изменен URL в `frontend/src/pages/XRayPage.jsx` для использования порта Vite (5174):
 ```javascript
 // Было (прямое подключение к backend):
-const XRAY_WS_URL = `ws://${window.location.hostname}:8080/api/v1/xray/ws`;
+const XRAY_WS_URL = `ws://${window.location.hostname}:8007/api/v1/xray/ws`;
 
 // Стало (через Vite proxy):
 const XRAY_WS_URL = `ws://${window.location.hostname}:5174/api/v1/xray/ws`;
@@ -78,7 +78,7 @@ start.bat
 1. Запустите backend:
    ```bash
    cd backend
-   uvicorn main:app --reload --port 8080
+   uvicorn main:app --reload --port 8007
    ```
 
 2. В новом терминале запустите frontend:
@@ -92,7 +92,7 @@ start.bat
 ### Шаг 4: Проверка работы
 
 1. **Проверка backend**:
-   - Откройте http://localhost:8080/health
+   - Откройте http://localhost:8007/health
    - Должен вернуться статус "healthy"
 
 2. **Проверка frontend**:
@@ -113,7 +113,7 @@ start.bat
 **Windows (PowerShell)**:
 ```powershell
 # Найти процесс на порту 8080
-netstat -ano | findstr :8080
+netstat -ano | findstr :8007
 
 # Убить процесс (замените PID на нужный)
 taskkill /F /PID <PID>

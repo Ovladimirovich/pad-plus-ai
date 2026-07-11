@@ -132,7 +132,7 @@ HTTPException: API ключ не настроен. Добавьте ключ в 
 cd backend && python main.py
 
 # В другом терминале отправьте запрос
-curl -X POST http://localhost:8000/api/v1/chat \
+curl -X POST http://localhost:8007/api/v1/chat \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"message": "Привет!", "key_id": "YOUR_KEY_ID"}'

@@ -158,7 +158,7 @@ const response = await fetchWithAuth('/api/v1/keys?offset=0&limit=100');
 ```bash
 # Остановите текущий backend
 # Запустите с отладкой
-python -m uvicorn backend.main:app --reload --port 8080 --log-level debug
+python -m uvicorn backend.main:app --reload --port 8007 --log-level debug
 ```
 
 Смотрите логи при попытке аутентификации.
@@ -195,18 +195,18 @@ python scripts/seed_data.py
 
 ```bash
 # Регистрация (если еще не зарегистрированы)
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8007/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "test@padplus.ai", "password": "TestPassword123!"}'
 
 # Вход
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8007/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@padplus.ai", "password": "TestPassword123!"}'
 
 # Скопируйте access_token из ответа
 # Проверьте профиль
-curl -X GET http://localhost:8080/api/v1/auth/me \
+curl -X GET http://localhost:8007/api/v1/auth/me \
   -H "Authorization: Bearer <ваш_токен>"
 ```
 
