@@ -206,7 +206,7 @@ class LocalDBClient:
         self._init_db()
     
     def _get_conn(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         return conn
     
@@ -228,11 +228,61 @@ class LocalDBClient:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_used_at TIMESTAMP
                 );
+
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    email TEXT UNIQUE NOT NULL,
+                    hashed_password TEXT NOT NULL,
+                    full_name TEXT,
+                    avatar_url TEXT,
+                    email_verified INTEGER DEFAULT 0,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_login_at TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS dialogs (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    title TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    message_count INTEGER DEFAULT 0,
+                    is_favorite INTEGER DEFAULT 0,
+                    last_message_at TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS messages (
+                    id TEXT PRIMARY KEY,
+                    dialog_id TEXT NOT NULL,
+                    role TEXT NOT NULL CHECK(role IN ('user','assistant')),
+                    content TEXT NOT NULL,
+                    model TEXT,
+                    provider TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata TEXT DEFAULT '{}'
+                );
+
+                CREATE TABLE IF NOT EXISTS user_settings (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT UNIQUE NOT NULL,
+                    persona_tone TEXT DEFAULT 'friendly',
+                    persona_detail_level TEXT DEFAULT 'moderate',
+                    persona_emotion_level TEXT DEFAULT 'balanced',
+                    persona_specialization TEXT DEFAULT 'general',
+                    notification_email INTEGER DEFAULT 1,
+                    notification_push INTEGER DEFAULT 0,
+                    notification_sound INTEGER DEFAULT 1,
+                    notification_frequency TEXT DEFAULT 'immediate',
+                    theme TEXT DEFAULT 'dark',
+                    font_size TEXT DEFAULT 'medium',
+                    compact_mode INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
             """)
             conn.commit()
-            # Verify
-            existing = list(conn.execute("PRAGMA table_info(user_api_keys)"))
-            logger.info(f"_init_db: created {len(existing)} columns in {self.db_path}")
         except Exception as e:
             logger.error(f"_init_db FAILED: {e}")
             raise
@@ -485,43 +535,23 @@ def get_local_db_client() -> LocalDBClient:
 
 
 def get_db_client(current_user: Optional[dict] = None):
-    from core.supabase_client import _is_development
-    logger.info(f"get_db_client called, user_keys={list(current_user.keys()) if current_user else 'None'}, dev={_is_development()}")
-    
     if current_user is not None and current_user.get("access_token"):
         client = create_supabase_client_with_access_token(current_user["access_token"])
         if client:
-            logger.info("get_db_client: using supabase with access_token")
             return client
-        logger.info("get_db_client: create_supabase_client_with_access_token returned None")
 
     db = get_supabase_service()
     if db:
-        logger.info("get_db_client: using supabase service")
         return db
-    logger.info("get_db_client: get_supabase_service returned None")
-    
+
     supabase = get_supabase()
     if supabase:
-        logger.info("get_db_client: using supabase")
         return supabase
-    logger.info("get_db_client: get_supabase returned None")
-    
+
     if _is_development():
         logger.info("DEV: using local SQLite")
-        result = get_local_db_client()
-        logger.info(f"get_local_db_client returned {type(result).__name__}")
-        # Check DB
-        import sqlite3
-        try:
-            conn = sqlite3.connect(str(result.db_path))
-            existing = list(conn.execute("PRAGMA table_info(user_api_keys)"))
-            logger.info(f"DB check: table has {len(existing)} columns")
-            conn.close()
-        except Exception as e:
-            logger.error(f"DB check failed: {e}")
-        return result
-    
+        return get_local_db_client()
+
     return None
 
 

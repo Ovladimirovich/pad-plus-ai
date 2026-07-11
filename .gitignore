@@ -34,6 +34,10 @@ yarn.lock
 
 # Build
 
+# PID files
+backend_pid.txt
+stderr_dump.txt
+
 # Data & Databases
 data/
 *.db
