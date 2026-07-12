@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS knowledge_relations (
     type TEXT DEFAULT 'related',
     weight REAL DEFAULT 1.0,
     confidence REAL DEFAULT 0.5,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Индексы для связей

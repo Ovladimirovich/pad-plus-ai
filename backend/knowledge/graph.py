@@ -332,7 +332,6 @@ class KnowledgeGraph:
                             "weight": rel.weight,
                             "confidence": rel.confidence,
                             "created_at": rel.created_at.isoformat(),
-                            "updated_at": datetime.now().isoformat(),
                         }).execute()
                         stats["relations_pushed"] += 1
                     except Exception as e:
@@ -635,7 +634,6 @@ class KnowledgeGraph:
                     "weight": relation.weight,
                     "confidence": relation.confidence,
                     "created_at": relation.created_at.isoformat(),
-                    "updated_at": now,
                 }).execute()
             except Exception as e:
                 logger.error(f"Supabase insert relation error: {e}")
