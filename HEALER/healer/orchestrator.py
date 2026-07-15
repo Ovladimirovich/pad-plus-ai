@@ -132,6 +132,14 @@ class HealerOrchestrator:
             started_at=time.time(), status="running",
         )
 
+        from aethon.xray.trace_store import store as _ts_registry
+        target = trace_path or (str(self.project_path) if self.project_path else None)
+        if target:
+            _ts = _ts_registry.get(target)
+            if not _ts.persist_enabled:
+                _ts.configure_persistence(target)
+            _ts_registry.set_active(target)
+
         trace = start_trace(f"healer.cycle.{cycle_id}", metadata={
             "mode": self.mode.value, "project": str(self.project_path or trace_path or ""),
         })
@@ -140,7 +148,6 @@ class HealerOrchestrator:
             if self._stop_event.is_set():
                 raise KeyboardInterrupt("graceful shutdown")
 
-            target = trace_path or (str(self.project_path) if self.project_path else None)
             if not target:
                 self.current_cycle.status = "error"
                 self.current_cycle.errors.append("No target path")
@@ -150,17 +157,11 @@ class HealerOrchestrator:
                 self._running = False
                 return self.current_cycle
 
-            from aethon.xray.trace_store import store
-            ts = store.get(target)
-            if not ts.persist_enabled:
-                ts.configure_persistence(target)
-            store.set_active(target)
-
             # ── Phase 1: Diagnostics ──
             diag_span = start_span(SpanKind.DIAGNOSTIC, "healer.diagnostics.run")
+            if diag_span: diag_span.end("ok")  # закрываем до run_diagnostics, иначе SpanAnalyzer найдёт свой же span
             all_reports = cast("list[DiagnosticReport]", run_diagnostics(event_callback=diagnostics_callback))
             reports = filter_reports(all_reports, "warning")
-            if diag_span: diag_span.end("ok")
 
             if self._stop_event.is_set():
                 raise KeyboardInterrupt("graceful shutdown after diagnostics")
