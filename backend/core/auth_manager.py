@@ -210,18 +210,26 @@ async def get_current_user_safe(
     
     # 3. Проверяем подключение к БД
     if not supabase:
-        # В DEV режиме принимаем локальный токен
-        if access_token and access_token.startswith("dev-token-"):
+        from core.supabase_client import _is_development
+        if _is_development():
             logger.info("🔧 DEV режим: аутентификация по локальному токену")
-            user = SimpleNamespace(
-                id="dev-user",
-                email="dev@local"
-            )
+            user_id = "dev-user"
+            user_email = "dev@local"
+            try:
+                import jwt
+                decoded = jwt.decode(access_token, options={"verify_signature": False})
+                if decoded.get("sub"):
+                    user_id = decoded["sub"]
+                if decoded.get("email"):
+                    user_email = decoded["email"]
+            except Exception:
+                pass
+            user = SimpleNamespace(id=user_id, email=user_email)
             return {
                 "auth_user": user,
-                "profile": {"id": "dev-user", "full_name": "Developer", "email": "dev@local"},
-                "id": "dev-user",
-                "email": "dev@local",
+                "profile": {"id": user_id, "full_name": user_email.split("@")[0], "email": user_email},
+                "id": user_id,
+                "email": user_email,
                 "access_token": access_token,
                 "authorization": f"Bearer {access_token}"
             }

@@ -28,6 +28,7 @@ from .phases import (
     IdentityPhase,
     GeneratePhase,
     TruthLoopPhase,
+    EvaluationPhase,
     SaveEpisodePhase,
     ExtractionPhase,
     EmotionUpdatePhase,
@@ -88,6 +89,7 @@ class PipelineExecutor:
             ("identity", IdentityPhase()),
             ("generate", GeneratePhase()),
             ("truth_loop", TruthLoopPhase()),
+            ("evaluation", EvaluationPhase()),
             ("save_episode", SaveEpisodePhase()),
             ("extraction", ExtractionPhase()),
             ("emotion_update", EmotionUpdatePhase()),
@@ -201,6 +203,17 @@ class PipelineExecutor:
             return "simple"
         if len(user_message) < 100:
             return "retrieval"
+
+        # Meta-Learner: рекомендация на основе исторической статистики
+        try:
+            from core.xray import get_meta_learner
+            ml = get_meta_learner()
+            recommended = ml.get_strategy_recommendation()
+            if recommended:
+                return recommended
+        except Exception:
+            pass
+
         return "reasoning"
 
     async def execute(
@@ -257,6 +270,7 @@ class PipelineExecutor:
             "emotion": "retrieve", "roots": "retrieve",
             "persona": "persona", "generate": "generate",
             "truth_loop": "verify",
+            "evaluation": "verify",
             "save_episode": "remember", "emotion_update": "remember",
             "persona_evolution": "remember",
             "events_broadcast": "emit", "health": "emit",
@@ -330,7 +344,7 @@ class PipelineExecutor:
         except Exception:
             pass
 
-        _simple_skip = {"rag", "knowledge_graph", "episodic", "semantic", "persona", "roots", "truth_loop", "save_episode", "extraction", "emotion_update", "persona_evolution", "reflection", "dreams"}
+        _simple_skip = {"rag", "knowledge_graph", "episodic", "semantic", "persona", "roots", "truth_loop", "evaluation", "save_episode", "extraction", "emotion_update", "persona_evolution", "reflection", "dreams"}
         _independent_group = {"rag", "knowledge_graph", "episodic", "semantic", "emotion"}
         _skip_phases = set()
 
@@ -726,6 +740,13 @@ class PipelineExecutor:
             if sources_info:
                 result.response += "\n\n---\n🔍 **Источники информации:**\n" + "\n".join(sources_info)
                 result.response += f"\n\n📊 **Общая уверенность:** {result.truth_confidence:.0%}"
+
+        elif phase_name == "evaluation":
+            result.metadata["evaluation"] = data.get("evaluation")
+            if data.get("ask_feedback"):
+                prompt = data.get("feedback_prompt", "")
+                if prompt:
+                    result.response += prompt
 
         elif phase_name == "save_episode":
             result.episode_id = data.get("episode_id")

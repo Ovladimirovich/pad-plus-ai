@@ -6,6 +6,7 @@ from core.pipeline.models import PhaseResult
 from core.pipeline.context import PipelineContext
 from learning.evaluator import SelfEvaluator, get_evaluator
 from learning.collector import DataCollector, get_collector
+from learning.active import get_active_policy
 
 logger = logging.getLogger("padplus.pipeline.evaluation")
 
@@ -24,9 +25,6 @@ class EvaluationPhase(PipelinePhase):
         return self._collector or get_collector()
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
-        # TEMPORARILY DISABLED FOR PERFORMANCE
-        return PhaseResult(success=True, data={"evaluation_skipped": True, "reason": "disabled_for_performance"})
-
         response = ctx.context.get("response", "")
         if not response:
             return PhaseResult(success=True, data={"evaluation_skipped": True, "reason": "no_response"})
@@ -61,13 +59,19 @@ class EvaluationPhase(PipelinePhase):
                 metadata=metadata,
             )
 
-            return PhaseResult(
-                success=True,
-                data={
-                    "evaluation": eval_dict,
-                    "evaluation_skipped": False,
-                },
-            )
+            active = get_active_policy()
+            data = {
+                "evaluation": eval_dict,
+                "evaluation_skipped": False,
+            }
+            if active.should_ask_feedback(eval_dict, response, metadata):
+                data["ask_feedback"] = True
+                data["feedback_prompt"] = (
+                    "\n\n---\n💬 **Был ли ответ полезным?** "
+                    "Оцени от 1 до 5 — это поможет мне стать лучше."
+                )
+
+            return PhaseResult(success=True, data=data)
         except Exception as e:
             logger.warning("Evaluation failed: %s", str(e))
             return PhaseResult(

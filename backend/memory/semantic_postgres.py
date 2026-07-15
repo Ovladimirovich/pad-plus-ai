@@ -154,8 +154,8 @@ class SemanticMemory:
                 self._init_attempts += 1
                 try:
                     self._ensure_tables()
+                    self._available = True  # ставим ДО загрузки кэша, чтобы _load_procedures_cache не вызвал рекурсию
                     self._load_procedures_cache()
-                    self._available = True
                     logger.info("✅ SemanticMemory PostgreSQL инициализирована")
                     break
                 except Exception as e:
@@ -400,7 +400,7 @@ class SemanticMemory:
 
         if knowledge_type:
             conditions.append("knowledge_type = %s")
-            params.append(knowledge_type)
+            params.append(knowledge_type.value if hasattr(knowledge_type, 'value') else knowledge_type)
 
         if domain:
             conditions.append("domain = %s")

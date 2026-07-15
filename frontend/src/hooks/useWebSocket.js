@@ -36,7 +36,10 @@ export function useWebSocket(url = null) {
     const token = getAuthToken();
     const refreshToken = getRefreshToken();
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const baseWsUrl = url || `${protocol}//${window.location.host}/ws`;
+    const defaultHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? `localhost:8007`
+      : window.location.host;
+    const baseWsUrl = url || `${protocol}//${defaultHost}/ws`;
     const wsUrl = new URL(baseWsUrl);
 
     if (token) {

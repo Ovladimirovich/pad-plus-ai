@@ -1,4 +1,4 @@
-import{r as s,j as e,C as c,a as l,b as d,c as p,B as t}from"./index-l79UL_xA.js";const g=[{id:"overview",label:"📋 Обзор системы"},{id:"quickstart",label:"🚀 Быстрый старт"},{id:"interface",label:"🖥️ Интерфейс"},{id:"chat",label:"💬 Чат"},{id:"providers",label:"⚡ Провайдеры"},{id:"dashboard",label:"📊 Дашборд"},{id:"memory",label:"🧠 Память и RAG"},{id:"emotion",label:"😊 Эмоции PAD"},{id:"experience",label:"📊 Опыт и дельты"},{id:"healer",label:"🧬 HEALER"},{id:"knowledge",label:"🔗 Знания"},{id:"settings",label:"⚙️ Настройки"},{id:"experiment",label:"🧪 Эксперимент"},{id:"faq",label:"❓ FAQ"}],E={overview:{title:"Обзор системы PAD+ AI v4.0",sections:[{heading:"Что такое PAD+ AI?",content:`⚠️ Это не просто ещё один чат бот. Это самая продвинутая открытая реализация когнитивной архитектуры искусственного интеллекта в России.
+import{r as s,j as e,C as c,a as l,b as d,c as p,B as t}from"./index-BLXsYOML.js";const g=[{id:"overview",label:"📋 Обзор системы"},{id:"quickstart",label:"🚀 Быстрый старт"},{id:"interface",label:"🖥️ Интерфейс"},{id:"chat",label:"💬 Чат"},{id:"providers",label:"⚡ Провайдеры"},{id:"dashboard",label:"📊 Дашборд"},{id:"memory",label:"🧠 Память и RAG"},{id:"emotion",label:"😊 Эмоции PAD"},{id:"experience",label:"📊 Опыт и дельты"},{id:"healer",label:"🧬 HEALER"},{id:"knowledge",label:"🔗 Знания"},{id:"settings",label:"⚙️ Настройки"},{id:"experiment",label:"🧪 Эксперимент"},{id:"faq",label:"❓ FAQ"}],E={overview:{title:"Обзор системы PAD+ AI v4.0",sections:[{heading:"Что такое PAD+ AI?",content:`⚠️ Это не просто ещё один чат бот. Это самая продвинутая открытая реализация когнитивной архитектуры искусственного интеллекта в России.
 
 Это единственная система в мире которая не просто вызывает LLM, а реализует полный цикл мышления с самонаблюдением, эмоциями, памятью и саморефлексией.
 
@@ -13,8 +13,8 @@ import{r as s,j as e,C as c,a as l,b as d,c as p,B as t}from"./index-l79UL_xA.js
 💾 **Многоуровневая система памяти (7 типов)**
 Система действительно ПОМНИТ вас. 7 типов памяти: RAG v3.0 (гибридный поиск: ключевые слова + свежесть), Episodic (диалоги), Semantic (знания), Facts (факты), Roots (убеждения), Persona (личность), Hygiene (авто-очистка).
 
-⚡ **Полностью прозрачный пайплайн обработки (21 фаза)**
-21 фаза pipeline: Safety → Intent → RAG → KnowledgeGraph → Episodic → Semantic → Emotion → Persona → Roots → Identity → Generate → TruthLoop → SaveEpisode → EmotionUpdate → Consolidation → PersonaEvolution → Events → Health → Reflection → Dreams → Metrics → ResponseGuard.
+⚡ **Полностью прозрачный пайплайн обработки (22+ фазы)**
+22+ фаз pipeline: Safety → Intent → RAG → KnowledgeGraph → Episodic → Semantic → Emotion → Persona → Roots → Identity → Generate → TruthLoop → SaveEpisode → EmotionUpdate → Consolidation → PersonaEvolution → Events → Health → Reflection → Dreams → **Evaluation** → Metrics → ResponseGuard.
 
 🏥 **HealerBridge — система самовосстановления**
 Система следит за собственным состоянием, запускает диагностику HEALER, обнаруживает аномалии и генерирует отчёты.
@@ -30,7 +30,7 @@ import{r as s,j as e,C as c,a as l,b as d,c as p,B as t}from"./index-l79UL_xA.js
 ✅ Мониторинг: X-Ray трассировка, Health Score, HEALER диагностика
 ✅ Память: RAG (ILIKE + recency ранжирование), эпизоды, семантика, факты, персона
 
-Это не обёртка над ChatGPT. Это попытка построить настоящую искусственную личность.`},{heading:"Архитектура обработки запроса",content:`Pipeline v4.0 (22 фазы):
+Это не обёртка над ChatGPT. Это попытка построить настоящую искусственную личность.`},{heading:"Архитектура обработки запроса",content:`Pipeline v4.0 (23 фазы):
 
 Фазы подготовки:
 1. 🛡️ Safety → Проверка безопасности (инъекции, токсичность)
@@ -57,8 +57,18 @@ import{r as s,j as e,C as c,a as l,b as d,c as p,B as t}from"./index-l79UL_xA.js
 18. ❤️ Health → Проверка здоровья системы
 19. 🪞 Reflection → Саморефлексия
 20. 🌙 Dreams → Запуск сновидений (при простое > 5 мин)
-21. 📊 Metrics → Сбор метрик производительности
-22. 🛡️ ResponseGuard → Финальная проверка ответа`}]},quickstart:{title:"Быстрый старт",sections:[{heading:"Шаг 1: Регистрация",content:`1. При первом входе нажмите "Регистрация"
+21. 🎯 **Evaluation** → Самооценка ответа (точность, полнота, полезность, безопасность) + запрос фидбека
+22. 📊 Metrics → Сбор метрик производительности
+23. 🛡️ ResponseGuard → Финальная проверка ответа`},{heading:"ActiveLearning — самооценка и запрос фидбека",content:`После каждого ответа система проводит самооценку (EvaluationPhase):
+• 4 критерия: точность, полнота, полезность, безопасность (0.0–1.0)
+• Результат записывается в Experience Layer и влияет на эмоции
+• Если ответ был неуверенным (< 0.6), система может запросить фидбек у пользователя
+
+ControlTick — фоновый автономный цикл (каждые 60с):
+• Self-Evaluation: оценка производительности (health score, response time, ошибки)
+• Meta-Learner: анализ стратегий генерации — кластеризация по success/efficiency/quality
+• Рекомендация смены стратегии при падении эффективности
+• Обновление виджетов Dashboard в реальном времени`}]},quickstart:{title:"Быстрый старт",sections:[{heading:"Шаг 1: Регистрация",content:`1. При первом входе нажмите "Регистрация"
 2. Введите email и придумайте пароль (мин. 8 символов, заглавная буква, цифра)
 3. Подтвердите регистрацию
 4. Войдите в систему с вашими данными

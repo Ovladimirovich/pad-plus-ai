@@ -13,7 +13,7 @@
 - Сон способствует консолидации
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 import logging
@@ -400,7 +400,7 @@ class MemoryConsolidator:
 
         # Фильтруем по критериям
         candidates = []
-        cutoff_time = datetime.now() - timedelta(hours=self.config["min_age_hours"])
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.config["min_age_hours"])
 
         seen_ids = set()
         for ep in significant + all_episodes:
@@ -408,8 +408,11 @@ class MemoryConsolidator:
                 continue
             seen_ids.add(ep.id)
 
-            # Проверяем возраст
-            if ep.timestamp < cutoff_time:
+            # Проверяем возраст (учитываем что timestamp может быть с таймзоной из PostgreSQL)
+            ep_ts = ep.timestamp
+            if ep_ts.tzinfo is None and cutoff_time.tzinfo is not None:
+                ep_ts = ep_ts.replace(tzinfo=timezone.utc)
+            if ep_ts < cutoff_time:
                 # Проверяем частоту использования ИЛИ эмоциональную значимость
                 if (ep.access_count >= self.config["min_access_count"] or
                     abs(ep.emotion_impact) >= self.config["emotion_boost_threshold"]):

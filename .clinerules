@@ -47,6 +47,28 @@ PAD+ AI — AI-ассистент с когнитивной архитектур
 - `\xa0` (неразрывный пробел) ломает Authorization header
 - Фикс: `.encode("ascii", errors="ignore")` при сохранении и чтении ключа
 
+### Fix 500 на дашборде
+- `GET /api/v1/analytics/dashboard` возвращал 500 при пустой аналитике
+- Фикс: `backend/app/routers/analytics.py` — fallback-данные при пустом результате, try/except вокруг каждого виджета
+
+### EvaluationPhase (ActiveLearning)
+- Фаза `Evaluation` в pipeline (между Dreams и Metrics)
+- Самооценка ответа по 4 критериям (accuracy, completeness, helpfulness, safety)
+- Запись результата в Experience Layer, влияние на эмоции
+- Файл: `backend/core/pipeline/phases/evaluation.py`
+
+### ControlTick
+- Фоновый автономный цикл в `backend/core/control_tick.py`
+- Запускается каждые 60с, обновляет метрики, запускает Meta-Learner
+- При старте логирует: "ControlTick запущен, интервал 60с"
+- Не блокирует pipeline
+
+### Meta-Learner
+- `backend/core/xray/meta_learner.py` — analyze_patterns()
+- Кластеризация стратегий по 3 критериям (success_rate, efficiency, quality_score)
+- Рекомендация: {"current": "...", "recommended": "...", "reason": "..."}
+- Вызывается из ControlTick и из EvaluationPhase
+
 ## Граф знаний (Knowledge Graph)
 Подробная документация в `.ai/knowledge-graph.md`. Кратко:
 - **Хранение:** Supabase (PostgreSQL) — продакшн, SQLite (`data/knowledge.db`) — локально. Авто-определение.

@@ -41,7 +41,7 @@
 |---|--------|-----|------------|--------|
 | 3.1 | Корзина документов — доделать | `frontend/src/pages/DocumentsPage.jsx` + `backend/api/document_routes.py` | Уже частично реализована (soft-delete, trash API). Доделать: кнопка "Восстановить все", бадж счётчика в sidebar, подтверждение очистки корзины | 1ч |
 | 3.2 | Коллекции документов | `backend/api/document_routes.py` + `DocumentsPage.jsx` | Починить `POST/PATCH /collections`. Добавить: переименование коллекции, drag-n-drop документов между коллекциями | 2ч |
-| 3.3 | Feedback в чате | `frontend/src/pages/ChatPage.jsx` + `backend/api/feedback_routes.py` | Добавить кнопки 👍/👎 к каждому сообщению ассистента. Отправлять `POST /feedback`. Показывать счётчик рейтинга | 2ч |
+| 3.3 | Feedback в чате | `frontend/src/pages/ChatPage.jsx` + `backend/api/feedback_routes.py` | Добавить кнопки 👍/👎 к каждому сообщению ассистента. Отправлять `POST /feedback`. Показывать счётчик рейтинга | ✅ Сделано |
 | 3.4 | Настройки документов | `backend/api/document_routes.py` + `DocumentsPage.jsx` | Подключить `PATCH /settings` к реальному сохранению в БД/файл | 1ч |
 | 3.5 | Memory Dashboard — улучшить виджеты | `frontend/src/pages/MemoryPage.jsx` | Сейчас — плоский список ключ-значение. Добавить: прогресс-бары, графики, timeline консолидации | 1ч |
 
@@ -54,9 +54,9 @@
 | # | Задача | Где | Что делать | Оценка |
 |---|--------|-----|------------|--------|
 | 4.1 | DreamsPhase — запустить dream() | `backend/core/pipeline/phases/dreams.py` + `executor.py` | Сейчас `record_activity()` вызывается, но `dream()` нет. Добавить вызов после N диалогов или по расписанию | 1ч |
-| 4.2 | ReflectionPhase — MetaController | `backend/core/pipeline/phases/reflection.py` | Сейчас блок с `core.meta_controller` закомментирован (модуль не создан). Создать `MetaController` или адаптировать существующий X-Ray Brain | 2ч |
+| 4.2 | ReflectionPhase — MetaController | `backend/core/pipeline/phases/reflection.py` | Сейчас блок с `core.meta_controller` закомментирован (модуль не создан). Создать `MetaController` или адаптировать существующий X-Ray Brain | ✅ Сделано |
 | 4.3 | X-Ray Pipeline Flow — визуализация | `frontend/src/pages/XRayPage.jsx` | 14 фаз pipeline. Показать: текущую фазу, время выполнения, статус (ok/warn/error). WebSocket для real-time | 2ч |
-| 4.4 | MetaLearner — анализатор стратегий | `backend/core/xray/meta_learner.py` | Метод `analyze_patterns()` возвращает `{}`. Реализовать: кластеризацию стратегий по успешности, рекомендацию смены стратегии | 1ч |
+| 4.4 | MetaLearner — анализатор стратегий | `backend/core/xray/meta_learner.py` | Метод `analyze_patterns()` возвращает `{}`. Реализовать: кластеризацию стратегий по успешности, рекомендацию смены стратегии | ✅ Сделано |
 
 ---
 
@@ -86,6 +86,20 @@
 
 ---
 
+## Фаза 7 — Стабилизация и автономность
+
+~4ч (выполнено)
+
+| # | Задача | Где | Что делать | Статус |
+|---|--------|-----|------------|--------|
+| 7.1 | Fix 500 на дашборде | `backend/app/routers/analytics.py` | При пустой аналитике — возвращать корректный fallback, а не 500 | ✅ |
+| 7.2 | ControlTick — автономный цикл | `backend/core/control_tick.py` | Фоновый цикл 60с: self-evaluation, обновление метрик, Meta-Learner | ✅ |
+| 7.3 | EvaluationPhase — активное обучение | `backend/core/pipeline/phases/evaluation.py` | Фаза самооценки ответа по 4 критериям, запись в опыт | ✅ |
+| 7.4 | ActiveLearning — запрос фидбека | `backend/app/routers/chat.py` | Nudge после N диалогов, обработка фидбека пользователя | ✅ |
+| 7.5 | Meta-Learner — рекомендации | `backend/core/xray/meta_learner.py` | Кластеризация стратегий по success + efficiency + quality score | ✅ |
+
+---
+
 ## Сводка
 
 | Фаза | Часы | Суть |
@@ -96,6 +110,7 @@
 | Фаза 4: X-Ray + MetaLearner | ~6ч | Dreams, MetaController, pipeline flow, анализатор |
 | Фаза 5: Knowledge Graph | ~6ч | API + force-directed визуализация |
 | Фаза 6: Оптимизация | ~2ч | Lazy imports, React.lazy, мемоизация |
-| **Итого** | **~28ч** | |
+| Фаза 7: Стабилизация | ~4ч | Fix 500, ControlTick, EvaluationPhase, ActiveLearning, Meta-Learner |
+| **Итого** | **~32ч** | |
 
 Порядок важен: каждая фаза опирается на предыдущую.

@@ -74,10 +74,12 @@ class Events:
         self.dialog_completed: Event[Dict[str, Any]] = Event("dialog_completed")
         self.strategy_changed: Event[Dict[str, Any]] = Event("strategy_changed")
         self.experience_captured: Event[Dict[str, Any]] = Event("experience_captured")
+        self.tick_completed: Event[Dict[str, Any]] = Event("tick_completed")
         self._all_events = {
             "dialog_completed": self.dialog_completed,
             "strategy_changed": self.strategy_changed,
             "experience_captured": self.experience_captured,
+            "tick_completed": self.tick_completed,
         }
         self._event_meta: List[EventMeta] = []
 

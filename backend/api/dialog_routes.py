@@ -79,70 +79,74 @@ async def list_dialogs(
         sort_order: Порядок сортировки (asc, desc)
         is_favorite: Фильтр по избранному (True/False/None)
     """
-    supabase = get_db_client(current_user)
-    user_id = current_user["id"]
-    
-    # Ограничиваем limit
-    limit = min(max(limit, 1), 100)
-    
-    # Валидируем sort_by
-    valid_sort_fields = ["created_at", "updated_at", "title", "message_count"]
-    if sort_by not in valid_sort_fields:
-        sort_by = "updated_at"
-    
-    # Валидируем sort_order
-    descending = sort_order.lower() != "asc"
-    
-    # Получаем пагинированные диалоги (без count — отдельным запросом)
-    query = supabase.table("dialogs")\
-        .select("*")\
-        .eq("user_id", user_id)
-    
-    if is_favorite is not None:
-        query = query.eq("is_favorite", is_favorite)
-    
-    query = query.order(f"{sort_by}", desc=descending)
-    query = query.range(offset, offset + limit - 1)
-    result = query.execute()
-    
-    # Общее количество — только если первая страница
-    total = 0
-    if offset == 0:
-        try:
-            count_result = supabase.table("dialogs")\
-                .select("id", count="exact")\
-                .eq("user_id", user_id)\
-                .limit(0)\
-                .execute()
-            total = count_result.count if count_result.count else 0
-        except Exception as e:
-            logger.warning(f"{__name__} error: {e}")
-    
-    has_more = False
-    if total > 0:
-        has_more = offset + limit < total
-    elif len(result.data) >= limit:
-        has_more = True
-    
-    dialogs = []
-    for dialog in result.data:
-        dialogs.append(DialogResponse(
-            id=dialog["id"],
-            title=dialog.get("title"),
-            created_at=dialog["created_at"],
-            updated_at=dialog["updated_at"],
-            message_count=dialog.get("message_count", 0),
-            is_favorite=dialog.get("is_favorite", False),
-            last_message_at=dialog.get("last_message_at")
-        ))
-    
-    return {
-        "data": dialogs,
-        "total": total,
-        "offset": offset,
-        "limit": limit,
-        "has_more": has_more
-    }
+    try:
+        supabase = get_db_client(current_user)
+        user_id = current_user["id"]
+        
+        # Ограничиваем limit
+        limit = min(max(limit, 1), 100)
+        
+        # Валидируем sort_by
+        valid_sort_fields = ["created_at", "updated_at", "title", "message_count"]
+        if sort_by not in valid_sort_fields:
+            sort_by = "updated_at"
+        
+        # Валидируем sort_order
+        descending = sort_order.lower() != "asc"
+        
+        # Получаем пагинированные диалоги (без count — отдельным запросом)
+        query = supabase.table("dialogs")\
+            .select("*")\
+            .eq("user_id", user_id)
+        
+        if is_favorite is not None:
+            query = query.eq("is_favorite", is_favorite)
+        
+        query = query.order(f"{sort_by}", desc=descending)
+        query = query.range(offset, offset + limit - 1)
+        result = query.execute()
+        
+        # Общее количество — только если первая страница
+        total = 0
+        if offset == 0:
+            try:
+                count_result = supabase.table("dialogs")\
+                    .select("id", count="exact")\
+                    .eq("user_id", user_id)\
+                    .limit(0)\
+                    .execute()
+                total = count_result.count if count_result.count else 0
+            except Exception as e:
+                logger.warning(f"{__name__} error: {e}")
+        
+        has_more = False
+        if total > 0:
+            has_more = offset + limit < total
+        elif len(result.data) >= limit:
+            has_more = True
+        
+        dialogs = []
+        for dialog in result.data:
+            dialogs.append(DialogResponse(
+                id=dialog["id"],
+                title=dialog.get("title"),
+                created_at=dialog["created_at"],
+                updated_at=dialog["updated_at"],
+                message_count=dialog.get("message_count", 0),
+                is_favorite=dialog.get("is_favorite", False),
+                last_message_at=dialog.get("last_message_at")
+            ))
+        
+        return {
+            "data": dialogs,
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "has_more": has_more
+        }
+    except Exception as e:
+        logger.warning(f"list_dialogs error: {e}")
+        return {"data": [], "total": 0, "offset": offset, "limit": limit, "has_more": False}
 
 
 @router.get("/stats")
@@ -150,7 +154,12 @@ async def get_dialog_stats(
     current_user: dict = Depends(get_current_user)
 ):
     """Статистика диалогов пользователя"""
-    supabase = get_db_client(current_user)
+    try:
+        supabase = get_db_client(current_user)
+    except Exception as e:
+        logger.warning(f"get_db_client error: {e}")
+        return {"total_dialogs": 0, "favorite_dialogs": 0, "total_messages": 0, "activity_by_day": {}}
+
     user_id = current_user["id"]
     
     total_dialogs = 0

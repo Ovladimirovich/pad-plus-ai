@@ -268,6 +268,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ X-Ray Broadcaster не запустился: {e}")
 
+    # Запуск ControlTick (фоновый цикл автономной обработки)
+    try:
+        from core.tick import get_control_tick
+        tick = get_control_tick()
+        await tick.start()
+        logger.info("✅ ControlTick запущен")
+    except Exception as e:
+        logger.warning(f"⚠️ ControlTick не запустился: {e}")
+
     total_time = time.time() - start_time
     logger.info(f"🚀 PAD+ AI готов к работе! (всего: {total_time:.2f}s)")
     
@@ -275,6 +284,15 @@ async def lifespan(app: FastAPI):
     
     # === SHUTDOWN ===
     logger.info("🛑 PAD+ AI останавливается...")
+
+    # Остановка ControlTick
+    try:
+        from core.tick import get_control_tick
+        tick = get_control_tick()
+        await tick.stop()
+        logger.info("✅ ControlTick остановлен")
+    except Exception as e:
+        logger.warning(f"⚠️ ControlTick stop: {e}")
 
     # Остановка X-Ray Broadcaster
     if xray_broadcaster:

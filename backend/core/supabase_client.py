@@ -41,15 +41,13 @@ def _is_development() -> bool:
     """
     Проверяет, работаем ли мы в development-режиме.
 
-    В development-режиме Supabase отключается принудительно,
-    даже если библиотека установлена и credentials есть в .env.
+    В development-режиме Supabase отключается принудительно.
+    Без явного APP_ENV=development считаем себя production-режимом.
     """
     if os.getenv("RENDER") == "true":
         return False
     env = os.getenv("APP_ENV", "").strip().lower()
-    if env in ("production", "prod"):
-        return False
-    return True
+    return env == "development"
 
 
 def get_supabase() -> Optional[Client]:
