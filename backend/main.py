@@ -75,234 +75,261 @@ from fastapi.staticfiles import StaticFiles
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Жизненный цикл приложения"""
-    # === STARTUP ===
+    """Жизненный цикл приложения (быстрый старт + фоновая инициализация)"""
+    # === STARTUP (только критическое) ===
     logger.info("🧠 PAD+ AI v4.0 запускается...")
     start_time = time.time()
-    
-    # Регистрация зависимостей (Вторая очередь улучшений)
+
+    # Регистрация зависимостей (быстро ~0.79s)
     logger.info("📦 Регистрация зависимостей...")
     register_dependencies()
     logger.info(f"✅ Dependency Injection инициализирован ({time.time()-start_time:.2f}s)")
 
-    # Запуск миграций БД (Alembic)
-    logger.info("🗄️ Запуск миграций БД...")
-    try:
-        from scripts.migrate import migrate_at_startup
-        migrated = migrate_at_startup()
-        if migrated:
-            logger.info(f"✅ Миграции БД применены ({time.time()-start_time:.2f}s)")
+    init_state: dict = {}
+
+    async def _background_init():
+        """Тяжёлая инициализация в фоне (миграции, кэш, мониторинг, X-Ray, ControlTick)."""
+        nonlocal init_state
+
+        # Миграции БД
+        logger.info("🗄️ Миграции БД (фон)...")
+        try:
+            from scripts.migrate import migrate_at_startup
+            migrated = migrate_at_startup()
+            if migrated:
+                logger.info("✅ Миграции БД применены")
+            else:
+                logger.warning("⚠️ Миграции БД не выполнены")
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка при запуске миграций: {e}")
+
+        # Проверка ANTI_DIRECTIVE
+        logger.info("🔒 Проверка ANTI_DIRECTIVE...")
+        if not check_integrity():
+            logger.error("❌ Целостность ANTI_DIRECTIVE нарушена!")
         else:
-            logger.warning(f"⚠️ Миграции БД не выполнены ({time.time()-start_time:.2f}s)")
-    except Exception as e:
-        logger.warning(f"⚠️ Ошибка при запуске миграций: {e}")
+            logger.info("✅ ANTI_DIRECTIVE проверена")
 
-    # Проверка целостности ANTI_DIRECTIVE
-    logger.info("🔒 Проверка ANTI_DIRECTIVE...")
-    if not check_integrity():
-        logger.error("❌ Целостность ANTI_DIRECTIVE нарушена!")
-        raise RuntimeError("Целость ядра нарушена")
-    logger.info(f"✅ ANTI_DIRECTIVE проверена ({time.time()-start_time:.2f}s)")
-    
-    # Инициализация Sentry
-    sentry_dsn = os.getenv("SENTRY_DSN")
-    if sentry_dsn:
-        try:
-            import sentry_sdk
-            sentry_sdk.init(
-                dsn=sentry_dsn,
-                environment=os.getenv("SENTRY_ENV", "production"),
-                traces_sample_rate=0.5,
-                profiles_sample_rate=0.1,
-            )
-            logger.info(f"✅ Sentry инициализирован ({time.time()-start_time:.2f}s)")
-        except Exception as e:
-            logger.warning(f"⚠️ Sentry не загрузился: {e}")
-    else:
-        logger.info("ℹ️ Sentry не настроен (нет SENTRY_DSN)")
-
-    # Пробрасываем токен в Sentry-Healer bridge
-    from core.sentry_healer_bridge import configure as configure_sentry_bridge
-    configure_sentry_bridge(
-        token=os.getenv("SENTRY_AUTH_TOKEN"),
-        mode=os.getenv("HEALER_MODE", "monitor"),
-    )
-
-    # Инициализация кэш менеджера
-    logger.info("💾 Инициализация кэш менеджера...")
-    cache_manager = get_cache_manager()
-    await cache_manager.connect()
-    logger.info(f"✅ Cache manager инициализирован ({time.time()-start_time:.2f}s)")
-    
-    # Запуск системы мониторинга (откладываем на фон)
-    logger.info("📊 Запуск мониторинга...")
-    monitoring_system = get_monitoring_system()
-    await monitoring_system.start_monitoring()
-    logger.info(f"✅ Система мониторинга запущена ({time.time()-start_time:.2f}s)")
-    
-    # Запуск импульса
-    logger.info("💫 Запуск импульса...")
-    from scripts.impulse import start_impulse
-    impulse = start_impulse()
-    question = impulse.get('question') or impulse.get('primary', {}).get('question', 'неизвестно')
-    logger.info(f"✅ Импульс: {question} ({time.time()-start_time:.2f}s)")
-
-    # Инициализация данных
-    logger.info("📁 Инициализация директорий данных...")
-    data_dir = Path(__file__).parent.parent / "data"
-    data_dir.mkdir(exist_ok=True)
-    
-    # Создание файлов БД (быстро)
-    db_files = ["core.db", "memory.db", "knowledge.db", "llm.db"]
-    for db_file in db_files:
-        db_path = data_dir / db_file
-        if not db_path.exists():
-            db_path.touch()
-    
-    logger.info(f"✅ Директория данных готова: {data_dir} ({time.time()-start_time:.2f}s)")
-    
-    logger.info("🧠 Инициализация RAG Memory...")
-    try:
-        from memory import get_rag
-        rag = get_rag()
-        logger.info(f"✅ RAG Memory инициализирована ({time.time()-start_time:.2f}s)")
-    except Exception as e:
-        logger.warning(f"⚠️ RAG Memory инициализация задерживается: {e}")
-
-    # Memory Hooks
-    logger.info("🔗 Инициализация Memory Hooks...")
-    try:
-        from core.pipeline.memory_hooks import register_default_hooks
-        register_default_hooks()
-        logger.info("✅ Memory Hooks инициализированы")
-    except Exception as e:
-        logger.warning(f"⚠️ Memory Hooks: {e}")
-
-    # Event Bus Listeners
-    logger.info("📡 Инициализация Event Bus Listeners...")
-    try:
-        from core.experience import setup_experience_listener
-        setup_experience_listener()
-        logger.info("✅ Experience Listener зарегистрирован")
-    except Exception as e:
-        logger.warning(f"⚠️ Experience Listener: {e}")
-
-    try:
-        from emotion import setup_emotion_listener
-        setup_emotion_listener()
-        logger.info("✅ Emotion Listener зарегистрирован")
-    except Exception as e:
-        logger.warning(f"⚠️ Emotion Listener: {e}")
-
-    try:
-        from core.strategy import setup_strategy_listener
-        setup_strategy_listener()
-        logger.info("✅ Strategy Listener зарегистрирован")
-    except Exception as e:
-        logger.warning(f"⚠️ Strategy Listener: {e}")
-
-    try:
-        from core.impulse import setup_impulse_listener
-        setup_impulse_listener()
-        logger.info("✅ Impulse Listener зарегистрирован")
-    except Exception as e:
-        logger.warning(f"⚠️ Impulse Listener: {e}")
-
-    try:
-        from core.persona import setup_persona_listener
-        setup_persona_listener()
-        logger.info("✅ Persona Listener зарегистрирован")
-    except Exception as e:
-        logger.warning(f"⚠️ Persona Listener: {e}")
-
-    # Запуск X-Ray Broadcaster + мост TraceCollector → WS
-    xray_broadcaster = None
-    logger.info("🔬 Запуск X-Ray Broadcaster...")
-    try:
-        from core.xray import get_xray_broadcaster, get_trace_collector
-        xray_broadcaster = get_xray_broadcaster()
-        await xray_broadcaster.start()
-
-        # Единый глобальный подписчик TraceCollector → все generic WS
-        collector = get_trace_collector()
-        def _forward_xray_to_ws(event_type: str, data: dict):
+        # Sentry
+        sentry_dsn = os.getenv("SENTRY_DSN")
+        if sentry_dsn:
             try:
-                loop = asyncio.get_running_loop()
-                asyncio.ensure_future(manager.broadcast({
-                    "type": event_type,
-                    "data": data,
-                    "timestamp": datetime.now().isoformat()
-                }))
+                import sentry_sdk
+                sentry_sdk.init(
+                    dsn=sentry_dsn,
+                    environment=os.getenv("SENTRY_ENV", "production"),
+                    traces_sample_rate=0.5,
+                    profiles_sample_rate=0.1,
+                )
+                logger.info("✅ Sentry инициализирован")
             except Exception as e:
-                logger.warning(f"{__name__} error: {e}")
-        collector.subscribe(_forward_xray_to_ws)
-        logger.info("✅ X-Ray Broadcaster запущен + мост TraceCollector→WS")
+                logger.warning(f"⚠️ Sentry не загрузился: {e}")
+        else:
+            logger.info("ℹ️ Sentry не настроен (нет SENTRY_DSN)")
 
-        # Внедряем WS manager в healer_routes для broadcast из bridge cycle
+        # Sentry-Healer bridge
+        from core.sentry_healer_bridge import configure as configure_sentry_bridge
+        configure_sentry_bridge(
+            token=os.getenv("SENTRY_AUTH_TOKEN"),
+            mode=os.getenv("HEALER_MODE", "monitor"),
+        )
+
+        # Cache manager
+        logger.info("💾 Cache manager (фон)...")
         try:
-            from backend.api.healer_routes import set_ws_manager as set_healer_ws
-            set_healer_ws(manager)
-            logger.info("✅ WS manager внедрён в healer_routes")
+            cm = get_cache_manager()
+            await cm.connect()
+            init_state["cache_manager"] = cm
+            logger.info("✅ Cache manager инициализирован")
         except Exception as e:
-            logger.warning(f"⚠️ WS manager не внедрён: {e}")
+            logger.warning(f"⚠️ Cache manager: {e}")
 
-        # Подключение HealerBridge к XRayTraceCollector (события: session_started/event_recorded/session_completed)
+        # Monitoring
+        logger.info("📊 Мониторинг (фон)...")
         try:
-            from backend.integration import get_healer_bridge
-            bridge = get_healer_bridge(mode=os.getenv("HEALER_MODE", "monitor"))
-            bridge.start(collector)
-            logger.info("✅ HealerBridge подключён к TraceCollector")
+            ms = get_monitoring_system()
+            await ms.start_monitoring()
+            init_state["monitoring_system"] = ms
+            logger.info("✅ Система мониторинга запущена")
         except Exception as e:
-            logger.warning(f"⚠️ HealerBridge не подключён: {e}")
+            logger.warning(f"⚠️ Мониторинг: {e}")
 
-        # Подключение HealerListener к пайплайн-событиям через core TraceCollector
+        # Impulse
+        logger.info("💫 Импульс (фон)...")
         try:
-            from healing.listener import get_healer
-            from core.trace_collector import trace_collector as core_collector
-            healer = get_healer()
-            healer.subscribe(lambda: core_collector)
-            logger.info("✅ HealerListener подписан на core TraceCollector")
+            from scripts.impulse import start_impulse
+            impulse = start_impulse()
+            question = impulse.get('question') or impulse.get('primary', {}).get('question', 'неизвестно')
+            logger.info(f"✅ Импульс: {question}")
         except Exception as e:
-            logger.warning(f"⚠️ HealerListener не подключён: {e}")
+            logger.warning(f"⚠️ Импульс: {e}")
 
-    except Exception as e:
-        logger.warning(f"⚠️ X-Ray Broadcaster не запустился: {e}")
+        # Data directories
+        logger.info("📁 Директории данных...")
+        data_dir = Path(__file__).parent.parent / "data"
+        data_dir.mkdir(exist_ok=True)
+        db_files = ["core.db", "memory.db", "knowledge.db", "llm.db"]
+        for db_file in db_files:
+            db_path = data_dir / db_file
+            if not db_path.exists():
+                db_path.touch()
+        logger.info(f"✅ Директория данных готова: {data_dir}")
 
-    # Запуск ControlTick (фоновый цикл автономной обработки)
-    try:
-        from core.tick import get_control_tick
-        tick = get_control_tick()
-        await tick.start()
-        logger.info("✅ ControlTick запущен")
-    except Exception as e:
-        logger.warning(f"⚠️ ControlTick не запустился: {e}")
+        # RAG Memory
+        logger.info("🧠 RAG Memory (фон)...")
+        try:
+            from memory import get_rag
+            rag = get_rag()
+            logger.info("✅ RAG Memory инициализирована")
+        except Exception as e:
+            logger.warning(f"⚠️ RAG Memory: {e}")
+
+        # Memory Hooks
+        logger.info("🔗 Memory Hooks (фон)...")
+        try:
+            from core.pipeline.memory_hooks import register_default_hooks
+            register_default_hooks()
+            logger.info("✅ Memory Hooks инициализированы")
+        except Exception as e:
+            logger.warning(f"⚠️ Memory Hooks: {e}")
+
+        # Event Bus Listeners
+        logger.info("📡 Event Bus Listeners (фон)...")
+        try:
+            from core.experience import setup_experience_listener
+            setup_experience_listener()
+            logger.info("✅ Experience Listener зарегистрирован")
+        except Exception as e:
+            logger.warning(f"⚠️ Experience Listener: {e}")
+
+        try:
+            from emotion import setup_emotion_listener
+            setup_emotion_listener()
+            logger.info("✅ Emotion Listener зарегистрирован")
+        except Exception as e:
+            logger.warning(f"⚠️ Emotion Listener: {e}")
+
+        try:
+            from core.strategy import setup_strategy_listener
+            setup_strategy_listener()
+            logger.info("✅ Strategy Listener зарегистрирован")
+        except Exception as e:
+            logger.warning(f"⚠️ Strategy Listener: {e}")
+
+        try:
+            from core.impulse import setup_impulse_listener
+            setup_impulse_listener()
+            logger.info("✅ Impulse Listener зарегистрирован")
+        except Exception as e:
+            logger.warning(f"⚠️ Impulse Listener: {e}")
+
+        try:
+            from core.persona import setup_persona_listener
+            setup_persona_listener()
+            logger.info("✅ Persona Listener зарегистрирован")
+        except Exception as e:
+            logger.warning(f"⚠️ Persona Listener: {e}")
+
+        # X-Ray Broadcaster
+        logger.info("🔬 X-Ray Broadcaster (фон)...")
+        try:
+            from core.xray import get_xray_broadcaster, get_trace_collector
+            xb = get_xray_broadcaster()
+            await xb.start()
+            collector = get_trace_collector()
+
+            def _forward_xray_to_ws(event_type: str, data: dict):
+                try:
+                    loop = asyncio.get_running_loop()
+                    asyncio.ensure_future(manager.broadcast({
+                        "type": event_type,
+                        "data": data,
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                except Exception as e:
+                    logger.warning(f"{__name__} error: {e}")
+            collector.subscribe(_forward_xray_to_ws)
+            init_state["xray_broadcaster"] = xb
+            logger.info("✅ X-Ray Broadcaster запущен + мост TraceCollector→WS")
+
+            # WS manager → healer_routes
+            try:
+                from backend.api.healer_routes import set_ws_manager as set_healer_ws
+                set_healer_ws(manager)
+                logger.info("✅ WS manager внедрён в healer_routes")
+            except Exception as e:
+                logger.warning(f"⚠️ WS manager не внедрён: {e}")
+
+            # HealerBridge
+            try:
+                from backend.integration import get_healer_bridge
+                bridge = get_healer_bridge(mode=os.getenv("HEALER_MODE", "monitor"))
+                bridge.start(collector)
+                logger.info("✅ HealerBridge подключён к TraceCollector")
+            except Exception as e:
+                logger.warning(f"⚠️ HealerBridge не подключён: {e}")
+
+            # HealerListener
+            try:
+                from healing.listener import get_healer
+                from core.trace_collector import trace_collector as core_collector
+                healer = get_healer()
+                healer.subscribe(lambda: core_collector)
+                logger.info("✅ HealerListener подписан на core TraceCollector")
+            except Exception as e:
+                logger.warning(f"⚠️ HealerListener не подключён: {e}")
+        except Exception as e:
+            logger.warning(f"⚠️ X-Ray Broadcaster не запустился: {e}")
+
+        # ControlTick
+        logger.info("⏱ ControlTick (фон)...")
+        try:
+            from core.tick import get_control_tick
+            t = get_control_tick()
+            await t.start()
+            init_state["control_tick"] = t
+            logger.info("✅ ControlTick запущен")
+        except Exception as e:
+            logger.warning(f"⚠️ ControlTick не запустился: {e}")
+
+        logger.info("✅ Полная фоновая инициализация завершена")
+
+    background_task = asyncio.create_task(_background_init())
 
     total_time = time.time() - start_time
-    logger.info(f"🚀 PAD+ AI готов к работе! (всего: {total_time:.2f}s)")
-    
+    logger.info(f"🚀 PAD+ AI готов к работе! (сервер: {total_time:.2f}s, инициализация в фоне)")
+
     yield
-    
+
     # === SHUTDOWN ===
     logger.info("🛑 PAD+ AI останавливается...")
 
-    # Остановка ControlTick
+    # Отмена фоновой инициализации, если ещё не завершена
+    background_task.cancel()
     try:
-        from core.tick import get_control_tick
-        tick = get_control_tick()
-        await tick.stop()
-        logger.info("✅ ControlTick остановлен")
-    except Exception as e:
-        logger.warning(f"⚠️ ControlTick stop: {e}")
+        await background_task
+    except (asyncio.CancelledError, Exception):
+        pass
 
-    # Остановка X-Ray Broadcaster
-    if xray_broadcaster:
+    # ControlTick
+    tick = init_state.get("control_tick")
+    if tick:
         try:
-            await xray_broadcaster.stop()
+            await tick.stop()
+            logger.info("✅ ControlTick остановлен")
+        except Exception as e:
+            logger.warning(f"⚠️ ControlTick stop: {e}")
+
+    # X-Ray Broadcaster
+    xb = init_state.get("xray_broadcaster")
+    if xb:
+        try:
+            await xb.stop()
             logger.info("✅ X-Ray Broadcaster остановлен")
         except Exception as e:
             logger.warning(f"⚠️ X-Ray Broadcaster stop: {e}")
 
-    # Сохранение состояния Persona
+    # Persona
     try:
         from memory.persona import get_persona
         persona = get_persona()
@@ -311,7 +338,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ Persona save: {e}")
 
-    # Сохранение состояния Emotion
+    # Emotion
     try:
         from emotion.pad_model import get_pad_model
         pad = get_pad_model()
@@ -320,15 +347,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ Emotion save: {e}")
 
-    # Отключение системы мониторинга
-    await monitoring_system.stop_monitoring()
-    logger.info("✅ Система мониторинга остановлена")
-    
-    # Отключение кэш менеджера
-    await cache_manager.disconnect()
-    logger.info("✅ Cache manager отключен")
+    # Monitoring
+    ms = init_state.get("monitoring_system")
+    if ms:
+        try:
+            await ms.stop_monitoring()
+            logger.info("✅ Система мониторинга остановлена")
+        except Exception as e:
+            logger.warning(f"⚠️ Monitoring stop: {e}")
 
-    # Пул PostgreSQL больше не используется (все через Supabase REST)
+    # Cache manager
+    cm = init_state.get("cache_manager")
+    if cm:
+        try:
+            await cm.disconnect()
+            logger.info("✅ Cache manager отключен")
+        except Exception as e:
+            logger.warning(f"⚠️ Cache manager disconnect: {e}")
 
 
 # CORS middleware — настройка для production
@@ -1031,5 +1066,6 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=backend_port,
         reload=reload,
-        log_level="info" if is_production else "debug"
+        log_level="info" if is_production else "debug",
+        lifespan="on"
     )
