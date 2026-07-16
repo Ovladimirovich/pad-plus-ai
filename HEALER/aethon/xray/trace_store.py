@@ -164,6 +164,32 @@ class TraceStore:
         except OSError:
             pass
 
+    def _cleanup_persisted_files(self, trace_id: str):
+        if not self._persist_enabled or not self._persist_path:
+            return
+        trace_path = os.path.join(self._persist_path, "traces", f"{trace_id}.json")
+        try:
+            if os.path.exists(trace_path):
+                os.remove(trace_path)
+        except OSError:
+            pass
+        span_dir = os.path.join(self._persist_path, "spans", trace_id)
+        try:
+            if os.path.isdir(span_dir):
+                for fname in os.listdir(span_dir):
+                    fpath = os.path.join(span_dir, fname)
+                    try:
+                        os.remove(fpath)
+                    except OSError:
+                        pass
+                os.rmdir(span_dir)
+        except OSError:
+            pass
+        index = self._read_index()
+        if trace_id in index:
+            index.pop(trace_id, None)
+            self._write_index(index)
+
     def _update_index_entry(self, trace_id: str, status: str):
         if not self._persist_enabled:
             return
@@ -303,6 +329,7 @@ class TraceStore:
                 snap = [(tid, t.ended_at or 0) for tid, t in list(self._completed.items())]
                 oldest = min(snap, key=lambda x: (x[1], x[0]))[0]
                 self._completed.pop(oldest, None)
+                self._cleanup_persisted_files(oldest)
             trace = self._active.pop(trace_id)
             self._completed[trace_id] = trace
             self._persist_trace_snapshot(trace)
@@ -314,6 +341,7 @@ class TraceStore:
             snap = [(tid, t.ended_at or 0) for tid, t in list(self._completed.items())]
             oldest = min(snap, key=lambda x: (x[1], x[0]))[0]
             self._completed.pop(oldest, None)
+            self._cleanup_persisted_files(oldest)
         self._completed[trace.trace_id] = trace
         self._persist_trace_snapshot(trace)
         self._update_index_entry(trace.trace_id, trace.status)
@@ -659,6 +687,8 @@ class TraceStore:
 
     def clear(self):
         with self._lock:
+            for tid in list(self._completed.keys()):
+                self._cleanup_persisted_files(tid)
             self._active.clear()
             self._completed.clear()
             self._orphan_spans.clear()

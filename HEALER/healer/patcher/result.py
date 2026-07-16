@@ -27,6 +27,7 @@ class PatchResult:
     error: str | None = None
     restart_required: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
+    project_root: str | None = None
 
     def __post_init__(self):
         if not self.restart_required:
@@ -53,8 +54,21 @@ class PatchResult:
             if l.startswith('+') and not l.startswith('+++')
         )
 
+    def _is_path_safe(self, target_path: str) -> bool:
+        if not self.project_root:
+            return True
+        try:
+            target = Path(target_path).resolve()
+            root = Path(self.project_root).resolve()
+            return root in target.parents or target == root
+        except (OSError, ValueError):
+            return False
+
     def apply(self, backup: bool = True) -> bool:
         if not self.success or self.patched_code is None:
+            return False
+        if not self._is_path_safe(self.source_path):
+            self.error = f"Path traversal blocked: {self.source_path} is outside project root"
             return False
         if not os.path.isfile(self.source_path):
             return False
@@ -67,6 +81,9 @@ class PatchResult:
         return True
 
     def rollback(self) -> bool:
+        if not self._is_path_safe(self.source_path):
+            self.error = f"Path traversal blocked: {self.source_path} is outside project root"
+            return False
         backup_path = self.source_path + ".healer.bak"
         if not os.path.isfile(backup_path):
             return False

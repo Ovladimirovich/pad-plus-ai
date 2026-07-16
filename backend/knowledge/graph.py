@@ -549,9 +549,11 @@ class KnowledgeGraph:
                         logger.debug(f"Supabase insert success with {len(data)} fields")
                         break
                     except Exception as e:
-                        if "PGRST204" not in str(e):
-                            # Не PGRST204 — пробуем следующий вариант
+                        if "PGRST204" in str(e):
+                            # PGRST204 — колонка не найдена, пробуем с меньшим количеством полей
                             continue
+                        logger.warning(f"Supabase insert failed (non-PGRST204): {e}")
+                        break
                 if not inserted:
                     logger.error(f"Supabase insert concept failed after all fallbacks")
 
@@ -786,6 +788,12 @@ class KnowledgeGraph:
         if norm_a == 0 or norm_b == 0:
             return 0.0
         return dot / (norm_a * norm_b)
+
+    def get_all_concepts(self) -> Dict[str, "Concept"]:
+        return dict(self._concepts)
+
+    def get_all_relations(self) -> List["Relation"]:
+        return list(self._relations)
 
     def to_dict(self) -> dict:
         nodes = [c.to_dict() for c in self._concepts.values()]

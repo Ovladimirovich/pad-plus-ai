@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 import os
@@ -80,6 +81,7 @@ class HealerOrchestrator:
         self.meta = MetaLearner()
         self.strategies = AdaptiveStrategies(self.meta)
         self._last_reports: list[DiagnosticReport] = []
+        self._last_patch_results: list[dict[str, Any]] = []
 
         self._load_patchers()
 
@@ -159,9 +161,21 @@ class HealerOrchestrator:
 
             # ── Phase 1: Diagnostics ──
             diag_span = start_span(SpanKind.DIAGNOSTIC, "healer.diagnostics.run")
-            if diag_span: diag_span.end("ok")  # закрываем до run_diagnostics, иначе SpanAnalyzer найдёт свой же span
+            if diag_span: diag_span.end("ok")
             all_reports = cast("list[DiagnosticReport]", run_diagnostics(event_callback=diagnostics_callback))
-            reports = filter_reports(all_reports, "warning")
+
+            # Отфильтровываем отчёты от ненадёжных детекторов
+            filtered: list[DiagnosticReport] = []
+            for r in all_reports:
+                if self.strategies.should_skip_detector(r.detector):
+                    logger.debug("Пропускаем детектор %s (низкий вес)", r.detector)
+                    continue
+                adjusted = self.strategies.adjust_severity_threshold(r.detector, "warning")
+                if ReportSeverity(adjusted).value == "critical":
+                    continue
+                filtered.append(r)
+
+            reports = filter_reports(filtered, "warning")
 
             if self._stop_event.is_set():
                 raise KeyboardInterrupt("graceful shutdown after diagnostics")
@@ -261,7 +275,14 @@ class HealerOrchestrator:
 
         try:
             result = patcher.patch_file(str(source_path), report)
+            self._last_patch_results.append({
+                "file": str(source_path),
+                "pattern": result.pattern if result.success else "none",
+                "success": result.success,
+                "detector": report.detector,
+            })
             if result.success:
+                result.project_root = str(self.project_path.resolve()) if self.project_path else None
                 ok = result.apply(backup=True)
                 self.current_cycle.patched_files.append(str(source_path))
                 if ok:
@@ -272,6 +293,12 @@ class HealerOrchestrator:
                     return True
         except Exception as e:
             logger.warning("Ошибка применения патча для %s: %s", source_path, e)
+            self._last_patch_results.append({
+                "file": str(source_path),
+                "pattern": "error",
+                "success": False,
+                "detector": report.detector,
+            })
         return False
 
     def _write_restart_flag(self) -> None:
@@ -298,12 +325,24 @@ class HealerOrchestrator:
 
         try:
             result = patcher.patch_file(str(source_path), report)
+            self._last_patch_results.append({
+                "file": str(source_path),
+                "pattern": result.pattern if result.success else "none",
+                "success": result.success,
+                "detector": report.detector,
+            })
             if result.success:
                 self.current_cycle.patched_files.append(str(source_path))
                 self._emit("patch_generated", {"file": str(source_path), "diff": result.diff})
                 return True
         except Exception as e:
             logger.warning("Ошибка генерации патча для %s: %s", source_path, e)
+            self._last_patch_results.append({
+                "file": str(source_path),
+                "pattern": "error",
+                "success": False,
+                "detector": report.detector,
+            })
         return False
 
     def _rollback_all(self) -> None:
@@ -330,6 +369,20 @@ class HealerOrchestrator:
         )
 
     def _guess_source_path(self, report: DiagnosticReport) -> Path | None:
+        raw = report.location
+        if raw:
+            stripped = re.sub(r':\d+$', '', raw)
+            if self.project_path:
+                candidate = Path(self.project_path) / stripped
+                if candidate.exists() and candidate.is_file():
+                    return candidate
+                candidate = Path(stripped)
+                if candidate.exists() and candidate.is_file():
+                    return candidate
+            else:
+                candidate = Path(stripped)
+                if candidate.exists() and candidate.is_file():
+                    return candidate
         if self.project_path and self.project_path.is_dir():
             return self.project_path / "viewer.py"
         return None
@@ -340,20 +393,19 @@ class HealerOrchestrator:
         c = self.current_cycle
         duration = ((c.ended_at or time.time()) - c.started_at) * 1000
 
-        for f in c.patched_files:
-            for report in self._last_reports or []:
-                if self._guess_source_path(report) == Path(f):
-                    record = HealingRecord(
-                        cycle_id=c.id,
-                        mode=c.mode.value,
-                        timestamp=c.started_at,
-                        detector=report.detector or "unknown",
-                        pattern="applied",
-                        success=c.status == "ok",
-                        duration_ms=duration,
-                        file_path=f,
-                    )
-                    self.meta.record_healing(record)
+        for pr in self._last_patch_results:
+            record = HealingRecord(
+                cycle_id=c.id,
+                mode=c.mode.value,
+                timestamp=c.started_at,
+                detector=pr["detector"],
+                pattern=pr["pattern"],
+                success=pr["success"],
+                duration_ms=duration,
+                file_path=pr["file"],
+            )
+            self.meta.record_healing(record)
+        self._last_patch_results.clear()
 
     def get_history(self, limit: int = 10) -> list[dict]:
         return [c.to_dict() for c in self.history[-limit:]]

@@ -39,7 +39,7 @@ export default function XRayPage() {
     const token = localStorage.getItem('auth_token');
 
     // Строго проксируем через Vite: клиент подключается к origin текущей страницы (5174),
-    // а Vite proxy проксирует WS на backend (8080).
+    // а Vite proxy проксирует WS на backend (8007).
     const wsUrl = new URL('/api/v1/xray/ws', window.location.origin);
 
     if (token) {

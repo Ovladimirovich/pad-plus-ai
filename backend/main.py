@@ -640,11 +640,15 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[Dict[str, Any
     """Authenticate WebSocket connection.
     
     Вызывается ПОСЛЕ accept(). При неудаче возвращает None.
+    Приоритет: Sec-WebSocket-Protocol > query param > Authorization header
     """
     token = websocket.query_params.get("token")
     header_auth = websocket.headers.get("authorization")
-    
-    if token:
+    ws_protocol = websocket.headers.get("sec-websocket-protocol", "")
+
+    if ws_protocol.startswith("auth_"):
+        authorization = f"Bearer {ws_protocol[5:]}"
+    elif token:
         if token.startswith("Bearer "):
             authorization = token
         else:

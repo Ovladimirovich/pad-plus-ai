@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import threading
 import time
 from collections import defaultdict, Counter
 from dataclasses import dataclass, field
@@ -146,6 +148,7 @@ class MetaLearner:
         self.records: list[HealingRecord] = []
         self.pattern_stats: dict[str, PatternStats] = {}
         self.detector_stats: dict[str, DetectorStats] = {}
+        self._lock = threading.Lock()
 
         self._load()
 
@@ -195,31 +198,32 @@ class MetaLearner:
 
     def record_healing(self, record: HealingRecord) -> None:
         """Записать результат одного healing-цикла."""
-        self.records.append(record)
+        with self._lock:
+            self.records.append(record)
 
-        stat = self.pattern_stats.setdefault(record.pattern, PatternStats(pattern=record.pattern))
-        stat.total += 1
-        stat.total_duration_ms += record.duration_ms
-        stat.last_used = record.timestamp
+            stat = self.pattern_stats.setdefault(record.pattern, PatternStats(pattern=record.pattern))
+            stat.total += 1
+            stat.total_duration_ms += record.duration_ms
+            stat.last_used = record.timestamp
 
-        if record.success:
-            stat.success += 1
-            stat.consecutive_failures = 0
-        else:
-            stat.failed += 1
-            stat.consecutive_failures += 1
+            if record.success:
+                stat.success += 1
+                stat.consecutive_failures = 0
+            else:
+                stat.failed += 1
+                stat.consecutive_failures += 1
 
-        det = self.detector_stats.setdefault(record.detector, DetectorStats(detector=record.detector))
-        det.total += 1
-        det.last_used = record.timestamp
-        if record.success:
-            det.true_positive += 1
-            det.patched += 1
-        else:
-            det.false_positive += 1
+            det = self.detector_stats.setdefault(record.detector, DetectorStats(detector=record.detector))
+            det.total += 1
+            det.last_used = record.timestamp
+            if record.success:
+                det.true_positive += 1
+                det.patched += 1
+            else:
+                det.false_positive += 1
 
-        self._prune()
-        self._save()
+            self._prune()
+            self._save()
 
     def record_batch(self, records: list[HealingRecord]) -> None:
         for r in records:
@@ -285,8 +289,16 @@ class MetaLearner:
             "updated_at": time.time(),
         }
         path = self.storage_path / "meta.json"
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        tmp = path.with_suffix(".json.tmp")
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, path)
+        except OSError:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
     def _load(self) -> None:
         path = self.storage_path / "meta.json"
@@ -306,8 +318,9 @@ class MetaLearner:
             for name, s in data.get("detectors", {}).items():
                 filtered = {k: v for k, v in s.items() if k in ds_fields}
                 self.detector_stats[name] = DetectorStats(**filtered)
-        except Exception:
-            pass
+        except Exception as e:
+            logger = logging.getLogger("padplus.meta")
+            logger.warning("MetaLearner: ошибка загрузки %s: %s", path, e)
 
     def clear(self) -> None:
         self.records.clear()

@@ -1,255 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent } from '../ui/Card';
 
-const pipelineStages = [
-  { 
-    id: 'safety', 
-    label: 'Safety', 
-    icon: '🛡️', 
-    color: 'bg-blue-600',
-    description: 'Проверка безопасности'
-  },
-  { 
-    id: 'intent', 
-    label: 'Intent', 
-    icon: '🎯', 
-    color: 'bg-cyan-600',
-    description: 'Классификация намерения'
-  },
-  { 
-    id: 'retrieve', 
-    label: 'Retrieve', 
-    icon: '🔍', 
-    color: 'bg-green-600',
-    description: 'Поиск в памяти'
-  },
-  { 
-    id: 'persona', 
-    label: 'Persona', 
-    icon: '👤', 
-    color: 'bg-yellow-600',
-    description: 'Контекст личности'
-  },
-  { 
-    id: 'generate', 
-    label: 'Generate', 
-    icon: '🤖', 
-    color: 'bg-orange-600',
-    description: 'Генерация ответа'
-  },
-  { 
-    id: 'verify', 
-    label: 'Verify', 
-    icon: '✅', 
-    color: 'bg-red-600',
-    description: 'Верификация'
-  },
-  { 
-    id: 'remember', 
-    label: 'Remember', 
-    icon: '💾', 
-    color: 'bg-purple-600',
-    description: 'Сохранение'
-  },
-  { 
-    id: 'emit', 
-    label: 'Emit', 
-    icon: '📡', 
-    color: 'bg-pink-600',
-    description: 'События'
-  }
+const STAGES = [
+  { id: 'safety', label: 'Safety', icon: '🛡️', color: 'blue' },
+  { id: 'intent', label: 'Intent', icon: '🎯', color: 'purple' },
+  { id: 'retrieve', label: 'Retrieve', icon: '🔍', color: 'cyan' },
+  { id: 'persona', label: 'Persona', icon: '👤', color: 'pink' },
+  { id: 'generate', label: 'Generate', icon: '⚡', color: 'amber' },
+  { id: 'verify', label: 'Verify', icon: '✅', color: 'green' },
+  { id: 'remember', label: 'Remember', icon: '💾', color: 'indigo' },
+  { id: 'emit', label: 'Emit', icon: '📤', color: 'rose' },
 ];
 
-const stageVariants = {
-  idle: { 
-    scale: 1, 
-    opacity: 0.5,
-    boxShadow: '0 0 0 0 rgba(0,0,0,0)'
-  },
-  active: { 
-    scale: 1.15, 
-    opacity: 1,
-    boxShadow: '0 0 20px currentColor'
-  },
-  completed: { 
-    scale: 1, 
-    opacity: 0.8,
-    boxShadow: '0 0 10px currentColor'
-  },
-  error: { 
-    scale: 1, 
-    opacity: 0.6,
-    boxShadow: '0 0 15px rgba(239,68,68,0.5)',
-    borderColor: 'rgb(239,68,68)'
-  }
+const colorMap = {
+  blue: 'from-blue-500 to-blue-600',
+  purple: 'from-purple-500 to-purple-600',
+  cyan: 'from-cyan-500 to-cyan-600',
+  pink: 'from-pink-500 to-pink-600',
+  amber: 'from-amber-500 to-amber-600',
+  green: 'from-green-500 to-green-600',
+  indigo: 'from-indigo-500 to-indigo-600',
+  rose: 'from-rose-500 to-rose-600',
 };
 
-const connectorVariants = {
-  idle: { opacity: 0.3, pathLength: 0 },
-  active: { opacity: 1, pathLength: 1 },
-  completed: { opacity: 0.7, pathLength: 1 }
+const glowMap = {
+  blue: 'shadow-blue-500/30',
+  purple: 'shadow-purple-500/30',
+  cyan: 'shadow-cyan-500/30',
+  pink: 'shadow-pink-500/30',
+  amber: 'shadow-amber-500/30',
+  green: 'shadow-green-500/30',
+  indigo: 'shadow-indigo-500/30',
+  rose: 'shadow-rose-500/30',
 };
 
-export function XRayPipeline({ 
-  activeStage = null, 
-  completedStages = [], 
-  stageData = {},
-  status = 'idle',
-  error = null
-}) {
-  const [hoveredStage, setHoveredStage] = useState(null);
-
-  const getStageStatus = (stageId) => {
-    if (error && stageId === activeStage) return 'error';
-    if (activeStage === stageId) return 'active';
-    if (completedStages.includes(stageId)) return 'completed';
-    return 'idle';
-  };
-
-  const getConnectorStatus = (index) => {
-    if (completedStages.length > index + 1) return 'completed';
-    if (activeStage && pipelineStages.findIndex(s => s.id === activeStage) > index) 
-      return 'active';
-    return 'idle';
-  };
-
+export function XRayPipeline({ activeStage, completedStages, stageData, status, error }) {
   return (
     <Card className="w-full bg-gray-900/50 border-gray-700">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg text-white">
-            🔬 X-Ray Pipeline
-          </CardTitle>
-          {status !== 'idle' && (
-            <span className={`text-xs px-2 py-1 rounded ${
-              status === 'processing' 
-                ? 'bg-blue-600/20 text-blue-400' 
-                : status === 'success'
-                ? 'bg-green-600/20 text-green-400'
-                : 'bg-red-600/20 text-red-400'
-            }`}>
-              {status === 'processing' && '⚡ Processing'}
-              {status === 'success' && '✅ Complete'}
-              {status === 'error' && '❌ Error'}
+      <CardContent className="p-4">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <span>🔬</span> Pipeline Status
+          {status === 'processing' && (
+            <span className="ml-2 inline-flex items-center gap-1 text-xs text-blue-400">
+              <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+              Processing
             </span>
           )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {/* Pipeline Flow */}
-        <div className="flex items-center justify-between gap-1 overflow-x-auto pb-4">
-          {pipelineStages.map((stage, index) => {
-            const stageStatus = getStageStatus(stage.id);
-            const connectorStatus = getConnectorStatus(index);
-            const isHovered = hoveredStage === stage.id;
+        </h2>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          {STAGES.map((stage) => {
+            const isActive = activeStage === stage.id;
+            const isCompleted = completedStages.includes(stage.id);
             const data = stageData[stage.id];
 
             return (
-              <div 
-                key={stage.id} 
-                className="flex items-center flex-1 min-w-0"
-              >
-                {/* Stage Node */}
-                <div className="relative">
-                  <motion.div
-                    className={`
-                      relative flex items-center justify-center 
-                      w-12 h-12 rounded-xl text-xl font-bold
-                      transition-colors cursor-pointer
-                      ${stage.color}
-                      ${stageStatus === 'active' ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-900' : ''}
-                    `}
-                    variants={stageVariants}
-                    animate={stageStatus}
-                    initial="idle"
-                    onHoverStart={() => setHoveredStage(stage.id)}
-                    onHoverEnd={() => setHoveredStage(null)}
-                    style={{ color: stageStatus === 'error' ? '#ef4444' : 'inherit' }}
-                  >
-                    <span className="text-lg">{stage.icon}</span>
-                    
-                    {/* Duration badge */}
-                    {data?.duration_ms && (
-                      <span className="absolute -bottom-4 text-xs text-gray-400 whitespace-nowrap">
-                        {data.duration_ms}ms
-                      </span>
-                    )}
-                  </motion.div>
-
-                  {/* Tooltip */}
-                  <AnimatePresence>
-                    {isHovered && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 
-                                   px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg 
-                                   text-xs text-white whitespace-nowrap z-10"
-                      >
-                        <div className="font-semibold mb-1">
-                          {stage.label}
-                        </div>
-                        <div className="text-gray-400">
-                          {stage.description}
-                        </div>
-                        {data && Object.keys(data).length > 0 && (
-                          <div className="mt-2 pt-2 border-t border-gray-600">
-                            {Object.entries(data).map(([key, value]) => (
-                              <div key={key} className="text-gray-300">
-                                {key}: {typeof value === 'boolean' 
-                                  ? (value ? '✅' : '❌') 
-                                  : value}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+              <div key={stage.id} className="flex-1 min-w-[120px]">
+                <div
+                  className={`
+                    p-3 rounded-lg border text-center transition-all duration-300
+                    ${isActive
+                      ? `bg-gradient-to-br ${colorMap[stage.color]} text-white shadow-lg ${glowMap[stage.color]} border-transparent scale-105`
+                      : isCompleted
+                        ? 'bg-gray-800 border-green-700/50 text-green-400'
+                        : 'bg-gray-800/50 border-gray-700 text-gray-500'
+                    }
+                  `}
+                >
+                  <div className="text-xl mb-1">{stage.icon}</div>
+                  <div className="text-xs font-medium">{stage.label}</div>
+                  {isCompleted && <div className="text-xs text-green-400 mt-1">✓</div>}
+                  {data?.duration_ms != null && (
+                    <div className="text-xs text-gray-400 mt-1">{data.duration_ms}ms</div>
+                  )}
                 </div>
-
-                {/* Connector */}
-                {index < pipelineStages.length - 1 && (
-                  <motion.div
-                    className={`flex-1 h-1 mx-1 rounded ${
-                      connectorStatus === 'completed' 
-                        ? 'bg-gradient-to-r from-gray-600 to-primary'
-                        : connectorStatus === 'active'
-                        ? 'bg-gradient-to-r from-gray-600 to-primary animate-pulse'
-                        : 'bg-gray-700'
-                    }`}
-                    variants={connectorVariants}
-                    animate={connectorStatus}
-                    initial="idle"
-                  />
-                )}
               </div>
             );
           })}
         </div>
-
-        {/* Error Display */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-3 bg-red-900/30 border border-red-800 rounded-lg"
-          >
-            <div className="flex items-center gap-2 text-red-400 text-sm">
-              <span>❌</span>
-              <span>{error}</span>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Request Info */}
-        {stageData.request_id && (
-          <div className="mt-4 text-xs text-gray-500">
-            Request ID: <code className="text-gray-400">{stageData.request_id}</code>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

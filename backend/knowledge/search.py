@@ -34,17 +34,19 @@ def find_related_triples(
     concept_ids = {c.id for c in concepts}
     concept_names = [c.name for c in concepts]
 
-    # Собираем triples: (имя_источника, тип_связи, имя_цели)
+    all_concepts = graph.get_all_concepts()
+    all_relations = graph.get_all_relations()
+
     triples: List[Tuple[str, str, str]] = []
     seen: set = set()
 
-    for rel in graph._relations:
-        src_name = graph._concepts.get(rel.source_id)
-        tgt_name = graph._concepts.get(rel.target_id)
-        if not src_name or not tgt_name:
+    for rel in all_relations:
+        src = all_concepts.get(rel.source_id)
+        tgt = all_concepts.get(rel.target_id)
+        if not src or not tgt:
             continue
-        src_name = src_name.name
-        tgt_name = tgt_name.name
+        src_name = src.name
+        tgt_name = tgt.name
 
         # Нужна хотя бы одна концепция из найденных
         if rel.source_id in concept_ids or rel.target_id in concept_ids:

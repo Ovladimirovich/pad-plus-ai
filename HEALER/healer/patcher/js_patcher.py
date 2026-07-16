@@ -92,24 +92,49 @@ class JSPatcher(BasePatcher):
         return None
 
     def _patch_add_timeout(self, source: str, report: DiagnosticReport) -> tuple[str, dict[str, Any]]:
-        """Добавляет timeout к fetch() вызовам без него."""
+        """Добавляет timeout к fetch() вызовам без него.
+        Безопасно обрабатывает вложенные скобки и существующие аргументы.
+        """
+
+        def _balanced_paren_end(text: str, start: int) -> int:
+            depth = 0
+            for i in range(start, len(text)):
+                ch = text[i]
+                if ch == '(':
+                    depth += 1
+                elif ch == ')':
+                    depth -= 1
+                    if depth == 0:
+                        return i
+            return -1
+
         metadata: dict[str, Any] = {"patched": 0, "lines": []}
+        result_lines = []
+        pos = 0
 
-        def add_timeout(m: re.Match) -> str:
-            full: str = m.group(0)
-            if "timeout" in full:
-                return full
+        for m in re.finditer(r'fetch\s*\(', source):
+            result_lines.append(source[pos:m.end() - 1])
+            paren_end = _balanced_paren_end(source, m.end() - 1)
+            if paren_end == -1:
+                return source, metadata
+            args_str = source[m.end() - 1:paren_end + 1]
+            if "timeout" in args_str or "AbortSignal" in args_str:
+                result_lines.append(args_str)
+                pos = paren_end + 1
+                continue
             metadata["patched"] += 1
-            metadata["lines"].append(m.group(0)[:60])
-            result: str = full.rstrip(")") + ", { signal: AbortSignal.timeout(30000) })"
-            return result
+            metadata["lines"].append(args_str[:60])
+            inner = args_str[1:-1].strip()
+            if not inner:
+                result_lines.append(f"({{ signal: AbortSignal.timeout(30000) }})")
+            elif inner.endswith('}') or inner.rstrip()[-1] == '}':
+                result_lines.append(f"({inner}, {{ signal: AbortSignal.timeout(30000) }})")
+            else:
+                result_lines.append(f"({inner}, {{ signal: AbortSignal.timeout(30000) }})")
+            pos = paren_end + 1
 
-        patched = re.sub(
-            r'fetch\s*\([^)]*\)',
-            add_timeout,
-            source,
-        )
-        return patched, metadata
+        result_lines.append(source[pos:])
+        return "".join(result_lines), metadata
 
     def _patch_try_finally(self, source: str, report: DiagnosticReport) -> tuple[str, dict[str, Any]]:
         """Добавляет try/finally вокруг тела функции с end()/cleanup()."""

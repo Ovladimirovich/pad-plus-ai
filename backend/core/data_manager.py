@@ -185,18 +185,20 @@ class DataManager:
                 import sqlite3
                 conn = sqlite3.connect(knowledge_path)
                 cursor = conn.cursor()
-                
+
                 nodes = []
                 edges = []
-                
-                cursor.execute("SELECT * FROM nodes")
+
+                cursor.execute("SELECT * FROM concepts")
+                columns = [desc[0] for desc in cursor.description]
                 for row in cursor.fetchall():
-                    nodes.append({"id": row[0], "name": row[1]})
-                
-                cursor.execute("SELECT * FROM edges")
+                    nodes.append(dict(zip(columns, row)))
+
+                cursor.execute("SELECT * FROM relations")
+                columns = [desc[0] for desc in cursor.description]
                 for row in cursor.fetchall():
-                    edges.append({"source": row[0], "target": row[1]})
-                
+                    edges.append(dict(zip(columns, row)))
+
                 conn.close()
                 return {"nodes": nodes, "edges": edges}
             except Exception as e:
