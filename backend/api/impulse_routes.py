@@ -52,6 +52,17 @@ class PopOut(BaseModel):
     stack_depth: int
 
 
+PRESETS = {
+    "strict": {"understand": 0.8, "improve": 0.1, "protect": 0.7, "create": 0.1},
+    "balanced": {"understand": 0.5, "improve": 0.5, "protect": 0.5, "create": 0.5},
+    "creative": {"understand": 0.3, "improve": 0.7, "protect": 0.2, "create": 0.9},
+}
+
+
+class SetPresetIn(BaseModel):
+    preset: str
+
+
 class ImpulseStackOut(BaseModel):
     depth: int
     states: list[dict] = []
@@ -152,4 +163,28 @@ async def get_impulse_labels():
         return IMPULSE_LABELS
     except Exception as e:
         logger.error(f"Error getting labels: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/preset")
+async def set_impulse_preset(data: SetPresetIn):
+    """Установить предустановленный профиль импульса: strict / balanced / creative"""
+    preset = data.preset.lower()
+    if preset not in PRESETS:
+        raise HTTPException(status_code=400, detail=f"Unknown preset: {preset}. Available: {list(PRESETS.keys())}")
+
+    try:
+        from scripts.impulse import set_impulse, get_impulse_core
+        set_impulse(PRESETS[preset])
+        core = get_impulse_core()
+        return ImpulseOut(
+            primary_question=core.get_primary_question(),
+            primary_label=core.get_primary_label(),
+            dimensions=[DimensionOut(**d.to_dict()) for d in core.dimensions],
+            stack_depth=core.stack_depth(),
+            created_at=core.created_at,
+            modified_at=core.modified_at,
+        )
+    except Exception as e:
+        logger.error(f"Error setting impulse preset: {e}")
         raise HTTPException(status_code=500, detail=str(e))
