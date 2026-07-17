@@ -1,6 +1,3 @@
-"""
-DEPRECATED Ч перенесЄн в scripts/diagnostics/check_latest_key.py
-"""
 import sys, os
 sys.path.insert(0, '.')
 sys.path.insert(0, '..')
@@ -31,4 +28,3 @@ if result.data:
         print(f'Decrypt error: {e}')
 else:
     print('No GigaChat keys found')
-

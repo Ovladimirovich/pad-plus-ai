@@ -1,6 +1,3 @@
-"""
-DEPRECATED Ч перенесЄн в scripts/diagnostics/check_with_service.py
-"""
 import sys, os
 sys.path.insert(0, '.')
 sys.path.insert(0, '..')
@@ -27,4 +24,3 @@ if result.data:
         print()
 else:
     print('No GigaChat keys found')
-

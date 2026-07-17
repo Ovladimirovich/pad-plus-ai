@@ -75,6 +75,7 @@ logs/
 htmlcov/
 .tox/
 test-results.xml
+tests/tmp/
 
 # MyPy
 .mypy_cache/
@@ -102,6 +103,7 @@ chroma_data/
 traces/
 spans/
 experiments/
+HEALER/data/trace_store/
 index.json
 healer_viewer*.png
 

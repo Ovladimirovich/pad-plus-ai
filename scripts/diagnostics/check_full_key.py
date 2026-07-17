@@ -1,6 +1,3 @@
-"""
-DEPRECATED Ч перенесЄн в scripts/diagnostics/check_full_key.py
-"""
 import sys, os
 sys.path.insert(0, '.')
 sys.path.insert(0, '..')
@@ -22,4 +19,3 @@ if result.data:
     print(f'Has colon: {":" in decrypted}')
 else:
     print('Key not found')
-

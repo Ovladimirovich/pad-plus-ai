@@ -1,6 +1,3 @@
-"""
-DEPRECATED Ч перенесЄн в scripts/diagnostics/check_encrypted_key.py
-"""
 import sys, os
 sys.path.insert(0, '.')
 sys.path.insert(0, '..')
@@ -19,4 +16,3 @@ if result.data:
     print(f'Encrypted key (first 50): {enc[:50]}...')
 else:
     print('Key not found')
-
