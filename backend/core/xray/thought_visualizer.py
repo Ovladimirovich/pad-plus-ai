@@ -23,6 +23,8 @@ class ThoughtType(Enum):
     EPISODE_RECALL = "episode_recall"
     PROCEDURE_APPLICATION = "procedure_application"
     EMOTION_UPDATE = "emotion_update"
+    IMPULSE_READ = "impulse_read"
+    IMPULSE_UPDATE = "impulse_update"
     STRATEGY_DECISION = "strategy_decision"
     MODEL_SELECTION = "model_selection"
     CLAIM_EXTRACTION = "claim_extraction"
@@ -244,6 +246,42 @@ class ThoughtVisualizer:
             content,
             confidence=0.9,
             metadata=emotion_state
+        )
+
+    def impulse_state(self, impulse_state: Dict, updated: bool = False) -> Thought:
+        """Мысль о когнитивном импульсе (read или update)."""
+        primary = "unknown"
+        dims: List[Any] = []
+        if isinstance(impulse_state, dict):
+            primary_block = impulse_state.get("primary") or {}
+            if isinstance(primary_block, dict):
+                primary = primary_block.get("label", "unknown") or "unknown"
+                dims = primary_block.get("dimensions") or []
+            elif impulse_state.get("impulse_primary"):
+                primary = impulse_state.get("impulse_primary", "unknown")
+
+        active_parts = []
+        for d in dims:
+            if not isinstance(d, dict):
+                continue
+            w = float(d.get("weight", 0) or 0)
+            if w > 0.3:
+                active_parts.append(f"{d.get('label', '?')}:{w:.1f}")
+
+        icon = "🔄" if updated else "🧠"
+        content = f"{icon} Импульс: {primary}"
+        if active_parts:
+            content += f" ({', '.join(active_parts[:3])})"
+
+        return self.create_thought(
+            ThoughtType.IMPULSE_UPDATE if updated else ThoughtType.IMPULSE_READ,
+            content,
+            confidence=0.9,
+            metadata={
+                "primary": primary,
+                "updated": updated,
+                "active": active_parts,
+            },
         )
     
     def strategy_decision(

@@ -336,7 +336,16 @@ Impulse не является инструкцией. Модель не обяз
 
 Impulse хранится как вектор из 4 весов (не нормированных к 1.0), поддерживает стек состояний (push/pop) и восстанавливается при перезапуске.
 
-**Интеграция:** Impulse встраивается в системный промпт Generate Phase как `impulse_line`. Компоненты ниже по иерархии (Persona, Emotion, Memory) не зависят от Impulse напрямую — они обрабатываются параллельно, и их результаты объединяются на этапе сборки промпта.
+**Интеграция (V1 runtime):**
+- `ImpulsePhase` (pre-generate) читает state и формирует `impulse_bias` через `get_bias_block()`
+- `GeneratePhase` инжектит bias-блок в system prompt (если primary ≠ `unknown`)
+- `ImpulseUpdatePhase` (post-generate) — единственный writer deltas; signals из эвристик / ctx
+- Dual storage: PostgreSQL `impulse_state` + JSON `data/impulse.json`
+- X-Ray: thoughts `impulse_read` / `impulse_update` + decision log
+- Compat API: `scripts/impulse.py` re-export; package `backend/core/impulse/`
+
+Компоненты ниже по иерархии (Persona, Emotion, Memory) не зависят от Impulse напрямую — результаты объединяются на этапе сборки промпта.
+
 
 ---
 

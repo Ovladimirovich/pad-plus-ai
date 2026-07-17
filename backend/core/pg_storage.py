@@ -64,6 +64,14 @@ class PgStorage:
                             updated_at TIMESTAMPTZ DEFAULT NOW()
                         )
                     """)
+                elif self.table == "impulse_state":
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS impulse_state (
+                            id TEXT PRIMARY KEY DEFAULT 'system',
+                            data JSONB NOT NULL,
+                            updated_at TIMESTAMPTZ DEFAULT NOW()
+                        )
+                    """)
                 elif self.table == "roots_knowledge":
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS roots_knowledge (

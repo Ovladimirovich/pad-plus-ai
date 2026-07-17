@@ -408,10 +408,9 @@ class MemoryConsolidator:
                 continue
             seen_ids.add(ep.id)
 
-            # Проверяем возраст (учитываем что timestamp может быть с таймзоной из PostgreSQL)
-            ep_ts = ep.timestamp
-            if ep_ts.tzinfo is None and cutoff_time.tzinfo is not None:
-                ep_ts = ep_ts.replace(tzinfo=timezone.utc)
+            # Возраст: naive timestamps (SQLite/local) = local wall time;
+            # aware timestamps (PostgreSQL) — конвертируем в UTC.
+            ep_ts = self._as_utc(ep.timestamp)
             if ep_ts < cutoff_time:
                 # Проверяем частоту использования ИЛИ эмоциональную значимость
                 if (ep.access_count >= self.config["min_access_count"] or
@@ -419,6 +418,17 @@ class MemoryConsolidator:
                     candidates.append(ep)
 
         return candidates
+
+    @staticmethod
+    def _as_utc(dt: datetime) -> datetime:
+        """Нормализует datetime к aware UTC для сравнения."""
+        if dt is None:
+            return datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            # naive: считаем локальным временем (как datetime.now() в episodic.py)
+            local_tz = datetime.now().astimezone().tzinfo or timezone.utc
+            return dt.replace(tzinfo=local_tz).astimezone(timezone.utc)
+        return dt.astimezone(timezone.utc)
     
     def _extract_common_concepts(self, episodes: List[Episode]) -> List[str]:
         """

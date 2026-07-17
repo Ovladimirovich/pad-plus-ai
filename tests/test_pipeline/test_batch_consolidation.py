@@ -50,7 +50,7 @@ class TestMemoryConsolidator:
         assert "results" in summary
 
     def test_emotion_integration(self, consolidator):
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         mock_ep = MagicMock()
         mock_ep.id = "ep1"
         mock_ep.topic = "тест"
@@ -61,7 +61,30 @@ class TestMemoryConsolidator:
         mock_ep.success = True
         mock_ep.access_count = 5
         mock_ep.emotion_impact = 0.5
-        mock_ep.timestamp = datetime.now() - timedelta(hours=2)
+        # Старше min_age_hours (1ч): и naive local, и aware UTC должны проходить
+        mock_ep.timestamp = datetime.now(timezone.utc) - timedelta(hours=2)
+
+        consolidator.episodic.get_significant_episodes.return_value = [mock_ep]
+        consolidator.episodic.search_episodes.return_value = []
+
+        with patch.object(consolidator, "_extract_procedures", return_value=[]):
+            result = consolidator.consolidate_episodes_to_semantic()
+        assert result.items_processed >= 1
+
+    def test_emotion_integration_naive_local_timestamp(self, consolidator):
+        """Регрессия: naive local timestamp не должен отфильтровываться из‑за UTC-сдвига."""
+        from datetime import datetime, timedelta
+        mock_ep = MagicMock()
+        mock_ep.id = "ep2"
+        mock_ep.topic = "тест"
+        mock_ep.user_message = "сообщение"
+        mock_ep.concepts = ["тест"]
+        mock_ep.keywords = ["тест"]
+        mock_ep.intent = "test"
+        mock_ep.success = True
+        mock_ep.access_count = 5
+        mock_ep.emotion_impact = 0.5
+        mock_ep.timestamp = datetime.now() - timedelta(hours=3)
 
         consolidator.episodic.get_significant_episodes.return_value = [mock_ep]
         consolidator.episodic.search_episodes.return_value = []

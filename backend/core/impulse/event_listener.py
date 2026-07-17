@@ -1,47 +1,64 @@
+"""
+Impulse event listener.
+
+V1 note (single writer):
+  Phase ImpulseUpdatePhase владеет мутацией весов.
+  Listener подписан для observability / future multi-process, но
+  НЕ применяет deltas, пока env IMPULSE_LISTENER_WRITE != true.
+
+  По умолчанию write отключён (IMPULSE_LISTENER_WRITE=false).
+  Для legacy-тестов dual-path можно включить явно.
+"""
+
+from __future__ import annotations
+
 import logging
+import os
 from typing import Any, Dict
 
 logger = logging.getLogger("padplus.impulse.listener")
 
 _listener_registered = False
 
-_IMPULSE_DELTAS = {
-    "contradiction": {"current": -0.20, "improve": 0.15},
-    "criticism":    {"current": -0.25, "improve": 0.20},
-    "praise":       {"current":  0.20},
-    "exploration":  {"understand": 0.15},
-    "error_recovery": {"protect": 0.20, "improve": 0.10},
-    "repetition":   {"current": -0.08},
-    "new_knowledge": {},
-}
+# V1 default: phase owns writes. Set true only for legacy/debug.
+_LISTENER_WRITE = os.getenv("IMPULSE_LISTENER_WRITE", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 
 async def _on_experience_captured(data: Dict[str, Any]) -> None:
+    """
+    Handler experience_captured.
+
+    V1: no-op write (single writer = ImpulseUpdatePhase).
+    Legacy write path: IMPULSE_LISTENER_WRITE=true.
+    """
     try:
+        if not _LISTENER_WRITE:
+            logger.debug(
+                "impulse listener: write skipped (phase owns updates); type=%s sig=%s",
+                data.get("interaction_type"),
+                data.get("significance"),
+            )
+            return
+
         interaction_type = data.get("interaction_type", "new_knowledge")
-        significance = data.get("significance", 0.0)
+        significance = float(data.get("significance", 0.0) or 0.0)
 
-        if significance < 0.2:
-            return
+        from .deltas import apply_deltas
+        from .manager import get_impulse_core, get_manager
 
-        deltas = _IMPULSE_DELTAS.get(interaction_type, {})
-        if not deltas:
-            return
-
-        from scripts.impulse import get_impulse_core, get_manager
         core = get_impulse_core()
-        current_label = core.get_primary_label()
-        dims = {d.label: d for d in core.dimensions}
-
-        for target, base_delta in deltas.items():
-            if target == "current":
-                if current_label in dims:
-                    dims[current_label].weight = max(0.0, dims[current_label].weight + base_delta * significance)
-            elif target in dims:
-                dims[target].weight = max(0.0, min(1.0, dims[target].weight + base_delta * significance))
-
-        get_manager().save(core)
-
+        changed = apply_deltas(core, interaction_type, significance)
+        if changed:
+            get_manager().save(core)
+            logger.info(
+                "impulse listener applied deltas: type=%s sig=%.2f",
+                interaction_type,
+                significance,
+            )
     except Exception as e:
         logger.warning("Impulse listener error: %s", e)
 
@@ -52,9 +69,13 @@ def setup_impulse_listener() -> None:
         return
     try:
         from core.events import get_events
+
         events = get_events()
         events.experience_captured.subscribe(_on_experience_captured)
         _listener_registered = True
-        logger.info("Impulse listener registered on experience_captured")
+        mode = "write" if _LISTENER_WRITE else "observe-only"
+        logger.info(
+            "Impulse listener registered on experience_captured (mode=%s)", mode
+        )
     except Exception as e:
         logger.warning("Failed to setup impulse listener: %s", e)

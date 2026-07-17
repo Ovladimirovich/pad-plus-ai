@@ -10,6 +10,7 @@ from .knowledge_graph import KnowledgeGraphPhase
 from .episodic import EpisodicPhase
 from .semantic import SemanticPhase
 from .emotion import EmotionPhase
+from .impulse import ImpulsePhase
 from .persona import PersonaPhase
 from .roots import RootsPhase
 from .identity import IdentityPhase
@@ -18,6 +19,7 @@ from .truth_loop import TruthLoopPhase
 from .save_episode import SaveEpisodePhase
 from .extraction import ExtractionPhase
 from .emotion_update import EmotionUpdatePhase
+from .impulse_update import ImpulseUpdatePhase
 from .persona_evolution import PersonaEvolutionPhase
 from .events import EventsBroadcastPhase
 from .health import HealthMonitorPhase
@@ -36,6 +38,7 @@ __all__ = [
     "EpisodicPhase",
     "SemanticPhase",
     "EmotionPhase",
+    "ImpulsePhase",
     "PersonaPhase",
     "RootsPhase",
     "IdentityPhase",
@@ -44,6 +47,7 @@ __all__ = [
     "SaveEpisodePhase",
     "ExtractionPhase",
     "EmotionUpdatePhase",
+    "ImpulseUpdatePhase",
     "PersonaEvolutionPhase",
     "EventsBroadcastPhase",
     "HealthMonitorPhase",

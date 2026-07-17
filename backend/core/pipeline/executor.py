@@ -23,6 +23,7 @@ from .phases import (
     EpisodicPhase,
     SemanticPhase,
     EmotionPhase,
+    ImpulsePhase,
     PersonaPhase,
     RootsPhase,
     IdentityPhase,
@@ -32,6 +33,7 @@ from .phases import (
     SaveEpisodePhase,
     ExtractionPhase,
     EmotionUpdatePhase,
+    ImpulseUpdatePhase,
     PersonaEvolutionPhase,
     EventsBroadcastPhase,
     HealthMonitorPhase,
@@ -84,6 +86,7 @@ class PipelineExecutor:
             ("episodic", EpisodicPhase()),
             ("semantic", SemanticPhase()),
             ("emotion", EmotionPhase()),
+            ("impulse", ImpulsePhase()),
             ("persona", PersonaPhase()),
             ("roots", RootsPhase()),
             ("identity", IdentityPhase()),
@@ -93,6 +96,7 @@ class PipelineExecutor:
             ("save_episode", SaveEpisodePhase()),
             ("extraction", ExtractionPhase()),
             ("emotion_update", EmotionUpdatePhase()),
+            ("impulse_update", ImpulseUpdatePhase()),
             ("consolidation", None),  # встроено в execute
             ("procedure_success", None),  # встроено в execute
             ("persona_evolution", PersonaEvolutionPhase()),
@@ -267,11 +271,12 @@ class PipelineExecutor:
             "safety": "safety", "intent": "intent",
             "rag": "retrieve", "knowledge_graph": "retrieve",
             "episodic": "retrieve", "semantic": "retrieve",
-            "emotion": "retrieve", "roots": "retrieve",
+            "emotion": "retrieve", "impulse": "retrieve", "roots": "retrieve",
             "persona": "persona", "generate": "generate",
             "truth_loop": "verify",
             "evaluation": "verify",
             "save_episode": "remember", "emotion_update": "remember",
+            "impulse_update": "remember",
             "persona_evolution": "remember",
             "events_broadcast": "emit", "health": "emit",
             "reflection": "emit", "dreams": "emit",
@@ -506,6 +511,19 @@ class PipelineExecutor:
                     th = tv.emotion_update(pd.get("emotion_style", {}))
                     await tb.send_thought(th.to_dict())
                     await tb.send_emotion_update(pd.get("emotion_style", {}))
+                elif phase_name == "impulse":
+                    th = tv.impulse_state(pd.get("impulse_state") or {})
+                    await tb.send_thought(th.to_dict())
+                    await tb.send_decision({
+                        "type": "impulse",
+                        "primary": pd.get("impulse_primary", "unknown"),
+                        "active": pd.get("impulse_active", []),
+                        "injected": bool(pd.get("impulse_bias")),
+                    })
+                elif phase_name == "impulse_update":
+                    if pd.get("impulse_updated"):
+                        th = tv.impulse_state(pd.get("impulse_state") or {}, updated=True)
+                        await tb.send_thought(th.to_dict())
                 elif phase_name == "persona":
                     adj = pd.get("adjustments", {})
                     if adj:
@@ -720,6 +738,10 @@ class PipelineExecutor:
         elif phase_name == "emotion":
             result.emotion_style = data.get("emotion_style", {})
 
+        elif phase_name == "impulse":
+            result.metadata["impulse_primary"] = data.get("impulse_primary", "unknown")
+            result.metadata["impulse_used"] = bool(data.get("impulse_bias"))
+
         elif phase_name == "generate":
             result.response = data.get("response", result.response)
             result.provider = data.get("provider", result.provider)
@@ -762,6 +784,9 @@ class PipelineExecutor:
 
         elif phase_name == "emotion_update":
             result.metadata["emotion_updated"] = True
+
+        elif phase_name == "impulse_update":
+            result.metadata["impulse_updated"] = bool(data.get("impulse_updated"))
 
         elif phase_name == "persona_evolution":
             result.metadata["persona_evolved"] = True

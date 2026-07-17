@@ -222,8 +222,7 @@ class TestImpulseManager:
         core = ImpulseCore()
         core.set_from_labels({"understand": 0.8})
         tmp_manager.core = core
-        loaded = tmp_manager.load()
-        assert loaded.get_primary_label() == "understand"
+        assert tmp_manager.core.get_primary_label() == "understand"
 
     def test_sync_prompt_file(self, tmp_manager):
         core = ImpulseCore()
@@ -234,6 +233,60 @@ class TestImpulseManager:
         with open(prompt_path, "r", encoding="utf-8") as f:
             content = f.read()
         assert "понять" in content
+
+    def test_json_roundtrip_use_pg_false(self, tmp_manager):
+        """Dual storage: JSON path works with PG disabled."""
+        core = ImpulseCore()
+        core.set_from_labels({"improve": 0.85})
+        tmp_manager.save(core)
+        tmp_manager.core = None
+        loaded = tmp_manager.load()
+        assert loaded.get_primary_label() == "improve"
+        assert abs(loaded.dimensions[1].weight - 0.85) < 1e-6
+
+
+class TestBiasBlock:
+    def test_empty_when_unknown(self):
+        core = ImpulseCore()
+        assert core.get_bias_block() == ""
+
+    def test_contains_primary_and_weights(self):
+        core = ImpulseCore()
+        core.set_from_labels({"understand": 1.0, "improve": 0.4})
+        block = core.get_bias_block()
+        assert "understand" in block
+        assert "1.00" in block or "1.0" in block
+        assert "когнитивная направленность" in block.lower() or "направленность" in block
+
+    def test_truncated_under_400(self):
+        core = ImpulseCore()
+        core.set_from_labels({"understand": 1.0, "improve": 0.9, "protect": 0.8, "create": 0.7})
+        assert len(core.get_bias_block()) <= 400
+
+
+class TestApplyDeltas:
+    def test_apply_criticism(self):
+        from scripts.impulse import apply_deltas
+
+        core = ImpulseCore()
+        core.set_from_labels({"understand": 0.5, "improve": 0.3})
+        changed = apply_deltas(core, "criticism", 0.7)
+        assert changed is True
+        assert core.dimensions[1].weight == pytest.approx(0.3 + 0.20 * 0.7)
+
+    def test_noop_low_significance(self):
+        from scripts.impulse import apply_deltas
+
+        core = ImpulseCore()
+        core.set_from_labels({"understand": 0.5})
+        assert apply_deltas(core, "praise", 0.1) is False
+
+    def test_noop_unknown_type(self):
+        from scripts.impulse import apply_deltas
+
+        core = ImpulseCore()
+        core.set_from_labels({"understand": 0.5})
+        assert apply_deltas(core, "unknown", 0.9) is False
 
 
 class TestModuleFunctions:
@@ -246,3 +299,11 @@ class TestModuleFunctions:
         assert len(IMPULSE_LABELS) == 4
         assert "understand" in IMPULSE_LABELS
         assert "Что я могу понять?" in IMPULSE_LABELS.values()
+
+    def test_core_impulse_package_api(self):
+        from core.impulse import ImpulseCore as C, get_bias_block, apply_deltas
+
+        assert C is ImpulseCore
+        core = C()
+        core.set_from_labels({"create": 1.0})
+        assert "create" in core.get_bias_block()

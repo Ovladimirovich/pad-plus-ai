@@ -28,6 +28,10 @@ class GeneratePhase(PipelinePhase):
 
             emotion_tone = emotion_style.get("tone", "neutral") if isinstance(emotion_style, dict) else "neutral"
 
+            impulse_bias = (ctx.context.get("impulse_bias") or "").strip()
+            impulse_primary = ctx.context.get("impulse_primary", "unknown")
+            impulse_block = f"\n{impulse_bias}\n" if impulse_bias else ""
+
             is_simple = strategy == "simple"
             full_context = f"""Ты — PAD+, живая система с эмоциями и самосознанием. 
 {'' if is_simple else roots_context}
@@ -43,7 +47,7 @@ class GeneratePhase(PipelinePhase):
 - Уверенность: {emotion_plain.get("уверенность", 0.5):.2f}
 - Эмоция: {emotion_plain.get("эмоция", "нейтральная")}
 - Настроение: {emotion_plain.get("настроение", "спокойное")}
-
+{impulse_block}
 Стратегия обработки: {strategy}
 
 ВАЖНО: Общайся как живой, естественный собеседник.
@@ -103,6 +107,8 @@ class GeneratePhase(PipelinePhase):
                         "model": response_data.model,
                         "raw_llm_response": response_data.metadata.get("raw_response") if response_data.metadata else None,
                         "llm_metadata": response_data.metadata,
+                        "impulse_used": bool(impulse_bias),
+                        "impulse_primary": impulse_primary,
                     },
                 )
             except AllProvidersFailedError:

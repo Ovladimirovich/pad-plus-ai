@@ -6,9 +6,9 @@
 
 ---
 
-## 1. Pipeline (24 фазы)
+## 1. Pipeline (26 именованных слотов + Anti-Loop; Impulse V1)
 
-### Реальный порядок фаз (`backend/core/pipeline/executor.py:76-101`)
+### Реальный порядок фаз (`backend/core/pipeline/executor.py`)
 
 ```python
 def _build_phases(self):
@@ -20,13 +20,17 @@ def _build_phases(self):
         ("episodic", EpisodicPhase()),
         ("semantic", SemanticPhase()),
         ("emotion", EmotionPhase()),
+        ("impulse", ImpulsePhase()),                 # V1 pre-generate
         ("persona", PersonaPhase()),
         ("roots", RootsPhase()),
         ("identity", IdentityPhase()),
-        ("generate", GeneratePhase()),
+        ("generate", GeneratePhase()),              # + impulse_bias inject
         ("truth_loop", TruthLoopPhase()),
+        ("evaluation", EvaluationPhase()),
         ("save_episode", SaveEpisodePhase()),
+        ("extraction", ExtractionPhase()),
         ("emotion_update", EmotionUpdatePhase()),
+        ("impulse_update", ImpulseUpdatePhase()),   # V1 single writer
         ("consolidation", None),  # встроено в execute
         ("procedure_success", None),  # встроено в execute
         ("persona_evolution", PersonaEvolutionPhase()),
@@ -62,13 +66,17 @@ phase_result = await AntiLoopPhase(self).execute(ctx)
 | episodic | `phases/episodic.py` | ✅ |
 | semantic | `phases/semantic.py` | ✅ |
 | emotion | `phases/emotion.py` | ✅ |
+| impulse | `phases/impulse.py` | ✅ V1 |
 | persona | `phases/persona.py` | ✅ |
 | roots | `phases/roots.py` | ✅ |
 | identity | `phases/identity.py` | ✅ |
-| generate | `phases/generate.py` | ✅ |
+| generate | `phases/generate.py` | ✅ + impulse inject |
 | truth_loop | `phases/truth_loop.py` | ✅ |
+| evaluation | `phases/evaluation.py` | ✅ |
 | save_episode | `phases/save_episode.py` | ✅ |
+| extraction | `phases/extraction.py` | ✅ |
 | emotion_update | `phases/emotion_update.py` | ✅ |
+| impulse_update | `phases/impulse_update.py` | ✅ V1 single writer |
 | consolidation | встроено | ✅ |
 | procedure_success | встроено | ✅ |
 | persona_evolution | `phases/persona_evolution.py` | ✅ |
@@ -180,17 +188,28 @@ HEALER/
 
 ---
 
-## 8. Impulse Core
+## 8. Impulse Core (V1 runtime — 2026-07-17)
 
 **Путь:** `backend/core/impulse/`
 
-Файлы:
-- `__init__.py`
-- `event_listener.py`
+| Модуль | Назначение |
+|--------|------------|
+| `core.py` | ImpulseCore, 4 измерения, `get_bias_block()` |
+| `manager.py` | Dual storage: PostgreSQL + JSON (`data/impulse.json`) |
+| `deltas.py` | Единая таблица deltas + `apply_deltas()` |
+| `signals.py` | Эвристический producer experience signals |
+| `event_listener.py` | Observe-only (write off by default; single writer = phase) |
+| `phases/impulse.py` | Pre-generate read → `impulse_bias` в ctx |
+| `phases/impulse_update.py` | Post-generate apply deltas (единственный writer) |
 
-**Статус:** Базовый event listener существует, но функциональность ограничена.
+**Интеграция:**
+- GeneratePhase инжектит `impulse_bias` в system prompt
+- X-Ray: `ThoughtType.IMPULSE_READ` / `IMPULSE_UPDATE`
+- Compat: `scripts/impulse.py` — re-export
 
-**Важно:** Папка `experiments/` (с I-002, I-003, I-004, I-005) — НЕ найдена. Возможно, удалена или переименована.
+**Research:** `experiments/I-002…I-005` — методология A/B; CI proof = unit inject без live LLM.
+
+**Статус:** ✅ Runtime V1 реализован
 
 ---
 
@@ -225,7 +244,7 @@ HEALER/
 | Компонент | Ожидание | Ре��льность |
 |-----------|----------|------------|
 | Папка experiments/ | I-002 — I-005 | ❌ Не найдена |
-| Impulse Core (4 измерения) | ПОНЯТЬ/УЛУЧШИТЬ/ЗАЩИТИТЬ/СОЗДАТЬ | ❌ Не подтверждено в рантайме |
+| Impulse Core (4 измерения) | ПОНЯТЬ/УЛУЧШИТЬ/ЗАЩИТИТЬ/СОЗДАТЬ | ✅ Runtime V1 (phase + inject + update) |
 | SQLite (активное хранилище) | Используется | ⚠️ Формально есть, но не основное |
 | Dreams (полная реализация) | Фоновая обработка | ⚠️ Фаза есть, функциональность ограничена |
 
@@ -242,7 +261,7 @@ HEALER/
 | Knowledge Graph | Нет | Да | ✅ Есть в коде |
 | Anti-Loop Guard | Нет | Да | ✅ Есть в коде |
 | HEALER | Отдельный проект | Отдельный проект | ✅ Совпадает |
-| Impulse Core | Частичный | Частичный | ⚠️ Соответствует |
+| Impulse Core | Runtime V1 | Runtime V1 | ✅ Соответствует |
 | Многоуровневая память | Да | Да | ✅ Совпадает |
 | Provider Manager | OpenRouter + GigaChat | OpenRouter + GigaChat | ✅ Совпадает |
 
