@@ -18,8 +18,7 @@ logger = logging.getLogger("PAD+.roots")
 
 from .base import MemoryRecord
 
-# Приоритет: PostgreSQL > файл > дефолт
-USE_PG_STORAGE = True
+from core.config import USE_PG_STORAGE
 
 
 # Базовые принципы PAD+ AI
@@ -253,9 +252,15 @@ class RootsMemory:
         
         self._save()
     
+    def _save_json(self) -> None:
+        """Файловый fallback — всегда."""
+        data = {"roots": [r.to_dict() for r in self._roots.values()]}
+        os.makedirs(os.path.dirname(self.data_path), exist_ok=True)
+        with open(self.data_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
     def _save(self):
-        """Сохраняет корневые знания в PostgreSQL (приоритет) и файл (fallback)."""
-        # Приоритет 1: PostgreSQL
+        """Сохраняет корневые знания в PostgreSQL (приоритет) + JSON (всегда)."""
         if USE_PG_STORAGE:
             try:
                 from core.pg_storage import PgStorage
@@ -265,7 +270,7 @@ class RootsMemory:
             except Exception as e:
                 logger.warning(f"PostgreSQL save roots failed: {e}")
         
-        logger.debug(f"Roots saved to PostgreSQL")
+        self._save_json()
     
     def get(self, root_id: str) -> Optional[RootKnowledge]:
         """Получает знание по ID"""

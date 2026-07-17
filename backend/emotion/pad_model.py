@@ -19,8 +19,7 @@ import json
 import os
 import threading
 
-# Приоритет: PostgreSQL > файл > дефолт
-USE_PG_STORAGE = True
+from core.config import USE_PG_STORAGE
 
 
 @dataclass

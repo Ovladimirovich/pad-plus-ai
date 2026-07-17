@@ -17,8 +17,7 @@ from .core import ImpulseCore
 
 logger = logging.getLogger("padplus.impulse.manager")
 
-# Env: IMPULSE_USE_PG=false отключает PG (удобно для unit-тестов / local)
-USE_PG_STORAGE = os.getenv("IMPULSE_USE_PG", "true").lower() in ("1", "true", "yes")
+from core.config import USE_PG_STORAGE
 
 
 def _project_root() -> str:

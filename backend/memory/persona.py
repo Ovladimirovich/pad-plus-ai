@@ -12,12 +12,12 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pathlib import Path
 import json
+import os
 import logging
 
 logger = logging.getLogger("PAD+.persona")
 
-# Приоритет: PostgreSQL > файл > дефолт
-USE_PG_STORAGE = True
+from core.config import USE_PG_STORAGE
 
 
 @dataclass
@@ -203,8 +203,14 @@ class PersonaMemory:
             "Избегать категоричных суждений"
         ]
     
+    def _save_json(self, data: dict) -> None:
+        """Файловый fallback — всегда."""
+        os.makedirs(self.storage_path.parent, exist_ok=True)
+        with open(self.storage_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
     def _save(self) -> None:
-        """Сохраняет персону"""
+        """Сохраняет персону (PG + JSON fallback)"""
         self.last_updated = datetime.now().isoformat()
         data = self._to_dict()
         
@@ -217,7 +223,8 @@ class PersonaMemory:
             except Exception as e:
                 logger.warning(f"PostgreSQL save failed: {e}")
         
-        logger.debug(f"Persona saved to PostgreSQL")
+        # Fallback: файл всегда
+        self._save_json(data)
     
     def _to_dict(self) -> dict:
         """Сериализация"""
