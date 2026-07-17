@@ -57,6 +57,21 @@ PAD+ AI — AI-ассистент с когнитивной архитектур
 - Запись результата в Experience Layer, влияние на эмоции
 - Файл: `backend/core/pipeline/phases/evaluation.py`
 
+### P1 — Hot/background pipeline split (2026-07-17)
+- **executor.py v5.0:** sync path (7 phases response-critical) + background path (7 phases fire-and-forget)
+- **Background:** consolidation, procedure_success, persona_evolution, health, reflection, dreams, metrics
+- **Sync:** safety → intent → parallel (rag, kg, episodic, semantic, emotion) → impulse → persona → roots → identity → generate → truth_loop → evaluation → save_episode → extraction → emotion_update → impulse_update → events_broadcast → response_guard
+- **AntiLoopPhase** inline (не в _build_phases, вызывается первым)
+- **`_consolidation_lock` удалён** → заменён на `asyncio.create_task` fire-and-forget
+- `get_stats()` version = `"5.0"`
+
+### P2 — Storage consistency (2026-07-17)
+- **Единый флаг:** `backend/core/config.py` → `USE_PG_STORAGE` (env: `USE_PG_STORAGE`, fallback `IMPULSE_USE_PG`)
+- **Политика:** PG = source of truth, JSON = dev/read-fallback/always-write (dual-write)
+- **Модули:** `persona.py`, `pad_model.py`, `roots.py`, `impulse/manager.py` — все импортируют `from core.config import USE_PG_STORAGE`
+- **JSON fallback:** добавлен `_save_json()` в persona.py и roots.py (раньше писали только в PG)
+- **Тест:** `tests/test_storage_consistency.py` (8 тестов)
+
 ### ControlTick
 - Фоновый автономный цикл в `backend/core/control_tick.py`
 - Запускается каждые 60с, обновляет метрики, запускает Meta-Learner
