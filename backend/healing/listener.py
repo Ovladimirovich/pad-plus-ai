@@ -20,7 +20,7 @@ logger = logging.getLogger("padplus.healing.listener")
 class HealerListener:
     """Подписывается на TraceCollector и запускает healing-цикл."""
 
-    def __init__(self, mode: str = "suggest"):
+    def __init__(self, mode: str = "monitor"):
         self.mode = mode
         self.remediation = RemediationEngine()
         self.remediation.set_mode(mode)

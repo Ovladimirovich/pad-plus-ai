@@ -1,6 +1,6 @@
 # Фактическое состояние системы PAD+ AI
 
-**Дата анализа:** 03.07.2026  
+**Дата анализа:** 17.07.2026  
 **Ветка:** main  
 **Цель:** Документирование реального состояния системы для корректного описания в статьях и документации
 
@@ -174,6 +174,11 @@ HEALER/
 
 **Важно:** HEALER — отдельный проект в репозитории, НЕ интегрирован в production-пайплайн. Сосуществует как диагностический инструмент.
 
+**P5 (2026-07-17):**
+- Default mode: `monitor` (было `suggest`)
+- Новые action в RemediationEngine: `clear_cache` (очистка L1/L2), `enable_safe_mode` (strategy → simple)
+- `CacheManager.clear_all()` — полная очистка L1 + L2
+
 ---
 
 ## 7. Knowledge Graph
@@ -188,7 +193,7 @@ HEALER/
 
 ---
 
-## 8. Impulse Core (V1 runtime — 2026-07-17)
+## 8. Impulse Core + Research (V1 runtime — 2026-07-17)
 
 **Путь:** `backend/core/impulse/`
 
@@ -207,7 +212,14 @@ HEALER/
 - X-Ray: `ThoughtType.IMPULSE_READ` / `IMPULSE_UPDATE`
 - Compat: `scripts/impulse.py` — re-export
 
-**Research:** `experiments/I-002…I-005` — методология A/B; CI proof = unit inject без live LLM.
+**Research harness (P3, 2026-07-17):**
+- `backend/impulse/research.py` — автоматический прогон 5 профилей × 7 вопросов
+- Keyword frequency analysis (4 словаря: understand/improve/protect/create)
+- Сравнение профилей с baseline (delta, effect-size)
+- `@pytest.mark.impulse_research` — не в default CI
+- `experiments/I-010/` — директория для отчётов (`raw_responses.json` + `REPORT.md`)
+
+**Research (исторические):** `experiments/I-002…I-005` — методология A/B; CI proof = unit inject без live LLM.
 
 **Статус:** ✅ Runtime V1 реализован
 
@@ -227,7 +239,51 @@ HEALER/
 
 ---
 
-## 10. Anti-Loop Guard
+## 10. Chat UX (P4 — 2026-07-17)
+
+`frontend/src/components/ChatMessage.jsx`:
+
+- **WhyAnswerWidget** — 1-2 строки под ответом: «Стратегия: Логический анализ | Импульс: понять | Уверенность: 85%»
+- **TruthBadge** — цветной индикатор: зелёный (≥0.8), жёлтый (0.5-0.8), серый (<0.5)
+- **Feedback 👍/👎** — замыкается на signals.py → ImpulseUpdatePhase
+
+`frontend/src/components/ChatControls.jsx`:
+- **Preset toggle** — Strict / Balanced / Creative (POST `/api/v1/impulse/preset`)
+
+`frontend/src/services/impulse.js`:
+- `getImpulse()`, `setImpulse()`, `setImpulsePreset()` — API client
+
+**Статус:** ✅ Chat UX (widget, badge, preset, feedback) — реализован
+
+---
+
+## 11. Quality & Degradation (P7 — 2026-07-17)
+
+`backend/core/pipeline/executor.py:_mark_degraded()`:
+
+- Каждая non-critical phase → `_mark_degraded()` + X-Ray event
+- Счётчик `degradation_total` в MetricsCollector (по компоненту и severity)
+- `except: pass` запрещён в critical path — проверено: 0 вхождений в backend
+- Всего счётчиков: `pipeline_requests_total` + `degradation_total` → можно вычислить `% degraded`
+
+**Статус:** ✅ Quality policy — degradation tracking, except:pass audit
+
+---
+
+## 12. Providers Depth (P8 — уже было)
+
+| Компонент | Файл | Статус |
+|-----------|------|--------|
+| Fallback OpenRouter ↔ GigaChat | `runtime/provider_manager.py` | ✅ |
+| Per-user keys + шифрование | `api/keys_routes.py` + `core/encryption.py` | ✅ |
+| ModelRouter (cheap vs strong) | `core/agi/model_router.py` | ✅ |
+| CognitiveBudget | `core/agi/budget.py` | ✅ |
+
+**Статус:** ✅ Fallback, per-user keys, model router — реализованы
+
+---
+
+## 13. Anti-Loop Guard
 
 `backend/core/pipeline/phases/anti_loop.py`
 
@@ -250,7 +306,7 @@ HEALER/
 
 ---
 
-## 12. Итоговая статистика соответствия
+## 14. Итоговая статистика соответствия
 
 | Компонент | В статье | В коде | Статус |
 |-----------|----------|--------|--------|
@@ -267,7 +323,7 @@ HEALER/
 
 ---
 
-## 13. Рекомендации для статьи
+## 15. Рекомендации для статьи
 
 1. **Исправить число фаз:** 24 вместо 13/22
 2. **Уточнить HEALER:** "отдельный проект в репозитории" вместо "интегрирован"
@@ -277,7 +333,7 @@ HEALER/
 
 ---
 
-## 14. Актуальная архитектура (фактическая)
+## 16. Актуальная архитектура (фактическая)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

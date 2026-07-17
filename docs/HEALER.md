@@ -51,9 +51,11 @@ Pipeline Complete
 
 | Режим | Описание | Действия |
 |-------|----------|----------|
-| `monitor` | Только наблюдение | Диагностика + сохранение отчётов |
+| `monitor` | Только наблюдение (default) | Диагностика + сохранение отчётов, apply() всегда False |
 | `suggest` | Диагностика + рекомендации | Диагностика + генерация патчей, без apply |
 | `auto` | Полный цикл | Диагностика → патч → верификация → apply/rollback |
+
+**P5 (2026-07-17):** Default mode изменён с `suggest` на `monitor`. В monitor mode `apply()` логирует action и возвращает False.
 
 ## 5 Детекторов
 
@@ -81,6 +83,27 @@ Pipeline Complete
 - **Находит**: отклонения от выбранной стратегии
 - **Паттерн**: mismatch между intent и фактическим routing
 - **Действие**: корректировка стратегии
+
+### MemoryLeakDetector
+- **Находит**: чрезмерный рост кэша (cache_growth > 0.5)
+- **Действие**: `clear_cache` — очистка L1/L2 через `CacheManager.clear_all()`
+
+### CriticalErrorDetector
+- **Находит**: высокая частота ошибок (error_rate > 0.5)
+- **Действие**: `enable_safe_mode` — переключение стратегии на "simple"
+
+## RemediationEngine (7 actions)
+
+| Action | Детектор | Условие | Описание |
+|--------|----------|---------|----------|
+| `switch_model` | SlowPhasesDetector | generate > 8000ms | Переключить на более быструю модель |
+| `deprioritize_provider` | ProviderHealthDetector | failure_rate > 0.3 | Понизить приоритет нестабильного провайдера |
+| `enable_fallback` | ErrorPathDetector | error without fallback | Включить fallback-провайдер |
+| `suggest_strategy_change` | StrategyDriftDetector | time_drift > 0.3 | Рекомендовать смену стратегии |
+| `clear_cache` | MemoryLeakDetector | cache_growth > 0.5 | Очистить кэш L1/L2 |
+| `enable_safe_mode` | CriticalErrorDetector | error_rate > 0.5 | Включить safe-mode (minimal pipeline) |
+
+В режиме `monitor` все действия только логируются. В режиме `auto` исполняются.
 
 ## ReflectionLoop
 
@@ -228,6 +251,17 @@ bridge.start(collector)
 healer = get_healer()
 healer.subscribe(lambda: core_collector)
 ```
+
+## Degradation Metrics (P7 — 2026-07-17)
+
+При каждой деградации компонента `_mark_degraded()` инкрементирует:
+
+| Метрика | Labels | Описание |
+|---------|--------|----------|
+| `degradation_total` | component, severity | Счётчик деградаций |
+| `pipeline_requests_total` | — | Всего запросов (уже был) |
+
+На dashboard можно вычислить `% degraded = degradation_total / pipeline_requests_total * 100`.
 
 ## Тесты
 

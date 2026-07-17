@@ -350,6 +350,15 @@ class CacheManager:
         
         logger.info(f"🗄️ Cache cleared for namespace: {namespace}")
 
+    async def clear_all(self):
+        """Полная очистка кэша (L1 + L2)."""
+        self.memory_cache.clear()
+        if self.redis:
+            keys = await self.redis.keys("padplus:*")
+            if keys:
+                await self.redis.delete(*keys)
+        logger.info("🗄️ Full cache cleared")
+
 
 # Глобальный экземпляр
 _cache_manager: Optional[CacheManager] = None

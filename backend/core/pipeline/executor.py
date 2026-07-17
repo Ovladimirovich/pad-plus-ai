@@ -128,6 +128,12 @@ class PipelineExecutor:
         elif self._degradations:
             self._state = PipelineState.DEGRADED
         logger.warning(f"Компонент '{component}' деградировал: {error} (severity={severity})")
+        try:
+            from core.metrics_collector import get_metrics
+            mc = get_metrics()
+            mc.increment("degradation_total", labels={"component": component, "severity": severity})
+        except Exception:
+            pass
 
     def _should_stop_on_degradation(self, component: str) -> bool:
         if component in self.CRITICAL_COMPONENTS:

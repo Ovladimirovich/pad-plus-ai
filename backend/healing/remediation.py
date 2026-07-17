@@ -62,6 +62,20 @@ REMEDIATION_TABLE = [
         params={"from_strategy": "reasoning", "to_strategy": "simple"},
         description="Рекомендовать смену стратегии при деградации",
     ),
+    RemediationAction(
+        detector_pattern="MemoryLeakDetector",
+        condition="cache_growth > 0.5",
+        action="clear_cache",
+        params={},
+        description="Очистить кэш L1/L2 при чрезмерном росте",
+    ),
+    RemediationAction(
+        detector_pattern="CriticalErrorDetector",
+        condition="error_rate > 0.5",
+        action="enable_safe_mode",
+        params={"strategy": "simple"},
+        description="Включить safe-mode (minimal pipeline) при высокой ошибке",
+    ),
 ]
 
 
@@ -70,7 +84,7 @@ class RemediationEngine:
 
     def __init__(self):
         self._applied: list[dict] = []
-        self._mode = "suggest"  # monitor / suggest / auto
+        self._mode = "monitor"  # monitor / suggest / auto
 
     def set_mode(self, mode: str):
         self._mode = mode
@@ -137,6 +151,10 @@ class RemediationEngine:
             return self._enable_fallback(action.params, report)
         elif action.action == "suggest_strategy_change":
             return self._suggest_strategy_change(action.params, report)
+        elif action.action == "clear_cache":
+            return self._clear_cache(action.params)
+        elif action.action == "enable_safe_mode":
+            return self._enable_safe_mode(action.params, report)
         return False
 
     def _switch_model(self, params: dict, report: Optional[DiagnosticReport] = None) -> bool:
@@ -195,6 +213,29 @@ class RemediationEngine:
             return True
         except Exception as e:
             logger.warning(f"🧬 _suggest_strategy_change error: {e}")
+            return False
+
+    def _clear_cache(self, params: dict) -> bool:
+        try:
+            from core.cache_manager import get_cache_manager
+            import asyncio
+            cm = get_cache_manager()
+            asyncio.create_task(cm.clear_all())
+            logger.info("🧬 Кэш L1/L2 очищен HEALER")
+            return True
+        except Exception as e:
+            logger.warning(f"🧬 clear_cache error: {e}")
+            return False
+
+    def _enable_safe_mode(self, params: dict, report: Optional[DiagnosticReport] = None) -> bool:
+        try:
+            from core.xray.meta_learner import get_meta_learner
+            meta = get_meta_learner()
+            meta.set_strategy_override("reasoning", params.get("strategy", "simple"))
+            logger.info("🧬 Safe-mode включён (strategy → simple)")
+            return True
+        except Exception as e:
+            logger.warning(f"🧬 enable_safe_mode error: {e}")
             return False
 
     def get_history(self) -> list[dict]:
