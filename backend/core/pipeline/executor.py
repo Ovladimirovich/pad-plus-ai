@@ -1,11 +1,11 @@
 """
-PipelineExecutor v4.0 — оркестратор фаз обработки запроса.
+PipelineExecutor v5.0 — оркестратор фаз с разделением hot/background path.
 
-Заменяет монолитный execute() из pipeline.py.
-Каждая фаза — отдельный класс с единым интерфейсом PipelinePhase.
+Sync path: фазы, влияющие на ответ (generate, truth_loop, response_guard...)
+Background: фазы аналитики/записи, выполняются fire-and-forget после ответа
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import logging
 import asyncio
 import os
@@ -43,6 +43,14 @@ from .phases import (
     ResponseGuardPhase,
 )
 
+# Фазы, которые выполняются fire-and-forget после отправки ответа.
+# Не влияют на ответ, только на внутреннее состояние системы.
+_BACKGROUND_PHASES: Set[str] = {
+    "consolidation", "procedure_success",
+    "persona_evolution", "health",
+    "reflection", "dreams", "metrics",
+}
+
 logger = logging.getLogger("padplus.pipeline.executor")
 
 
@@ -71,7 +79,6 @@ class PipelineExecutor:
         self._max_history = 10
         self._dialogs_since_consolidation = 0
         self._consolidation_interval = int(os.getenv("CONSOLIDATION_INTERVAL", "10"))
-        self._consolidation_lock = asyncio.Lock()
         self._state = PipelineState.HEALTHY
         self._degradations: List[DegradationInfo] = []
 
@@ -220,6 +227,107 @@ class PipelineExecutor:
 
         return "reasoning"
 
+    def _fire_background_phases(self, ctx: PipelineContext, result: PipelineResult, request_id: str, start_time: float):
+        """Запускает background-фазы fire-and-forget после ответа пользователю."""
+        bg_data = {
+            "user_message": ctx.user_message,
+            "session_id": ctx.session_id,
+            "user_id": ctx.context.get("user_id"),
+            "response": result.response,
+            "strategy": result.strategy,
+            "intent": result.intent,
+            "emotion_style": result.emotion_style,
+            "impulse_primary": result.metadata.get("impulse_primary", ""),
+            "experience_interaction_type": ctx.context.get("experience_interaction_type", "new_knowledge"),
+            "experience_significance": ctx.context.get("experience_significance", 0.0),
+            "pipeline_success": result.success,
+            "rag_used": result.rag_used,
+            "start_time": start_time,
+            "request_id": request_id,
+        }
+
+        # 1. Consolidation (счётчик + запуск при необходимости)
+        self._dialogs_since_consolidation += 1
+        if self._dialogs_since_consolidation >= self._consolidation_interval:
+            self._dialogs_since_consolidation = 0
+            asyncio.create_task(self._run_background_consolidation(bg_data))
+
+        # 2. Фазы из _BACKGROUND_PHASES
+        for phase_name, phase in self._phases:
+            if phase is None:
+                if phase_name == "procedure_success":
+                    asyncio.create_task(self._run_background_procedure_success(bg_data))
+                continue
+            if phase_name not in _BACKGROUND_PHASES:
+                continue
+            if result.strategy == "simple" and phase_name in {"persona_evolution", "reflection", "dreams"}:
+                continue
+            asyncio.create_task(self._run_background_phase(phase_name, phase, bg_data, request_id))
+
+    async def _run_background_phase(self, phase_name: str, phase, bg_data: dict, request_id: str):
+        """Выполняет одну background-фазу с X-Ray записью и изоляцией ошибок."""
+        try:
+            ctx = PipelineContext(
+                user_message=bg_data["user_message"],
+                context={
+                    "user_id": bg_data["user_id"],
+                    "response": bg_data["response"],
+                    "strategy": bg_data["strategy"],
+                    "intent": bg_data["intent"],
+                    "emotion_style": bg_data["emotion_style"],
+                    "impulse_primary": bg_data["impulse_primary"],
+                    "experience_interaction_type": bg_data["experience_interaction_type"],
+                    "experience_significance": bg_data["experience_significance"],
+                    "pipeline_success": bg_data["pipeline_success"],
+                    "rag_used": bg_data["rag_used"],
+                    "start_time": bg_data["start_time"],
+                    "request_id": request_id,
+                },
+                session_id=bg_data["session_id"],
+            )
+            pr = await phase.execute(ctx)
+            dur_ms = (time.perf_counter() - bg_data["start_time"]) * 1000
+            phase_status = "error" if not pr.success else "success"
+            phase_error = pr.errors[0] if pr.errors else None
+            self._record_xray_background(phase_name, {"phase": phase_name}, dur_ms, request_id, phase_status, phase_error)
+        except Exception as e:
+            logger.warning(f"Background phase '{phase_name}' error: {e}")
+
+    async def _run_background_consolidation(self, bg_data: dict):
+        """Consolidation в фоне, не блокирует response."""
+        try:
+            from memory.consolidation import get_consolidator
+            consolidator = get_consolidator()
+            consolidator.run_scheduled_consolidation(user_id=bg_data.get("user_id"))
+            logger.info("Background consolidation completed")
+        except Exception as e:
+            logger.warning(f"Background consolidation error: {e}")
+
+    async def _run_background_procedure_success(self, bg_data: dict):
+        """Procedure success запись в фоне."""
+        try:
+            from memory import get_semantic_memory
+            semantic = get_semantic_memory()
+            semantic.record_procedure_success(bg_data.get("intent", ""), success=True)
+        except Exception as e:
+            logger.warning(f"Background procedure_success error: {e}")
+
+    def _record_xray_background(self, pname: str, pdata: dict, dur_ms: float, request_id: str, pstatus: str = "success", perror: str = None):
+        """X-Ray запись для background-фазы."""
+        try:
+            from core.xray import get_trace_collector
+            from core.xray.trace_collector import TraceStage
+            stage_map = {
+                "consolidation": "remember", "procedure_success": "remember",
+                "persona_evolution": "remember", "health": "emit",
+                "reflection": "emit", "dreams": "emit", "metrics": "emit",
+            }
+            stage = TraceStage(stage_map.get(pname, "emit"))
+            tc = get_trace_collector()
+            tc.record_event(request_id, stage, {**pdata, "phase": pname}, dur_ms, pstatus, perror)
+        except Exception as e:
+            logger.warning(f"X-Ray background record error: {e}")
+
     async def execute(
         self,
         user_message: str,
@@ -349,12 +457,16 @@ class PipelineExecutor:
         except Exception:
             pass
 
-        _simple_skip = {"rag", "knowledge_graph", "episodic", "semantic", "persona", "roots", "truth_loop", "evaluation", "save_episode", "extraction", "emotion_update", "persona_evolution", "reflection", "dreams"}
+        _simple_skip = {"rag", "knowledge_graph", "episodic", "semantic", "persona", "roots", "truth_loop", "evaluation", "save_episode", "extraction", "emotion_update"}
         _independent_group = {"rag", "knowledge_graph", "episodic", "semantic", "emotion"}
         _skip_phases = set()
 
         for phase_name, phase in self._phases:
             if phase is None:
+                # inline-фазы (consolidation, procedure_success) — background
+                continue
+            if phase_name in _BACKGROUND_PHASES:
+                # background-фазы — выполняются после ответа
                 continue
             if result.strategy == "simple" and phase_name in _simple_skip:
                 continue
@@ -557,33 +669,11 @@ class PipelineExecutor:
                     logger.warning(f"{__name__} error: {e}")
                 return result
 
-        # === Consolidation (встроенная логика с блокировкой) ===
-        async with self._consolidation_lock:
-            self._dialogs_since_consolidation += 1
-            if self._dialogs_since_consolidation >= self._consolidation_interval:
-                try:
-                    from memory.consolidation import get_consolidator
-                    consolidator = get_consolidator()
-                    user_id = ctx.context.get("user_id")
-                    consolidator.run_scheduled_consolidation(user_id=user_id)
-                    result.consolidation_triggered = True
-                    self._dialogs_since_consolidation = 0
-                    logger.info("Consolidation triggered")
-                except Exception as e:
-                    logger.warning(f"Consolidation error: {e}")
-
-        # === Procedure success ===
-        applicable_procedure_id = ctx.context.get("procedure_id")
-        truth_confidence = result.truth_confidence or ctx.context.get("truth_confidence", 0)
-        if applicable_procedure_id and truth_confidence > 0.6:
-            try:
-                from memory import get_semantic_memory
-                semantic = get_semantic_memory()
-                semantic.record_procedure_success(applicable_procedure_id, success=True)
-            except Exception as e:
-                logger.warning(f"{__name__} error: {e}")
-
         # Memory Hook: before_response
+
+        # === Fire background phases (fire-and-forget) ===
+        if result.success and result.response.strip():
+            self._fire_background_phases(ctx, result, request_id, start_time)
         try:
             from core.pipeline.memory_hooks import get_memory_hooks
             hctx = {
@@ -806,6 +896,6 @@ class PipelineExecutor:
             "anti_loop_history_size": len(self._anti_loop_history),
             "dialogs_since_consolidation": self._dialogs_since_consolidation,
             "consolidation_interval": self._consolidation_interval,
-            "version": "4.0",
+            "version": "5.0",
             "state": self._state.value,
         }

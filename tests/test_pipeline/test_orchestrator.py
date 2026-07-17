@@ -43,6 +43,6 @@ async def test_orchestrator_strategy_detection():
 async def test_orchestrator_get_stats():
     executor = PipelineExecutor()
     stats = executor.get_stats()
-    assert stats["version"] == "4.0"
+    assert stats["version"] == "5.0"
     assert stats["state"] == "healthy"
     assert stats["total_calls"] >= 0
