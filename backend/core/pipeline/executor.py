@@ -707,7 +707,10 @@ class PipelineExecutor:
             tc = get_trace_collector()
 
             # B2: структурированное объяснение ответа
-            eval_data = result.metadata.get("evaluation") or {}
+            # eval_data берём из ctx.context (туда попадает data фаз evaluation
+            # через ctx.context.update), т.к. result.metadata["evaluation"]
+            # устанавливается позже (строка ~906).
+            eval_data = ctx.context.get("evaluation") or result.metadata.get("evaluation") or {}
             explanation = {
                 "strategy_why": (
                     f"Выбрана стратегия '{result.strategy}' на основе намерения "
@@ -735,9 +738,14 @@ class PipelineExecutor:
                 ),
                 "evaluation_notes": eval_data.get("details", {}) if isinstance(eval_data, dict) else {},
                 "evaluation": {
-                    "score": eval_data.get("score") if isinstance(eval_data, dict) else None,
-                    "passed": eval_data.get("passed") if isinstance(eval_data, dict) else None,
-                    "summary": eval_data.get("summary") if isinstance(eval_data, dict) else None,
+                    "score": eval_data.get("overall") if isinstance(eval_data, dict) else None,
+                    "passed": (eval_data.get("overall", 0) >= 0.5) if isinstance(eval_data, dict) else None,
+                    "summary": (
+                        f"Completeness {eval_data.get('completeness', 0):.2f}, "
+                        f"Safety {eval_data.get('safety', 0):.2f}, "
+                        f"Overall {eval_data.get('overall', 0):.2f}"
+                        if isinstance(eval_data, dict) else None
+                    ),
                     "details": eval_data.get("details", {}) if isinstance(eval_data, dict) else {},
                 },
             }

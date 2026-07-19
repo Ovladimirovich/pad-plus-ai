@@ -79,7 +79,9 @@ async def get_current_response():
 
     eval_data = None
     if trace_session:
-        eval_data = (trace_session.get("metadata") or {}).get("explanation", {}).get("evaluation_notes")
+        _expl = (trace_session.get("metadata") or {}).get("explanation", {}) or {}
+        # Новое поле explanation.evaluation (score/passed/summary/details)
+        eval_data = _expl.get("evaluation") or _expl.get("evaluation_notes")
 
     return {
         "status": "ok",
