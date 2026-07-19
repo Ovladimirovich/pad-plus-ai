@@ -21,7 +21,8 @@ aiohttp==3.13.5
 requests==2.33.0
 
 # WebSocket
-websockets==16.0
+# <16: требование supabase/realtime (2.28.3); >=11 — требование uvicorn[standard]
+websockets>=11,<16
 
 # Knowledge Graph
 networkx==3.6.1
