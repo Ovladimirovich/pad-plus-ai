@@ -489,6 +489,9 @@ Knowledge Graph is the system's knowledge graph storing concepts and relationshi
 
 A comprehensive toolkit for researching, debugging, and analyzing the behavior of PAD+ AI's cognitive architecture. Available on the `#research` page (frontend hash navigation).
 
+![AI Under Microscope](screenshots/research_microscope.png)
+![Research Platform — Compare Providers / Decision Log](screenshots/research_compare.png)
+
 ### 🔬 AI Under Microscope
 
 Neural Link UI — a visual diagram of all pipeline phases in real time. Each phase shows:
@@ -696,6 +699,8 @@ PAD+ AI/
 | `screenshots/experience.png` | Experience and Impulse Core |
 | `screenshots/knowledge.png` | Knowledge graph |
 | `screenshots/instructions.png` | System instructions |
+| `screenshots/research_microscope.png` | 🔬 AI Under Microscope — all pipeline phases in real time (Neural Link UI) |
+| `screenshots/research_compare.png` | Research Platform — Compare Providers, Decision Log, Replay |
 
 ---
 
