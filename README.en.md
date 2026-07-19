@@ -39,6 +39,7 @@ The system includes multi-layered memory (episodic, semantic, vector), an emotio
   - [Provider Manager](#provider-manager)
   - [Persona](#persona)
   - [RAG v3.0](#rag)
+  - [Research Platform](#research-platform)
 - [Memory Architecture](#memory-architecture)
 - [Technology Stack](#technology-stack)
 - [Repository Structure](#repository-structure)
@@ -484,6 +485,71 @@ Knowledge Graph is the system's knowledge graph storing concepts and relationshi
 
 ---
 
+## Research Platform
+
+A comprehensive toolkit for researching, debugging, and analyzing the behavior of PAD+ AI's cognitive architecture. Available on the `#research` page (frontend hash navigation).
+
+### 🔬 AI Under Microscope
+
+Neural Link UI — a visual diagram of all pipeline phases in real time. Each phase shows:
+- **Category icon** (cognition / memory / emotion / safety / generation / evaluation / output)
+- **Status** (pending / running / done / error)
+- **Evaluation + Why-card** — expandable "why this decision" card with evaluation details (score, passed, metrics)
+- **Duration** of phase execution
+
+**Live updates:** Microscope listens to WebSocket `/api/v1/xray/ws`. On disconnect — automatic fallback to `fetch` (polling).
+
+### Replay Mode
+
+Replay saved traces for analyzing system behavior in past sessions:
+- `POST /api/v1/experiments/replay` — load a saved trace into Microscope
+- Snapshots available in `backend/experiments/snapshots/` (created automatically and manually)
+
+### Compare Providers
+
+Compare LLM providers (OpenRouter / GigaChat) across key metrics:
+- **Latency** — generation time
+- **Cost** — token cost
+- **Quality** — quality score (via Evaluation pipeline)
+- **Export** — table export to **JSON** and **CSV** (`ProvidersCompareTab.jsx`)
+
+### Decision Log ↔ Living Anatomy
+
+Cross-integration with the 🧬 Living Anatomy module:
+- "Module Decisions" button on the Anatomy page → navigate to `#research?component=<component>`
+- Filters Decision Log by component (source: `decisions_routes.py` + `MODULE_TO_COMPONENT` in `backend/core/anatomy.py`)
+
+### Snapshot ↔ Living Anatomy
+
+- `#anatomy?snapshot=<id>` shows a snapshot slice from Research on the Anatomy module tree
+- Snapshots aggregate the state of all subsystems at a point in time
+
+### Tracing and Cleanup (Trace cleanup)
+
+- `backend/core/xray/history_recorder.py` automatically cleans traces older than `TRACE_RETENTION_DAYS=30` (method `cleanup_old()`)
+- Seed experiments (`I-*`) are created in `backend/experiments/runs/` on first startup (if directory is empty)
+
+### API endpoints (Research Platform)
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/xray/current` | Current trace (aggregates all phases + evaluation from `explanation.evaluation`) |
+| `WS /api/v1/xray/ws` | WebSocket live trace updates |
+| `GET /api/v1/experiments/runs` | List of runs / experiments |
+| `POST /api/v1/experiments/replay` | Replay a saved trace |
+| `GET /api/v1/experiments/compare-providers` | Provider comparison data |
+| `GET /api/v1/decisions?component=<c>` | Decision Log, filter by component (for Anatomy) |
+| `GET /api/v1/anatomy/status` | Live module status (for Snapshot) |
+
+**Related files:**
+- `backend/api/experiments_routes.py` — runs, replay, compare-providers
+- `backend/api/decisions_routes.py` — Decision Log
+- `backend/api/anatomy_routes.py` — Living Anatomy status
+- `backend/api/xray_routes.py` — `/xray/current`, `/xray/ws`
+- `frontend/src/pages/research/` — MicroscopeTab, ProvidersCompareTab, DecisionsTab, ExperimentsTab, PipelineTab, MetricsTab, EvalTab
+
+---
+
 ## Memory Architecture
 
 ```mermaid
@@ -563,9 +629,10 @@ The Consolidation Engine moves knowledge upward: episodes are distilled into sem
 | **Cache** | Redis 7 (optional) |
 | **LLM Providers** | OpenRouter, GigaChat |
 | **LLM Interface** | ProviderManager (unified SDK interface) |
-| **Pipeline** | PipelineExecutor v4.0, 24 stages |
+| **Pipeline** | PipelineExecutor v5.0, 25 stages |
 | **X-Ray** | TraceCollector + WebSocket Broadcaster + ThoughtVisualizer |
 | **HEALER** | Self-contained module, zero external dependencies |
+| **Research** | AI Under Microscope (WebSocket), Replay, Compare Providers, Decision Log |
 | **CI** | GitHub Actions (pytest, ruff, black, mypy) |
 | **Deployment** | Render (Web Service + Static Site), Docker |
 | **Testing** | pytest, 400+ test functions |
@@ -578,8 +645,12 @@ The Consolidation Engine moves knowledge upward: episodes are distilled into sem
 PAD+ AI/
 ├── backend/                    # FastAPI backend
 │   ├── api/                    # 130+ routes
+│   │   ├── experiments_routes.py   # Research: runs, replay, compare-providers
+│   │   ├── decisions_routes.py     # Decision Log
+│   │   ├── anatomy_routes.py       # Living Anatomy status
+│   │   └── xray_routes.py          # /xray/current, /xray/ws
 │   ├── core/                   # System core
-│   │   ├── pipeline/           # Pipeline v4.0 (executor + phases)
+│   │   ├── pipeline/           # Pipeline v5.0 (executor + phases)
 │   │   ├── xray/               # X-Ray (trace, broadcast, visualization)
 │   │   └── guard/              # Response Guard (safety, tone, cognition)
 │   ├── emotion/                # PAD+ emotional model
@@ -590,7 +661,8 @@ PAD+ AI/
 │   └── knowledge/              # Knowledge Graph
 ├── frontend/                   # React + Vite frontend
 │   └── src/
-│       ├── pages/              # 12 pages (Chat, X-Ray, Healer, Memory, etc.)
+│       ├── pages/              # 15 pages (Chat, Research, Anatomy, X-Ray, etc.)
+│       │   └── research/       # MicroscopeTab, ProvidersCompareTab, DecisionsTab
 │       ├── components/         # UI components
 │       └── services/           # API clients
 ├── HEALER/                     # Self-contained HEALER module
@@ -685,6 +757,21 @@ docker run -d --name padplus -p 8007:8007 --env-file .env padplus-backend
 
 ---
 
+## Recent Updates
+
+### Research Platform (v4.1)
+- **🔬 AI Under Microscope** — Neural Link UI: all pipeline phases visualized in real time on a single diagram
+- **Live X-Ray with WebSocket** — instant trace updates via `/api/v1/xray/ws` (fallback to polling on disconnect)
+- **Replay Mode** — replay saved traces via `POST /api/v1/experiments/replay`
+- **Evaluation + Why-card** — per-step score/passed and expandable "why this decision" card with evaluation details
+- **Compare Providers** — OpenRouter/GigaChat comparison (latency, cost, quality) with JSON and CSV export
+- **Decision Log ↔ Living Anatomy** — "Module Decisions" button on Anatomy → `#research?component=<component>`
+- **Snapshot ↔ Living Anatomy** — `#anatomy?snapshot=<id>` shows a Research snapshot slice on the Anatomy tree
+- **Trace cleanup** — `history_recorder.py` cleans traces older than `TRACE_RETENTION_DAYS=30`
+- **Seed experiments** — demo experiments (`I-*`) are created in `backend/experiments/runs/` on first startup
+
+---
+
 ## Documentation
 
 | Document | Description |
@@ -712,10 +799,11 @@ Subsystem documentation: [docs/architecture/](docs/architecture/) — Overview, 
 ✓ v2 — RAG + Vector Search
 ✓ v3 — Personality + Emotion Engine
 ✓ v4 — Cognitive Pipeline (current)
+✓ v4.1 — Research Platform: AI Under Microscope, WebSocket live X-Ray, Replay, Compare Providers, Decision Log ↔ Anatomy, Snapshot ↔ Anatomy
 
 ---
-▲ v4.1 — Security audit, HEALER isolation, CORS hardening
-△ v4.2 — Multi-worker, async consolidation, structured logging
+▲ v4.2 — Multi-worker, async consolidation, structured logging
+△ v4.3 — Extended eval metrics, multi-provider benchmarks export
 ○     — Cognitive Observatory, Self Evolution, Multi-Agent
 ```
 
