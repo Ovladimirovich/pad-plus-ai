@@ -117,6 +117,11 @@ healer_viewer*.png
 .ai/
 .vs/
 
+# Local-only docs (removed from repo, kept on disk)
+AGENTS.md
+habr_article_discrepancies_report.md
+testing_feedback.md
+
 # Production
 .env.production
 .env.staging
