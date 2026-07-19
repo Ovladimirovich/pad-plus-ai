@@ -485,6 +485,28 @@ async def restore_document(
     return {"success": True, "message": "Документ восстановлен"}
 
 
+@router.post("/documents/trash/restore-all")
+async def restore_all_trash(current_user: dict = Depends(get_current_user)):
+    """Восстановление всех документов из корзины"""
+    db = get_db_client(current_user)
+    if not db:
+        raise HTTPException(status_code=500, detail="БД не подключена")
+
+    user_id = current_user["id"]
+
+    try:
+        result = db.table("documents")\
+            .update({"is_deleted": False, "deleted_at": None})\
+            .eq("user_id", user_id)\
+            .eq("is_deleted", True)\
+            .execute()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Корзина не поддерживается — накатите миграцию")
+
+    count = len(result.data) if result.data else 0
+    return {"success": True, "message": f"Восстановлено: {count}", "count": count}
+
+
 @router.delete("/documents/trash/clear")
 async def clear_trash(
     current_user: dict = Depends(get_current_user),

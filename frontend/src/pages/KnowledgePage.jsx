@@ -553,7 +553,7 @@ export default function KnowledgePage() {
   const fullscreen = graph?.nodes?.length > 0 && viewMode === 'graph';
 
   return (
-    <div className={`${fullscreen ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-gray-950 text-white flex flex-col`}>
+    <div className={`${fullscreen ? 'h-[calc(100vh-4rem)] overflow-hidden' : 'min-h-screen'} bg-gray-950 text-white flex flex-col`}>
       <div className="shrink-0 border-b border-gray-800 px-4 lg:px-6 py-3">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h1 className="text-xl font-semibold">🔗 Граф знаний</h1>

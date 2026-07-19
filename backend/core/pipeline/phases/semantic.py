@@ -3,10 +3,12 @@ import logging
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.semantic")
 
 
+@register_phase("semantic", order=6)
 class SemanticPhase(PipelinePhase):
     name = "semantic"
 

@@ -47,9 +47,14 @@ PAD+ AI — AI-ассистент с когнитивной архитектур
 - `\xa0` (неразрывный пробел) ломает Authorization header
 - Фикс: `.encode("ascii", errors="ignore")` при сохранении и чтении ключа
 
+### Persona deltas import (500)
+- `GET /api/v1/admin/persona/deltas` — **ImportError**: импорт `_IMPULSE_DELTAS` из `core.pipeline.phases.impulse_update`, где его нет. Фактически определён в `core.impulse.deltas`.
+- Фикс: `backend/api/persona_routes.py:51` — заменить импорт на `from core.impulse.deltas import _IMPULSE_DELTAS`
+
 ### Fix 500 на дашборде
-- `GET /api/v1/analytics/dashboard` возвращал 500 при пустой аналитике
-- Фикс: `backend/app/routers/analytics.py` — fallback-данные при пустом результате, try/except вокруг каждого виджета
+- Дашборд использует `GET /api/v1/mind-state` и `GET /api/v1/system/full-status` (из `backend/api/frontend_routes.py`).
+- Старый эндпоинт `/api/v1/analytics/dashboard` **удалён** — не использовать.
+- Роутеры живут в **`backend/api/`** (НЕ в `backend/app/routers/` — этот путь больше не существует).
 
 ### EvaluationPhase (ActiveLearning)
 - Фаза `Evaluation` в pipeline (между Dreams и Metrics)
@@ -83,6 +88,39 @@ PAD+ AI — AI-ассистент с когнитивной архитектур
 - Кластеризация стратегий по 3 критериям (success_rate, efficiency, quality_score)
 - Рекомендация: {"current": "...", "recommended": "...", "reason": "..."}
 - Вызывается из ControlTick и из EvaluationPhase
+
+## Структура бэкенда (реальная, июль 2026)
+Роутеры живут в **`backend/api/`** (НЕ в `backend/app/routers/` — этот путь больше не используется). Регистрация в `backend/main.py` → `_register_routers()`.
+
+| Префикс | Файл | Назначение |
+|---------|------|-----------|
+| `/api/v1` | `frontend_routes.py`, `routes.py`, `document_routes.py` | Фронт-API (auth, chat, mind-state, health, providers, keys, documents) |
+| `/api/v1/user` | `user_routes.py` | Пользователи + `/keys` (API-ключи) |
+| `/api/v1/dialogs` | `dialog_routes.py` | История диалогов |
+| `/api/v1/xray` | `xray_routes.py` | X-Ray наблюдаемость |
+| `/api/v1/metrics` | `metrics_routes.py` | Метрики pipeline/системы |
+| `/api/v1/memory` | `memory_routes.py` | Memory-дашборд |
+| `/api/v1/knowledge` | `knowledge_routes.py` | Граф знаний |
+| `/api/v1/feedback` | `feedback_routes.py` | Обратная связь |
+| `/api/v1/healer` | `healer_routes.py` | HEALER |
+| `/api/v1/experience` | `experience_routes.py` | Опыт (`/admin/experiences`) |
+| `/api/v1/admin/persona` | `persona_routes.py` | Persona (admin) |
+| `/api/v1/impulse` | `impulse_routes.py` | Impulse Core |
+| `/api/v1/admin` | `admin_routes.py` | Admin (emotion, sync, health) |
+| `/api/v1/sentry` | `sentry_routes.py` | Sentry-совместимый ingest |
+| `/api/v1/experiments` | `experiments_routes.py` | Research Platform (runs/compare/evals/snapshots) |
+| `/api/v1/decisions` | `decisions_routes.py` | Decision Log |
+| `/api/v1/anatomy` | `anatomy_routes.py` | 🧬 Живая анатомия |
+| `/api/v1/learning` | `learning_routes.py` | Обучение |
+| `/api/v1/debug` | `debug_routes.py` | Только при `DEBUG=true` |
+
+> ℹ️ Ранее существовавший `legacy_routes.py` (заглушки 503 для `/providers` и `/keys`) **удалён** — он был мёртвым кодом, не регистрировался в `main.py` и создавал риск перекрытия рабочих эндпоинтов при случайном подключении.
+
+**Фронтенд-страницы** (hash-навигация, `frontend/src/pages/`, табы в `App.jsx`): home, chat, anatomy, research, xray, healer, knowledge, memory, experience, history, documents, providers, connected-providers, settings, instructions (15 страниц).
+
+**Pipeline v5.0:** 25 зарегистрированных фаз (`@register_phase`, макс. `order=27`) + AntiLoopPhase inline. Sync path (hot) + background path (fire-and-forget через `asyncio.create_task`).
+
+**Память:** 7 типов в `backend/memory/`.
 
 ## Граф знаний (Knowledge Graph)
 Подробная документация в `.ai/knowledge-graph.md`. Кратко:

@@ -82,6 +82,14 @@ run-server:
 # Полная проверка (установка + тесты)
 check: install test
 
+# Smoke test (быстрая проверка проекта)
+smoke:
+	python scripts/smoke_test.py
+
+# Миграция существующих трейсов в SQLite
+migrate-traces:
+	python scripts/migrate_traces.py
+
 # Помощь
 help:
 	@echo "Доступные команды:"
@@ -105,4 +113,6 @@ help:
 	@echo "  install       - Установить зависимости"
 	@echo "  run-server    - Запустить сервер"
 	@echo "  check         - Установить зависимости + запустить тесты"
+	@echo "  smoke         - Smoke test (быстрая проверка проекта)"
+	@echo "  migrate-traces- Миграция трейсов из JSON в SQLite"
 	@echo "  help          - Показать эту справку"

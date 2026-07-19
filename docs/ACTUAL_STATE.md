@@ -1,12 +1,12 @@
 # Фактическое состояние системы PAD+ AI
 
-**Дата анализа:** 17.07.2026  
+**Дата анализа:** 18.07.2026  
 **Ветка:** main  
 **Цель:** Документирование реального состояния системы для корректного описания в статьях и документации
 
 ---
 
-## 1. Pipeline (26 именованных слотов + Anti-Loop; Impulse V1)
+## 1. Pipeline (25 зарегистрированных фаз @register_phase + Anti-Loop inline; Impulse V1)
 
 ### Реальный порядок фаз (`backend/core/pipeline/executor.py`)
 
@@ -52,7 +52,9 @@ phase_result = await AntiLoopPhase(self).execute(ctx)
 
 При >3 повторных запросах — блокирует выполнение.
 
-### Итого: 24 именованные фазы + Anti-Loop перед циклом
+### Итого: 25 зарегистрированных фаз (`@register_phase`, макс. `order=27`) + Anti-Loop перед циклом
+
+**Примечание:** В v5.0 фазы зарегистрированы через декоратор `@register_phase` (не список в `_build_phases`). Anti-Loop Guard выполняется inline первым в `execute()` (вне `_build_phases`). Background-фазы (consolidation, procedure_success, persona_evolution, health, reflection, dreams, metrics) выполняются fire-and-forget через `asyncio.create_task`.
 
 **Примечание:** Anti-Loop Guard выполняется ПЕРЕД основным пайплайном, проверяет повторяющиеся запросы и блокирует при >3 повторениях.
 
@@ -170,14 +172,26 @@ HEALER/
 └── healer/viewer/        # Веб-интерфейс
 ```
 
-**Интеграция:** `backend/integration/healer_bridge.py` — мост, релеит события в HEALER TraceStore.
+**Интеграция:** `backend/integration/healer_bridge.py` — мост, релеит события в HEALER TraceStore. HealerListener подключён к TraceCollector и активен в рантайме (`backend/main.py`).
 
-**Важно:** HEALER — отдельный проект в репозитории, НЕ интегрирован в production-пайплайн. Сосуществует как диагностический инструмент.
+**Важно:** HEALER — отдельный проект в репозитории, интегрированный в production-пайплайн через HealerBridge (диагностика + самовосстановление по событиям TraceCollector).
 
 **P5 (2026-07-17):**
 - Default mode: `monitor` (было `suggest`)
 - Новые action в RemediationEngine: `clear_cache` (очистка L1/L2), `enable_safe_mode` (strategy → simple)
 - `CacheManager.clear_all()` — полная очистка L1 + L2
+
+---
+
+## 6.1. Living Anatomy (🧬 Anatomy)
+
+**Файлы:** `frontend/src/pages/AnatomyPage.jsx`, `backend/api/anatomy_routes.py`, `backend/core/anatomy.py`
+
+Интерактивная визуализация когнитивной архитектуры в реальном времени (ReactFlow). Дерево `brain` → 11 модулей (memory, reasoning, identity, emotion, reflection, dreams, truth, safety, healer, research, xray); у Memory — вложенные подмодули (episodic, semantic, rag, persona, roots).
+
+- `GET /api/v1/anatomy` — полное дерево статусов (обновляется каждые 5с при включённом Live-режиме)
+- `GET /api/v1/anatomy/{module_id}` — деталь модуля (component + decision_count для кросс-ссылки Decision Log)
+- Кросс-интеграция: Anatomy ↔ Research (Decision Log по компоненту), Anatomy ↔ Snapshot (срез из Research → Snapshots)
 
 ---
 
@@ -222,6 +236,10 @@ HEALER/
 **Research (исторические):** `experiments/I-002…I-005` — методология A/B; CI proof = unit inject без live LLM.
 
 **Статус:** ✅ Runtime V1 реализован
+
+### Известные баги (исправленные)
+
+- `GET /api/v1/admin/persona/deltas` — **ImportError** (500): импорт `_IMPULSE_DELTAS` из несуществующего модуля `core.pipeline.phases.impulse_update` вместо `core.impulse.deltas`. Исправлено 18.07.2026.
 
 ---
 

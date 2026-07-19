@@ -11,7 +11,7 @@
 
 ### 1.1. Когнитивное ядро (Cognitive Core)
 - **PAD Emotional Model** — Pleasure, Arousal, Dominance + Curiosity, Confidence, Social Connection
-- **Pipeline v4.0** — 24 фазы обработки: от идентификации до генерации ответа
+- **Pipeline v5.0** — 25 фаз обработки (Hot/Background split): от защиты от зацикливания до генерации и фоновой аналитики
 - **TruthLoop** — цикл проверки достоверности
 - **Anti-Directive** — защита от инжекции инструкций
 - **Intent Router** — маршрутизация намерений
@@ -36,7 +36,7 @@
   - Healer Trace Panel
 
 ### 1.4. API (Backend)
-- FastAPI приложение, ~130 endpoints
+- FastAPI приложение, 18 роутеров в `backend/api/` (ключи, диалоги, xray, metrics, memory, knowledge, healer, experience, impulse, experiments, decisions, anatomy и др.)
 - Поддержка множества LLM-провайдеров через LiteLLM-совместимый менеджер
 - Управление API-ключами провайдеров (шифрованное хранение)
 - WebSocket endpoint для real-time обновлений
@@ -47,7 +47,7 @@
 
 ### 1.5. Frontend
 - React 18 + Vite 5 + Tailwind CSS 3
-- 13 страниц: Chat, Dashboard, Providers, Documents, Memory, History, X-Ray, Healer, Experience, Knowledge, Settings, Instructions, Connected Providers
+- 15 страниц: Chat, Dashboard, Providers, Documents, Memory, History, X-Ray, Healer, Experience, Knowledge, Settings, Instructions, Connected Providers, **Anatomy** (🧬 живая анатомия когнитивной архитектуры), **Research** (🔬 исследовательская платформа, 7 вкладок)
 - X-Ray панели в реальном времени (WebSocket)
 - Адаптивный дизайн (MobileMenu)
 - ErrorBoundary

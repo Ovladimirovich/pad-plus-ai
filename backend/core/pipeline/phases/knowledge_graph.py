@@ -3,10 +3,12 @@ import logging
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.knowledge_graph")
 
 
+@register_phase("knowledge_graph", order=4)
 class KnowledgeGraphPhase(PipelinePhase):
     name = "knowledge_graph"
 

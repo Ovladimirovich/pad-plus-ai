@@ -62,6 +62,7 @@ class PipelineResult:
     intent: str = ""
     confidence: float = 0.0
     provider: str = ""
+    request_id: Optional[str] = None
     safety_passed: bool = True
     safety_warning: Optional[str] = None
     truth_confidence: float = 0.5

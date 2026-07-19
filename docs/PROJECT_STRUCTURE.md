@@ -1,6 +1,6 @@
 # 📁 Структура проекта PAD+ AI
 
-**Версия:** 3.0  
+**Версия:** 4.0  
 **Последнее обновление:** Июль 2026  
 **Статус:** ✅ Актуально (по фактическому состоянию кода)
 
@@ -24,7 +24,7 @@ PAD+ AI/
 
 ### Pipeline (`backend/core/pipeline/`)
 
-**Executor:** `executor.py` — PipelineExecutor v4.0, 24 именованные фазы.
+**Executor:** `executor.py` — PipelineExecutor v5.0 (Hot/Background split). 25 зарегистрированных фаз (`@register_phase`, макс. `order=27`) + AntiLoopPhase выполняется inline перед циклом.
 
 **Фазы** (`phases/`):
 
@@ -92,9 +92,41 @@ PAD+ AI/
 | `llm_service.py` | Единый интерфейс LLM |
 | `gigachat_client.py` | GigaChat SDK |
 
+### API роутеры (`backend/api/`)
+
+Регистрируются в `backend/main.py` → `_register_routers()`. **Важно:** старая структура `backend/app/routers/` больше не используется.
+
+| Файл | Префикс | Назначение |
+|------|---------|-----------|
+| `frontend_routes.py` | `/api/v1` | Фронт-API (health, mind-state, providers) |
+| `routes.py` | `/api/v1` | Корневые эндпоинты |
+| `document_routes.py` | `/api/v1` | Управление документами |
+| `user_routes.py` | `/api/v1/user` | Пользователи + `/keys` (API-ключи) |
+| `dialog_routes.py` | `/api/v1/dialogs` | История диалогов |
+| `xray_routes.py` | `/api/v1/xray` | X-Ray наблюдаемость |
+| `metrics_routes.py` | `/api/v1/metrics` | Метрики pipeline/системы |
+| `memory_routes.py` | `/api/v1/memory` | Memory-дашборд |
+| `knowledge_routes.py` | `/api/v1/knowledge` | Граф знаний |
+| `feedback_routes.py` | `/api/v1/feedback` | Обратная связь |
+| `healer_routes.py` | `/api/v1/healer` | HEALER |
+| `experience_routes.py` | `/api/v1/admin/experiences` | Опыт |
+| `persona_routes.py` | `/api/v1/admin/persona` | Persona (admin) |
+| `impulse_routes.py` | `/api/v1/impulse` | Impulse Core |
+| `admin_routes.py` | `/api/v1/admin` | Admin |
+| `sentry_routes.py` | `/api/v1/sentry` | Sentry-совместимый ingest |
+| `experiments_routes.py` | `/api/v1/experiments` | Research Platform (runs/compare/evals) |
+| `decisions_routes.py` | `/api/v1/decisions` | Decision Log |
+| `anatomy_routes.py` | `/api/v1/anatomy` | 🧬 Живая анатомия |
+| `learning_routes.py` | `/api/v1/learning` | Обучение |
+| `debug_routes.py` | `/api/v1/debug` | Только при `DEBUG=true` |
+
+### Living Anatomy (`backend/core/anatomy.py`)
+
+Агрегатор live-статуса всех когнитивных модулей. Возвращает дерево `brain` → 11 модулей (memory, reasoning, identity, emotion, reflection, dreams, truth, safety, healer, research, xray); у Memory — вложенные подмодули (episodic, semantic, rag, persona, roots). Каждый узел содержит `status`, `metrics`, `children`. Кросс-ссылка модуль → компонент Decision Log через `MODULE_TO_COMPONENT`.
+
 ---
 
-## HEALER (отдельный проект)
+## HEALER (отдельный проект + интеграция)
 
 **Путь:** `HEALER/`
 
@@ -111,9 +143,31 @@ HEALER/
 └── healer/viewer/        # Веб-интерфейс
 ```
 
-**Интеграция:** `backend/integration/healer_bridge.py` — релеит события в HEALER TraceStore.
+**Интеграция:** `backend/integration/healer_bridge.py` — релеит события в HEALER TraceStore. HealerListener подключён к TraceCollector и активен в рантайме (`backend/main.py`). HEALER используется для диагностики и самовосстановления и интегрирован в production-пайплайн через HealerBridge.
 
-**Важно:** HEALER — отдельный проект, НЕ интегрирован в production-пайплайн. Используется для диагностики и самовосстановления.
+---
+
+## Frontend (`frontend/`)
+
+React + Vite, hash-навигация (`#<id>`). Страницы в `frontend/src/pages/`:
+
+| Файл | Hash | Назначение |
+|------|------|-----------|
+| `DashboardPage.jsx` | `#home` | Главный дашборд |
+| `ChatPage.jsx` | `#chat` | Чат с LLM |
+| `AnatomyPage.jsx` | `#anatomy` | 🧬 Живая анатомия (ReactFlow) |
+| `ResearchPage.jsx` + `research/` | `#research` | 🔬 Research (7 вкладок) |
+| `XRayPage.jsx` | `#xray` | Трассировка pipeline |
+| `HealerPage.jsx` | `#healer` | Самовосстановление |
+| `KnowledgePage.jsx` | `#knowledge` | Граф знаний |
+| `MemoryPage.jsx` | `#memory` | Memory-дашборд |
+| `ExperiencePage.jsx` | `#experience` | Опыт и дельты |
+| `HistoryPage.jsx` | `#history` | История диалогов |
+| `DocumentsPage.jsx` | `#documents` | Документы |
+| `ProvidersPage.jsx` | `#providers` | Провайдеры/ключи |
+| `ConnectedProvidersPage.jsx` | `#connected-providers` | Подключённые ключи |
+| `SettingsPage.jsx` | `#settings` | Настройки |
+| `InstructionsPage.jsx` | `#instructions` | Инструкции (вкладки по подсистемам) |
 
 ---
 
@@ -149,8 +203,10 @@ HEALER/
 | **Backend файлов** | 100+ |
 | **Frontend файлов** | 50+ |
 | **Тестов** | 400+ |
-| **Pipeline фаз** | 24 + Anti-Loop |
+| **Pipeline фаз** | 25 (`@register_phase`) + Anti-Loop inline |
 | **Слоёв памяти** | 7 |
+| **Фронтенд-страниц** | 15 |
+| **Бэкенд-роутеров** | 18 (в `backend/api/`) |
 
 ---
 
@@ -170,7 +226,7 @@ HEALER/
 ┌─────────────────────────────────────────────────────────────┐
 │                    PipelineExecutor v4.0                      │
 ├─────────────────────────────────────────────────────────────┤
-│ 24 фазы: Anti-Loop → Safety → Intent → RAG → Knowledge Graph│
+│ 25 фаз: Anti-Loop → Safety → Intent → RAG → Knowledge Graph │
 │ → Episodic → Semantic → Emotion → Persona → Roots → Identity│
 │ → Generate → Truth Loop → Save Episode → Emotion Update     │
 │ → Persona Evolution → Events Broadcast → Health → Reflection│

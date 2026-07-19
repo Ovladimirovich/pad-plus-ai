@@ -21,18 +21,22 @@ const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
 const ExperiencePage = lazy(() => import('./pages/ExperiencePage'));
 const HealerPage = lazy(() => import('./pages/HealerPage'));
+const ResearchPage = lazy(() => import('./pages/ResearchPage'));
+const AnatomyPage = lazy(() => import('./pages/AnatomyPage'));
 
 // Вкладки навигации
 const tabs = [
-  { id: 'home', label: '🏠 Главная', icon: '🏠' },
+  { id: 'research', label: '📊 Research', icon: '📊' },
   { id: 'chat', label: '💬 Чат', icon: '💬' },
-  { id: 'documents', label: '📄 Документы', icon: '📄' },
-  { id: 'history', label: '📜 История', icon: '📜' },
   { id: 'xray', label: '🔬 X-Ray', icon: '🔬' },
   { id: 'healer', label: '🧬 HEALER', icon: '🧬' },
+  { id: 'anatomy', label: '🧠 Anatomy', icon: '🧠' },
+  { id: 'home', label: '🏠 Главная', icon: '🏠' },
   { id: 'memory', label: '🧠 Память', icon: '🧠' },
   { id: 'knowledge', label: '🔗 Знания', icon: '🔗' },
   { id: 'experience', label: '📊 Опыт', icon: '📊' },
+  { id: 'history', label: '📜 История', icon: '📜' },
+  { id: 'documents', label: '📄 Документы', icon: '📄' },
   { id: 'settings', label: '⚙️ Настройки', icon: '⚙️' },
   { id: 'instructions', label: '📖 Инструкции', icon: '📖' },
   { id: 'providers', label: '⚡ Провайдеры', icon: '⚡' },
@@ -42,7 +46,7 @@ const tabs = [
 function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('activeTab') || 'home';
+    return localStorage.getItem('activeTab') || 'research';
   });
   const [showInstructions, setShowInstructions] = useState(false);
   const [keys, setKeys] = useState([]);
@@ -98,6 +102,31 @@ function App() {
   // Сохраняем активную вкладку
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
+
+  // Cross-integration: hash-навигация (например #decisions?component=provider_selector)
+  const [navParams, setNavParams] = useState({});
+  useEffect(() => {
+    const applyHash = () => {
+      const hash = window.location.hash.replace(/^#/, '');
+      if (!hash) return;
+      const [tab, query] = hash.split('?');
+      if (tab && tab !== activeTab) {
+        setActiveTab(tab);
+      }
+      const params = {};
+      if (query) {
+        for (const pair of query.split('&')) {
+          const [k, v] = pair.split('=');
+          if (k) params[decodeURIComponent(k)] = decodeURIComponent(v || '');
+        }
+      }
+      setNavParams(params);
+    };
+    window.addEventListener('hashchange', applyHash);
+    // применяем при старте, если hash задан
+    if (window.location.hash) applyHash();
+    return () => window.removeEventListener('hashchange', applyHash);
   }, [activeTab]);
 
   // Сохраняем выбранную модель в localStorage
@@ -319,7 +348,7 @@ function App() {
             </h1>
             
             {/* Навигация - скрываем на мобильных */}
-            <nav className="hidden lg:flex gap-1 ml-6">
+            <nav className="hidden lg:flex gap-1 ml-6 overflow-x-auto">
               {tabs.map(tab => (
                 <button
                   key={tab.id}
@@ -383,7 +412,9 @@ function App() {
             {activeTab === 'providers' && <ProvidersPage />}
             {activeTab === 'connected-providers' && <ConnectedProvidersPage />}
             {activeTab === 'xray' && <XRayPage />}
+            {activeTab === 'research' && <ResearchPage navParams={navParams} />}
             {activeTab === 'healer' && <HealerPage />}
+            {activeTab === 'anatomy' && <AnatomyPage navParams={navParams} />}
             {activeTab === 'settings' && <SettingsPage />}
 
             {/* History — единственная страница с hidden (сохраняет состояние скролла) */}

@@ -3,10 +3,12 @@ import logging
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.impulse_update")
 
 
+@register_phase("impulse_update", order=18)
 class ImpulseUpdatePhase(PipelinePhase):
     """
     Post-generate: единственный writer deltas (V1).

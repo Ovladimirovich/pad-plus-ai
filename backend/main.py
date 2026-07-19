@@ -612,6 +612,15 @@ def _register_routers(app):
     from api.sentry_routes import router as sentry_router
     app.include_router(sentry_router)
 
+    from api.experiments_routes import router as experiments_router
+    app.include_router(experiments_router)
+
+    from api.decisions_routes import router as decisions_router
+    app.include_router(decisions_router)
+
+    from api.anatomy_routes import router as anatomy_router
+    app.include_router(anatomy_router)
+
     from api.routes import router as root_router
     app.include_router(root_router)
 

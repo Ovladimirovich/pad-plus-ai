@@ -9,6 +9,7 @@ const tabs = [
   { id: 'history', label: 'История', icon: '📜' },
   { id: 'xray', label: 'X-Ray', icon: '🔬' },
   { id: 'healer', label: 'HEALER', icon: '🧬' },
+  { id: 'anatomy', label: 'Anatomy', icon: '🧠' },
   { id: 'settings', label: 'Настройки', icon: '⚙️' },
   { id: 'instructions', label: 'Инструкции', icon: '📖' },
   { id: 'providers', label: 'Провайдеры', icon: '⚡' },

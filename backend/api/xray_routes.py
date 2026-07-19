@@ -31,6 +31,98 @@ async def get_latest_pipeline_result():
     return _latest_pipeline_result
 
 
+@router.get("/current")
+async def get_current_response():
+    """
+    Агрегированный «срез текущего ответа» для UI Microscope.
+
+    Объединяет: последний pipeline-result, активную/последнюю сессию
+    трассировки (фазы, метрики) и структурированное объяснение (explanation).
+    Единый payload — без дублирующих endpoint-ов.
+    """
+    if _latest_pipeline_result is None:
+        return {"status": "no_data", "message": "Нет данных. Отправьте запрос в чат."}
+
+    latest = _latest_pipeline_result
+    # Поддержка обоих форматов latest (pipeline.execute и fallback pm.generate)
+    request_id = latest.get("request_id")
+    pipeline = latest.get("pipeline", {})
+    if not isinstance(pipeline, dict):
+        pipeline = {}
+
+    trace_session = None
+    explanation = None
+    if request_id:
+        try:
+            from core.xray import get_trace_collector
+            session = get_trace_collector().get_session(request_id)
+            if session is not None:
+                trace_session = session.get_summary()
+                trace_session["events"] = [e.to_dict() for e in session.events]
+                explanation = (session.metadata or {}).get("explanation")
+        except Exception as e:
+            logger.warning(f"X-Ray current trace error: {e}")
+
+    # Fallback: если request_id нет (fallback-ветка чата), берём последний trace из history
+    if trace_session is None:
+        try:
+            from core.xray.history_recorder import get_xray_history
+            traces = get_xray_history().list_sessions(limit=1)
+            if traces:
+                last = get_xray_history().get_trace(traces[0]["id"])
+                if last:
+                    trace_session = last
+                    request_id = last.get("id")
+                    explanation = (last.get("metadata") or {}).get("explanation")
+        except Exception as e:
+            logger.warning(f"X-Ray current history lookup error: {e}")
+
+    eval_data = None
+    if trace_session:
+        eval_data = (trace_session.get("metadata") or {}).get("explanation", {}).get("evaluation_notes")
+
+    return {
+        "status": "ok",
+        "user_message": latest.get("user_message"),
+        "session_id": latest.get("session_id"),
+        "request_id": request_id,
+        "timestamp": latest.get("timestamp"),
+        "strategy": pipeline.get("strategy"),
+        "intent": pipeline.get("intent"),
+        "provider": latest.get("provider"),
+        "model": latest.get("model"),
+        "confidence": pipeline.get("confidence"),
+        "truth_confidence": pipeline.get("truth_confidence"),
+        "latency_ms": pipeline.get("execution_time_ms"),
+        "success": pipeline.get("success"),
+        "phases": _build_phase_view(trace_session),
+        "metrics": {
+            "confidence": pipeline.get("confidence"),
+            "truth_confidence": pipeline.get("truth_confidence"),
+            "latency_ms": pipeline.get("execution_time_ms"),
+        },
+        "evaluation": eval_data,
+        "explanation": explanation,
+        "trace": trace_session,
+    }
+
+
+def _build_phase_view(trace_session: Optional[dict]) -> List[dict]:
+    """Компактное представление фаз из сессии трассировки"""
+    if not trace_session or not trace_session.get("events"):
+        return []
+    phases = []
+    for ev in trace_session["events"]:
+        phases.append({
+            "phase": ev.get("data", {}).get("phase") or ev.get("stage"),
+            "stage": ev.get("stage"),
+            "status": ev.get("status"),
+            "duration_ms": ev.get("duration_ms"),
+            "error": ev.get("error"),
+        })
+    return phases
+
+
 @router.get("/")
 async def xray_root():
     """Информация о X-Ray системе"""
@@ -314,7 +406,7 @@ async def get_brain_status():
     
     return {
         "brain": {"status": "deprecated", "message": "XRayBrain was removed"},
-        "system_state": state_manager.get_snapshot(),
+        "system_state": state_manager.get_stats()["current_state"],
         "meta_learner": meta.get_stats(),
         "reflection": reflection.get_stats()
     }

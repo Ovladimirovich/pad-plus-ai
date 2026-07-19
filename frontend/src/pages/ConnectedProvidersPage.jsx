@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { apiFetch } from '../services/api';
+import { cacheModels } from '../services/modelCache';
 
 // Все доступные провайдеры (только 2 основных)
 const allProviders = [
@@ -71,7 +72,9 @@ export default function ConnectedProvidersPage() {
       const response = await apiFetch(`/api/v1/providers/${providerId}/models`);
       if (response.ok) {
         const data = await response.json();
-        setAvailableModels(data.models || []);
+        const models = data.models || [];
+        setAvailableModels(models);
+        try { cacheModels(providerId, models); } catch (e) { /* ignore cache write */ }
       }
     } catch (error) {
       console.error('Failed to load models:', error);

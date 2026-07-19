@@ -1,8 +1,10 @@
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 
+@register_phase("safety", order=1)
 class SafetyPhase(PipelinePhase):
     name = "safety"
 

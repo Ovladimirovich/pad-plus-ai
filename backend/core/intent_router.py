@@ -344,13 +344,40 @@ class IntentRouter:
         }
         
         strategy = strategies.get(intent, strategies[IntentType.CHAT_GENERAL])
-        
+
         # Корректируем на основе эмоций
+        high_anxiety = False
         if emotion_state:
             тревога = emotion_state.get("тревога", 0.5)
             if тревога > 0.7:
                 strategy.reason += " (высокая тревога — нужен качественный ответ)"
-        
+                high_anxiety = True
+
+        # ─── Decision Log: фиксируем выбор провайдера ───
+        try:
+            from backend.core.decisions import get_decision_recorder
+            rec = get_decision_recorder()
+            rec.record(
+                component="provider_selector",
+                decision_type="provider_selection",
+                selected=strategy.primary,
+                confidence=0.7 if not high_anxiety else 0.9,
+                reason=strategy.reason,
+                input_factors={
+                    "intent": intent.value if hasattr(intent, "value") else str(intent),
+                    "high_anxiety": high_anxiety,
+                    "fallback": strategy.fallback,
+                },
+                candidates=[
+                    {"name": strategy.primary, "score": 1.0, "role": "primary"}
+                ] + [
+                    {"name": fb, "score": 0.5, "role": "fallback"}
+                    for fb in (strategy.fallback or [])
+                ],
+            )
+        except Exception as e:
+            logger.warning("Decision log (provider) failed: %s", e)
+
         return strategy
     
     def route(

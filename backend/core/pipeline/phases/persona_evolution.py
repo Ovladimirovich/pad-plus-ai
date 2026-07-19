@@ -4,6 +4,7 @@ import os
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.persona_evolution")
 
@@ -16,6 +17,7 @@ def _reset_reflection_counter():
     _reflection_counter = 0
 
 
+@register_phase("persona_evolution", order=21)
 class PersonaEvolutionPhase(PipelinePhase):
     name = "persona_evolution"
 

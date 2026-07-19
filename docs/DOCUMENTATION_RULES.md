@@ -15,15 +15,15 @@
 - количество фаз pipeline — проверка executor.py;
 - количество типов памяти — проверка backend/memory/.
 
-Нельзя писать «145+ endpoints» — только «130+ routes» (после проверки).
+Нельзя писать «145+ endpoints» — только проверенные значения (после подсчёта routes в `backend/api/`). Актуально: 18 роутеров в `backend/api/`.
 
 ## 3. Every architectural statement must reference implementation
 
 Утверждение о наличии компонента должно подкрепляться ссылкой на реализацию:
 
 ```
-Memory: 6 types implemented in backend/memory/
-Pipeline: 22 stages in backend/core/pipeline/phases/
+Memory: 7 types implemented in backend/memory/
+Pipeline: 25 phases (@register_phase) + Anti-Loop inline in backend/core/pipeline/
 ```
 
 Не «у нас есть память», а «6 типов памяти в backend/memory/».

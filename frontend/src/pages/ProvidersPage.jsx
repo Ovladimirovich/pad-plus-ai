@@ -205,21 +205,7 @@ export default function ProvidersPage() {
 
   // Загрузка моделей (из кэша или API)
   const loadModels = async (providerId, forceRefresh = false) => {
-    const status = getCacheStatus(providerId);
-    setCacheStatus(status);
-
-    if (!forceRefresh && status.status === 'fresh') {
-      const cached = getCachedModels(providerId);
-      if (cached) {
-        const availableModels = getAvailableModels(cached.models);
-        setProviderModels(availableModels);
-        return;
-      }
-    }
-
-    if (forceRefresh || status.status === 'stale' || status.status === 'none') {
-      await fetchModelsFromApi(providerId);
-    }
+    await fetchModelsFromApi(providerId, true);
   };
 
   const fetchModelsFromApi = async (providerId, forceRefresh = false) => {
@@ -235,14 +221,13 @@ export default function ProvidersPage() {
 
         cacheModels(providerId, models);
         setCacheStatus(getCacheStatus(providerId));
-        const availableModels = getAvailableModels(models);
-        setProviderModels(availableModels);
+        setProviderModels(models);
       } else {
-        useStaticModels(providerId);
+        setProviderModels([]);
       }
     } catch (error) {
       console.error('Failed to fetch models from API:', error);
-      useStaticModels(providerId);
+      setProviderModels([]);
     } finally {
       setIsRefreshing(false);
     }
@@ -388,6 +373,7 @@ export default function ProvidersPage() {
     setEditModel(key.model_preference);
     setEditName(key.name || '');
     setEditIsDefault(key.is_default || false);
+    loadModels(key.provider, true);
     
     // Для GigaChat ключ хранится как "clientId:clientSecret" — разбираем
     if (key.provider === 'gigachat' && key.api_key_encrypted) {

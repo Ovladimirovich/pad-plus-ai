@@ -315,10 +315,14 @@ async def _get_user_openrouter_key(user_id: str) -> Optional[str]:
     """Получает OpenRouter API ключ пользователя из таблицы user_api_keys."""
     try:
         from core.supabase_client import get_supabase
+        from core.encryption import get_encryptor
         supabase = get_supabase()
-        result = supabase.table("user_api_keys").select("api_key").eq("user_id", user_id).eq("provider", "openrouter").execute()
+        result = supabase.table("user_api_keys").select("api_key_encrypted").eq("user_id", user_id).eq("provider", "openrouter").execute()
         if result.data:
-            return result.data[0].get("api_key")
+            encrypted = result.data[0].get("api_key_encrypted")
+            if encrypted:
+                encryptor = get_encryptor()
+                return encryptor.decrypt(encrypted)
         return None
     except Exception as e:
         logger.warning(f"Не удалось получить ключ OpenRouter: {e}")

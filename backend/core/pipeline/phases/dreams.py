@@ -5,6 +5,7 @@ import os
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.dreams")
 
@@ -17,6 +18,7 @@ def _reset_dream_counter():
     _dialogs_since_dream = 0
 
 
+@register_phase("dreams", order=25)
 class DreamsPhase(PipelinePhase):
     name = "dreams"
 

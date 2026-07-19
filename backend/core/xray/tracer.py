@@ -119,6 +119,13 @@ class XRayTracer:
             if span.end_ms == 0:
                 span.end_ms = trace.total_ms
 
+        # Сохраняем в persistent storage
+        try:
+            from .history_recorder import get_xray_history
+            get_xray_history().add_trace(trace)
+        except Exception as e:
+            logger.warning(f"X-Ray history save error: {e}")
+
         logger.info(f"🔍 X-Ray trace finished: {trace.id} ({trace.total_ms:.0f}ms, {trace.model})")
         return trace
 

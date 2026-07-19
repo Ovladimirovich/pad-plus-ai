@@ -48,7 +48,7 @@ def _build_persona_system_deltas() -> Dict[str, List[Tuple[str, float]]]:
 
 @router.get("/deltas")
 async def get_persona_deltas():
-    from core.pipeline.phases.impulse_update import _IMPULSE_DELTAS
+    from core.impulse.deltas import _IMPULSE_DELTAS
 
     return {
         "emotion": {

@@ -2,1766 +2,446 @@
 
 *PAD+ = Pleasure, Arousal, Dominance + Curiosity, Confidence, Social Connection*
 
+> ⚠️ **Актуальность:** документ синхронизирован с реальными роутерами в `backend/api/` (июль 2026). Старые эндпоинты `/rag/*`, `/episodic/*`, `/semantic/*`, `/gigachat/*`, `/dreams/*`, `/autonomy/*`, `/plans/*` **удалены** — вместо них используйте `/api/v1/memory`, `/api/v1/xray`, `/api/v1/anatomy`, `/api/v1/experiments` и др.
+
 ## Base URL
 
 ```
 http://localhost:8007/api/v1
 ```
 
+Production: `https://pad-plus-ai.onrender.com/api/v1`
+
 ## Содержание
 
-1. [Chat](#chat)
-2. [Memory (RAG)](#memory-rag)
-3. [Episodic Memory](#episodic-memory)
-4. [Semantic Memory](#semantic-memory)
-5. [Facts](#facts)
-6. [Knowledge Graph](#knowledge-graph)
-7. [Emotions](#emotions)
-8. [Autonomy](#autonomy)
-9. [Dreams](#dreams)
-10. [Consolidation](#consolidation)
-11. [Hierarchical Plans](#hierarchical-plans)
-12. [Persona](#persona)
-13. [Pipeline](#pipeline)
-14. [Hygiene](#hygiene)
-15. [Safety](#safety)
-16. [Truth Loop](#truth-loop)
-17. [Events](#events)
-18. [Health](#health)
-19. [Meta-Cognition](#meta-cognition)
-20. [Analytics](#analytics)
-21. [Cache](#cache)
-22. [Feedback](#feedback)
-23. [Data Management](#data-management)
-24. [Sessions](#sessions)
-25. [Config](#config)
-26. [WebSocket](#websocket)
-27. [Rate Limiter](#rate-limiter)
-28. [Mind State](#mind-state)
+1. [Auth](#auth)
+2. [Providers & Keys](#providers--keys)
+3. [Chat & Mind State](#chat--mind-state)
+4. [🧬 Living Anatomy](#-living-anatomy)
+5. [Research Platform (Experiments)](#research-platform-experiments)
+6. [Decision Log](#decision-log)
+7. [X-Ray](#x-ray)
+8. [Metrics](#metrics)
+9. [Memory](#memory)
+10. [Knowledge Graph](#knowledge-graph)
+11. [Impulse Core](#impulse-core)
+12. [HEALER](#healer)
+13. [Experience](#experience)
+14. [Learning](#learning)
+15. [Documents & Collections](#documents--collections)
+16. [Dialogs](#dialogs)
+17. [Feedback](#feedback)
+18. [User & Settings](#user--settings)
+19. [Admin](#admin)
+20. [Sentry](#sentry)
+21. [Debug](#debug)
+22. [WebSocket](#websocket)
 
 ---
 
-## Chat
+## Auth
 
-### POST /chat
-
-Основной чат-эндпоинт через Pipeline Executor.
-
-**Request:**
-```json
-{
-  "prompt": "Привет!",
-  "context": {}
-}
-```
-
-**Response:**
-```json
-{
-  "prompt": "Привет!",
-  "response": "Привет! Чем могу помочь?",
-  "anti_directive": "Не закрепляй знания...",
-  "confidence": 0.85,
-  "provider": "gigachat",
-  "intent": "greeting",
-  "safety": {
-    "passed": true,
-    "warning": null
-  },
-  "truth": {
-    "confidence": 0.8,
-    "claims_verified": 2
-  },
-  "emotion_style": {
-    "tone": "friendly",
-    "verbosity": "moderate"
-  },
-  "rag_used": true,
-  "facts_used": 1,
-  "execution_time_ms": 250,
-  "success": true,
-  "errors": []
-}
-```
-
-### GET /chat/stream
-
-Потоковый чат (SSE).
-
-### GET /gigachat/test
-
-Тестовое подключение к GigaChat.
-
-### GET /gigachat/status
-
-Статус GigaChat.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/api/v1/auth/register` | Регистрация (Supabase) |
+| POST | `/api/v1/auth/login` | Вход |
+| GET | `/api/v1/auth/me` | Текущий пользователь |
+| POST | `/api/v1/auth/refresh` | Обновление токена |
 
 ---
 
-## Memory (RAG)
+## Providers & Keys
 
-### GET /rag/stats
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/providers` | Список доступных провайдеров |
+| GET | `/api/v1/providers/status` | Статус провайдеров |
+| GET | `/api/v1/providers/{provider_id}/models` | Модели провайдера |
+| GET | `/api/v1/keys` | Список ключей пользователя (пагинация) |
+| POST | `/api/v1/keys` | Добавить ключ |
+| PATCH | `/api/v1/keys/{key_id}` | Обновить ключ (модель, имя, is_default) |
+| DELETE | `/api/v1/keys/{key_id}` | Удалить ключ |
+| POST | `/api/v1/keys/{key_id}/set-default` | Сделать ключ основным |
+| POST | `/api/v1/keys/{key_id}/test` | Протестировать ключ |
+| GET | `/api/v1/keys/status/batch` | Статус всех ключей (с кэшем) |
+| POST | `/api/v1/keys/status/{key_id}/refresh` | Обновить статус ключа |
 
-Статистика RAG памяти v3.0.
+> ℹ️ Ранее существовавший `legacy_routes.py` (заглушки 503 для `/providers` и `/keys`) **удалён** — он был мёртвым кодом и не регистрировался в `main.py`.
 
-**Response:**
-```json
-{
-  "total_dialogs": 150,
-  "with_keywords": 140,
-  "summarized": 50,
-  "total_entities": 300,
-  "total_relations": 75,
-  "topic_distribution": {
-    "техническое": 45,
-    "философское": 20,
-    "личное": 30
-  },
-  "sentiment_distribution": {
-    "positive": 60,
-    "neutral": 80,
-    "negative": 10
-  },
-  "persist_dir": "data/chroma",
-  "version": "3.0",
-  "features": {
-    "hybrid_search": true,
-    "keyword_extraction": true,
-    "recency_ranking": true,
-    "auto_summarization": true,
-    "topic_classification": true,
-    "entity_extraction": true,
-    "relation_extraction": true,
-    "llm_summarization": false
-  }
-}
+---
+
+## Chat & Mind State
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/api/v1/chat` | Основной чат (авто-выбор провайдера/модели) |
+| POST | `/api/v1/chat/stream` | Потоковый чат (SSE) |
+| GET | `/api/v1/mind-state` | Полное состояние системы (PAD, persona, stats) |
+| GET | `/api/v1/system/full-status` | Полный статус всех систем |
+| GET | `/api/v1/events/recent` | История недавних событий |
+| GET | `/api/v1/metrics/activity` | Метрики активности |
+| GET | `/api/v1/models` | Список доступных моделей |
+| GET | `/api/v1/settings` | Настройки пользователя |
+| PATCH | `/api/v1/settings` | Обновить настройки |
+| GET | `/api/v1/health` | Health check |
+
+**Пример — основной чат:**
+```bash
+curl -X POST http://localhost:8007/api/v1/chat \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Привет!", "session_id": "sess-123"}'
 ```
 
-### GET /rag/topics
+---
 
-Статистика по темам диалогов.
+## 🧬 Living Anatomy
 
-### GET /rag/entities
+Визуализация когнитивной архитектуры в реальном времени. Источник: `backend/core/anatomy.py`.
 
-Индекс сущностей.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/anatomy` | Полное дерево живой анатомии (brain → 11 модулей → подмодули) |
+| GET | `/api/v1/anatomy/{module_id}` | Деталь конкретного модуля (component + decision_count) |
 
-### POST /rag/search
-
-Семантический поиск.
-
-**Request:**
+**Ответ `GET /api/v1/anatomy`:**
 ```json
 {
-  "query": "как настроить API",
-  "n_results": 5
-}
-```
-
-**Response:**
-```json
-{
-  "query": "как настроить API",
-  "results": [
-    {
-      "id": "abc123",
-      "document": "Вопрос: ... Ответ: ...",
-      "similarity": 0.89,
-      "topic": "техническое",
-      "entities": [...],
-      "relations": [...]
+  "brain": {
+    "label": "Brain",
+    "status": "active",
+    "metrics": { "modules": 11, "strategy": "reasoning" },
+    "children": {
+      "memory": {
+        "label": "Memory", "status": "active",
+        "metrics": { "modules": 5, "items": 1234 },
+        "children": {
+          "episodic":  { "label": "Episodic", "status": "active", "metrics": { "episodes": 500 } },
+          "semantic":  { "label": "Semantic", "status": "active", "metrics": { "knowledge": 300, "avg_confidence": 0.8 } },
+          "rag":       { "label": "RAG", "status": "active", "metrics": { "dialogs": 200 } },
+          "persona":   { "label": "Persona", "status": "active", "metrics": { "traits": 8, "interactions": 50 } },
+          "roots":     { "label": "Roots", "status": "active", "metrics": { "roots": 12 } }
+        }
+      },
+      "reasoning": { "label": "Reasoning", "status": "active", "metrics": { "strategy": "reasoning", "success_rate": 0.9, "decisions": 42 } },
+      "identity":  { "label": "Identity", "status": "active", "metrics": {} },
+      "emotion":   { "label": "Emotion", "status": "active", "metrics": { "pleasure": 0.1, "arousal": 0.2, "dominance": 0.0, "curiosity": 0.7, "confidence": 0.6 } },
+      "reflection":{ "label": "Reflection", "status": "active", "metrics": { "count": 10, "adjustments": 3 } },
+      "dreams":    { "label": "Dreams", "status": "active", "metrics": { "total_dreams": 5, "consolidated": 2, "is_dreaming": false } },
+      "truth":     { "label": "Truth", "status": "active", "metrics": { "claims": 100, "avg_confidence": 0.85 } },
+      "safety":    { "label": "Safety", "status": "active", "metrics": { "autonomy": true, "strict_mode": false, "requests_1m": 0 } },
+      "healer":    { "label": "Healer", "status": "active", "metrics": { "mode": "monitor", "remediations": 1, "cycles": 3 } },
+      "research":  { "label": "Research", "status": "active", "metrics": { "decisions": 42, "components": 5 } },
+      "xray":      { "label": "X-Ray", "status": "active", "metrics": { "traces": 7 } }
     }
-  ],
-  "total": 1
+  },
+  "timestamp": "2026-07-19T12:00:00"
 }
 ```
 
-### POST /rag/hybrid
+**Модули первого уровня:** `memory`, `reasoning`, `identity`, `emotion`, `reflection`, `dreams`, `truth`, `safety`, `healer`, `research`, `xray`.
 
-Гибридный поиск с ранжированием.
-
-**Request:**
-```json
-{
-  "query": "настройка",
-  "n_results": 5,
-  "use_keywords": true,
-  "use_recency": true
-}
-```
-
-### POST /rag/by-topic
-
-Поиск по теме.
-
-**Request:**
-```json
-{
-  "topic": "техническое",
-  "n_results": 5
-}
-```
-
-### GET /rag/recent
-
-Недавние диалоги.
-
-**Query:** `?days=7&limit=10`
-
-### POST /rag/keywords
-
-Поиск по ключевым словам.
-
-**Request:**
-```json
-{
-  "keywords": ["API", "настройка"],
-  "n_results": 5
-}
-```
-
-### POST /rag/clear
-
-Очистка RAG памяти.
+**Кросс-ссылка Decision Log** (поле `component` в детали модуля):
+`reflection`→reflection, `dreams`→reflection, `healer`→healing, `reasoning`→strategy_selector, `research`→provider_selector.
 
 ---
 
-## Episodic Memory
+## Research Platform (Experiments)
 
-### GET /episodic/stats
+Источник: `backend/api/experiments_routes.py`. Префикс `/api/v1/experiments`.
 
-Статистика эпизодической памяти.
-
-**Response:**
-```json
-{
-  "total_episodes": 150,
-  "with_emotional_context": 120,
-  "significant_episodes": 25,
-  "oldest_episode": "2026-02-17T10:00:00",
-  "newest_episode": "2026-02-21T10:00:00"
-}
-```
-
-### POST /episodic/search
-
-Поиск эпизодов.
-
-**Request:**
-```json
-{
-  "query": "разговор о Python",
-  "limit": 10
-}
-```
-
-### GET /episodic/timeline
-
-Timeline эпизодов.
-
-**Query:** `?days=7`
-
-### GET /episodic/significant
-
-Значимые эпизоды.
-
-### GET /episodic/emotional
-
-Эпизоды с эмоциональным контекстом.
-
-### GET /episodic/{id}
-
-Получить эпизод по ID.
-
-### GET /episodic/{id}/related
-
-Связанные эпизоды.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/experiments/runs` | Список прогонов экспериментов |
+| GET | `/api/v1/experiments/runs/{name}` | Детали прогона (raw + config + report) |
+| GET | `/api/v1/experiments/runs/{name}/report` | Отчёт прогона (markdown) |
+| GET | `/api/v1/experiments/compare?baseline=X&treatment=Y` | Сравнение двух прогонов |
+| GET | `/api/v1/experiments/traces` | Список X-Ray трасс |
+| GET | `/api/v1/experiments/traces/{trace_id}` | Детали трассы |
+| GET | `/api/v1/experiments/pipeline/registry` | Реестр фаз pipeline |
+| GET | `/api/v1/experiments/evals?limit=N` | Оценки качества (средние, по стратегиям/провайдерам) |
+| POST | `/api/v1/experiments/snapshot` | Создать снэпшот |
+| GET | `/api/v1/experiments/snapshots` | Список снэпшотов |
+| GET | `/api/v1/experiments/snapshots/{snapshot_id}` | Детали снэпшота |
+| POST | `/api/v1/experiments/snapshots/{snapshot_id}/link-to-run/{run_name}` | Привязать снэпшот к прогону |
+| GET | `/api/v1/experiments/snapshots/{snapshot_id}/decisions` | Решения Decision Log после снэпшота |
 
 ---
 
-## Semantic Memory
+## Decision Log
 
-### GET /semantic/stats
+Источник: `backend/api/decisions_routes.py`. Префикс `/api/v1/decisions`.
 
-Статистика семантической памяти.
-
-**Response:**
-```json
-{
-  "total_concepts": 200,
-  "by_category": {
-    "declarative": 100,
-    "procedural": 30,
-    "conceptual": 50,
-    "metacognitive": 20
-  }
-}
-```
-
-### POST /semantic/search
-
-Поиск концепций.
-
-**Request:**
-```json
-{
-  "query": "программирование",
-  "category": "conceptual",
-  "limit": 10
-}
-```
-
-### GET /semantic/{id}
-
-Получить концепцию по ID.
-
-### GET /semantic/self
-
-Метакогнитивные знания о себе.
-
-### POST /semantic/procedure/{id}/apply
-
-Применить процедурное знание.
-
-### GET /semantic/procedure/find
-
-Найти процедуру по триггеру.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/decisions?component=&type=&session=&trace=&since=` | Список решений (фильтры) |
+| GET | `/api/v1/decisions/stats` | Статистика решений |
+| GET | `/api/v1/decisions/{decision_id}` | Детали решения |
+| GET | `/api/v1/decisions/session/{session_id}` | Решения сессии |
 
 ---
 
-## Facts
+## X-Ray
 
-### POST /facts
+Источник: `backend/api/xray_routes.py`. Префикс `/api/v1/xray`.
 
-Создать факт.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/xray/brain/status` | Статус X-Ray Brain (system_state + meta_learner + reflection) |
+| GET | `/api/v1/xray/brain/strategies` | Статистика по стратегиям Brain |
+| POST | `/api/v1/xray/brain/strategy` | Принудительно установить стратегию |
+| GET | `/api/v1/xray/stats` | Общая статистика X-Ray |
+| GET | `/api/v1/xray/active` | Активные сессии трассировки |
+| GET | `/api/v1/xray/recent` | Последние завершённые трассы |
+| GET | `/api/v1/xray/sessions` | Список сессий |
+| GET | `/api/v1/xray/sessions/{session_id}` | Детали сессии |
+| GET | `/api/v1/xray/sessions/{session_id}/export` | Экспорт сессии (json/csv) |
+| DELETE | `/api/v1/xray/sessions/{session_id}` | Удаление сессии |
+| GET | `/api/v1/xray/pipeline/stages` | Стадии pipeline для визуализации |
+| POST | `/api/v1/xray/trace/start` | Начало сессии трассировки |
+| POST | `/api/v1/xray/trace/complete` | Завершение сессии трассировки |
+| WS | `/api/v1/xray/ws` | WebSocket real-time событий |
 
-**Request:**
-```json
-{
-  "subject": "Python",
-  "predicate": "is_a",
-  "object": "programming language",
-  "confidence": 0.9,
-  "source": "user"
-}
-```
+---
 
-### GET /facts/stats
+## Metrics
 
-Статистика фактов.
+Источник: `backend/api/metrics_routes.py`. Префикс `/api/v1/metrics`.
 
-### POST /facts/search
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/metrics/pipeline` | Статистика pipeline (counters, histograms, timeseries) |
+| GET | `/api/v1/metrics/system` | Системные метрики (CPU, память, соединения, стоимость) |
+| GET | `/api/v1/metrics/dashboard` | Метрики для дашборда (JSON) |
+| GET | `/api/v1/metrics/summary` | Краткая сводка |
+| GET | `/api/v1/metrics/memory` | Метрики памяти (Memory Manager) |
+| GET | `/api/v1/metrics/db-circuit-breaker` | Статус DB Circuit Breaker |
+| POST | `/api/v1/metrics/reset` | Сброс всех метрик |
 
-Поиск фактов.
+---
 
-**Request:**
-```json
-{
-  "query": "Python",
-  "limit": 10
-}
-```
+## Memory
 
-### GET /facts/contradictions
+Источник: `backend/api/memory_routes.py`. Префикс `/api/v1/memory`.
 
-Найти противоречия в фактах.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/memory/dashboard` | Агрегированная статистика всех систем памяти |
+| POST | `/api/v1/memory/consolidation/trigger` | Ручной запуск консолидации |
+
+> Детальные операции по эпизодам/семантике доступны через MemoryManager (`backend/memory/`) и агрегируются в `dashboard`.
 
 ---
 
 ## Knowledge Graph
 
-### GET /knowledge/graph
+Источник: `backend/api/knowledge_routes.py`. Префикс `/api/v1/knowledge`.
 
-Получить граф знаний.
-
-**Response:**
-```json
-{
-  "nodes": [
-    {
-      "id": "concept_1",
-      "name": "Python",
-      "type": "language",
-      "confidence": 0.9
-    }
-  ],
-  "links": [
-    {
-      "source": "concept_1",
-      "target": "concept_2",
-      "type": "related"
-    }
-  ],
-  "stats": {
-    "nodes": 10,
-    "edges": 15,
-    "density": 0.33
-  }
-}
-```
-
-### POST /knowledge/concepts
-
-Создать концепцию.
-
-**Request:**
-```json
-{
-  "name": "Machine Learning",
-  "type": "concept",
-  "confidence": 0.8,
-  "metadata": {}
-}
-```
-
-### POST /knowledge/relations
-
-Создать связь.
-
-**Request:**
-```json
-{
-  "source_id": "concept_1",
-  "target_id": "concept_2",
-  "type": "related",
-  "weight": 1.0
-}
-```
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/knowledge/graph` | Полный граф для визуализации |
+| GET | `/api/v1/knowledge/stats` | Статистика графа |
+| GET | `/api/v1/knowledge/search` | Поиск концепций |
+| GET | `/api/v1/knowledge/related/{concept_id}` | Связанные концепции |
+| GET | `/api/v1/knowledge/semantic-search` | Семантический поиск (vector) |
+| POST | `/api/v1/knowledge/concepts` | Добавить концепцию |
+| POST | `/api/v1/knowledge/concepts/batch` | Пакетное добавление |
+| POST | `/api/v1/knowledge/relations` | Добавить связь |
+| PATCH | `/api/v1/knowledge/relations` | Обновить/создать связь |
+| POST | `/api/v1/knowledge/extract` | Извлечь концепции/связи из текста |
+| POST | `/api/v1/knowledge/recompute-embeddings` | Перегенерация эмбеддингов |
+| POST | `/api/v1/knowledge/concepts/{concept_id}/merge` | Объединить концепции |
+| DELETE | `/api/v1/knowledge/concepts/{concept_id}` | Удалить концепцию |
 
 ---
 
-## Emotions
+## Impulse Core
 
-### GET /emotion/state
+Источник: `backend/api/impulse_routes.py`. Префикс `/api/v1/impulse`.
 
-Текущее эмоциональное состояние (PAD+).
-
-**Response:**
-```json
-{
-  "удовольствие": 0.3,
-  "возбуждение": 0.5,
-  "доминирование": 0.2,
-  "любопытство": 0.8,
-  "уверенность": 0.6,
-  "социальная_связь": 0.4,
-  "updated_at": "2026-02-20T15:00:00",
-  "trigger": "user_interaction",
-  "style": {
-    "tone": "friendly",
-    "verbosity": "moderate",
-    "color": "balanced"
-  }
-}
-```
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/impulse` | Текущее состояние импульсного ядра |
+| PUT | `/api/v1/impulse` | Установить веса импульсов |
+| PUT | `/api/v1/impulse/question` | Установить импульс по строке вопроса |
+| POST | `/api/v1/impulse/push` | Сохранить состояние в стек |
+| POST | `/api/v1/impulse/pop` | Восстановить из стека |
+| GET | `/api/v1/impulse/labels` | Все метки импульсов |
+| POST | `/api/v1/impulse/preset` | Установить пресет (strict/balanced/creative) |
 
 ---
 
-## Autonomy
+## HEALER
 
-### GET /autonomy/status
+Источник: `backend/api/healer_routes.py`. Префикс `/api/v1/healer`.
 
-Статус автономных процессов.
-
-**Response:**
-```json
-{
-  "planner": {
-    "running": true,
-    "pending_tasks": 5,
-    "completed_tasks": 42,
-    "dialog_count": 100,
-    "reflection_interval": 10,
-    "last_auto_reflection": "2026-02-20T10:00:00"
-  },
-  "quality": {
-    "total_assessed": 50,
-    "average_score": 0.75,
-    "low_quality_count": 5
-  },
-  "knowledge_extractions": 25,
-  "self_reflection": {
-    "last_reflection": "2026-02-20T10:00:00",
-    "total_findings": 12
-  }
-}
-```
-
-### POST /autonomy/start
-
-Запустить планировщик.
-
-### POST /autonomy/stop
-
-Остановить планировщик.
-
-### POST /autonomy/reflect
-
-Запустить саморефлексию.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/healer/status` | Статус HealerListener |
+| GET | `/api/v1/healer/mode` | Текущий режим (monitor/suggest/auto) |
+| POST | `/api/v1/healer/mode` | Установить режим |
+| POST | `/api/v1/healer/diagnose` | Ручная диагностика |
+| GET | `/api/v1/healer/reports` | Последние отчёты диагностики |
+| GET | `/api/v1/healer/remediation` | История remediate-действий |
+| GET | `/api/v1/healer/tone` | Статус ToneEngine |
+| POST | `/api/v1/healer/tone` | Вкл/выкл ToneEngine |
+| GET | `/api/v1/healer/bridge/status` | Статус HealerBridge |
+| POST | `/api/v1/healer/bridge/diagnose` | Диагностика HEALER |
+| POST | `/api/v1/healer/bridge/cycle` | Полный healing cycle |
+| GET | `/api/v1/healer/bridge/orchestrator` | Статус Orchestrator |
+| GET | `/api/v1/healer/bridge/reflection/latest` | Последняя рефлексия |
+| GET | `/api/v1/healer/bridge/changes` | Список изменений HEALER |
+| POST | `/api/v1/healer/bridge/rollback/{patch_id}` | Откат патча |
+| GET/POST/DELETE/PUT | `/api/v1/healer/bridge/auto-cycle` | Управление автоциклами |
 
 ---
 
-## Dreams
+## Experience
 
-### GET /dreams/stats
+Источник: `backend/api/experience_routes.py`. Префикс `/api/v1/admin/experiences`.
 
-Статистика сновидений.
-
-**Response:**
-```json
-{
-  "total_dreams": 25,
-  "last_dream": "2026-02-21T05:00:00",
-  "insights_found": 15,
-  "connections_created": 30,
-  "phases_used": {
-    "NREM1": 25,
-    "NREM2": 25,
-    "NREM3": 20,
-    "REM": 15
-  }
-}
-```
-
-### POST /dreams/run
-
-Запустить сновидение.
-
-**Response:**
-```json
-{
-  "status": "completed",
-  "phase": "REM",
-  "duration_seconds": 5.2,
-  "insights": [
-    "Обнаружена связь между Python и Machine Learning"
-  ],
-  "connections_created": 3
-}
-```
-
-### GET /dreams/last
-
-Последнее сновидение.
-
-### GET /dreams/should-dream
-
-Проверка необходимости сновидения.
-
-**Response:**
-```json
-{
-  "should_dream": true,
-  "reason": "Низкая активность более 5 минут",
-  "memory_accumulated": 150
-}
-```
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/admin/experiences` | Список записей опыта (фильтр/пагинация) |
+| GET | `/api/v1/admin/experiences/stats` | Сводка по опыту |
 
 ---
 
-## Consolidation
+## Learning
 
-### GET /consolidation/stats
+Источник: `backend/api/learning_routes.py`. Префикс `/api/v1/learning`.
 
-Статистика консолидации.
-
-**Response:**
-```json
-{
-  "total_consolidations": 10,
-  "last_consolidation": "2026-02-21T05:00:00",
-  "episodic_to_semantic": 50,
-  "facts_extracted": 25,
-  "patterns_found": 10
-}
-```
-
-### POST /consolidation/run
-
-Запустить консолидацию памяти.
-
-**Response:**
-```json
-{
-  "status": "completed",
-  "duration_seconds": 3.5,
-  "episodes_processed": 100,
-  "concepts_created": 5,
-  "patterns_found": 3
-}
-```
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/learning/stats` | Статистика обучения |
+| GET | `/api/v1/learning/evaluation/recent` | Последние оценки |
+| GET | `/api/v1/learning/experience/stats` | Статистика experience-learner |
+| GET | `/api/v1/learning/experience/recent` | Последние опыты |
+| GET | `/api/v1/learning/active/policy` | Состояние active-policy |
+| POST | `/api/v1/learning/active/reset` | Сброс active-policy |
 
 ---
 
-## Hierarchical Plans
+## Documents & Collections
 
-### GET /plans/stats
+Источник: `backend/api/document_routes.py`. Префикс `/api/v1`.
 
-Статистика планов.
-
-**Response:**
-```json
-{
-  "total_goals": 5,
-  "total_tasks": 15,
-  "total_actions": 50,
-  "completed_actions": 30,
-  "active_goals": 3
-}
-```
-
-### GET /plans/hierarchy
-
-Полная иерархия планов.
-
-**Response:**
-```json
-{
-  "goals": [
-    {
-      "id": "goal_1",
-      "title": "Улучшить качество ответов",
-      "status": "in_progress",
-      "progress": 0.6,
-      "tasks": [
-        {
-          "id": "task_1",
-          "title": "Анализ проблемных областей",
-          "status": "completed",
-          "actions": [...]
-        }
-      ]
-    }
-  ]
-}
-```
-
-### GET /plans/goals
-
-Список целей.
-
-### POST /plans/goals
-
-Создать цель.
-
-**Request:**
-```json
-{
-  "title": "Улучшить память",
-  "description": "Оптимизировать извлечение контекста",
-  "priority": 0.8
-}
-```
-
-### GET /plans/next-actions
-
-Следующие действия.
-
-**Response:**
-```json
-{
-  "actions": [
-    {
-      "id": "action_1",
-      "title": "Запустить рефлексию",
-      "priority": 0.9,
-      "goal_id": "goal_1",
-      "task_id": "task_1"
-    }
-  ]
-}
-```
-
-### GET /plans/{id}
-
-Получить план по ID.
-
-### PUT /plans/{id}/progress
-
-Обновить прогресс.
-
-**Request:**
-```json
-{
-  "progress": 0.7
-}
-```
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/api/v1/documents/upload` | Загрузка документа |
+| GET | `/api/v1/documents` | Список документов |
+| GET | `/api/v1/documents/stats` | Статистика документов |
+| GET | `/api/v1/documents/{document_id}` | Детали документа |
+| PATCH | `/api/v1/documents/{document_id}` | Обновить документ |
+| DELETE | `/api/v1/documents/{document_id}` | Удалить документ |
+| GET | `/api/v1/documents/trash` | Корзина |
+| POST | `/api/v1/documents/{document_id}/restore` | Восстановить из корзины |
+| DELETE | `/api/v1/documents/trash/clear` | Очистить корзину |
+| GET | `/api/v1/documents/search` | RAG-поиск |
+| GET | `/api/v1/documents/settings` | Настройки обработки |
+| POST | `/api/v1/documents/from-url` | Загрузка из URL |
+| GET | `/api/v1/collections` | Список коллекций |
+| POST | `/api/v1/collections` | Создать коллекцию |
+| DELETE | `/api/v1/collections/{collection_id}` | Удалить коллекцию |
 
 ---
 
-## Persona
-
-### GET /persona/stats
-
-Статистика персоны.
-
-**Response:**
-```json
-{
-  "traits_count": 8,
-  "total_interactions": 150,
-  "reflections_count": 25,
-  "dominant_traits": ["curiosity", "helpfulness", "adaptability"]
-}
-```
-
-### GET /persona/traits
-
-Все черты характера.
-
-**Response:**
-```json
-{
-  "traits": {
-    "curiosity": {
-      "name": "Любопытство",
-      "value": 0.85,
-      "description": "Интерес к новому",
-      "stability": 0.9
-    },
-    "helpfulness": {
-      "name": "Помощь",
-      "value": 0.9,
-      "description": "Стремление помочь",
-      "stability": 0.95
-    }
-  }
-}
-```
-
-### POST /persona/adjust
-
-Корректировка черты.
-
-**Request:**
-```json
-{
-  "trait": "curiosity",
-  "delta": 0.1
-}
-```
-
-### GET /persona/values
-
-Ценности и принципы.
-
-### GET /persona/reflections
-
-Недавние саморефлексии.
-
-**Query:** `?limit=5`
-
-### POST /persona/reflect
-
-Добавить саморефлексию.
-
-**Request:**
-```json
-{
-  "insight": "Пользователь предпочитает краткие ответы",
-  "action": "Уменьшить многословность",
-  "confidence": 0.7
-}
-```
-
-### GET /persona/context
-
-Контекст личности для промптов.
-
----
-
-## Pipeline
-
-### GET /pipeline/stats
-
-Статистика пайплайна.
-
-**Response:**
-```json
-{
-  "total_calls": 500,
-  "successful_calls": 480,
-  "failed_calls": 20,
-  "avg_execution_time_ms": 200,
-  "stages": {
-    "safety": {"calls": 500, "avg_ms": 5},
-    "intent": {"calls": 500, "avg_ms": 10},
-    "retrieve": {"calls": 500, "avg_ms": 50},
-    "generate": {"calls": 500, "avg_ms": 150}
-  }
-}
-```
-
----
-
-## Hygiene
-
-### GET /hygiene/stats
-
-Статистика гигиены памяти.
-
-**Response:**
-```json
-{
-  "total_cleanups": 10,
-  "last_cleanup": "2026-02-20T10:00:00",
-  "config": {
-    "similarity_threshold": 0.85,
-    "obsolete_days": 90,
-    "usefulness_threshold": 0.2,
-    "max_items": 10000
-  },
-  "memory_stats": {
-    "rag_count": 150,
-    "facts_count": 50
-  }
-}
-```
-
-### POST /hygiene/analyze
-
-Анализ памяти (dry run).
-
-**Query:** `?dry_run=true`
-
-**Response:**
-```json
-{
-  "items_scanned": 500,
-  "duration_seconds": 2.5,
-  "duplicates": {
-    "found": 15,
-    "removed": 0
-  },
-  "obsolete": {
-    "found": 8,
-    "removed": 0
-  },
-  "low_quality": {
-    "found": 3
-  },
-  "recommendations": [
-    "Найдено 15 дубликатов — рекомендуется очистка",
-    "8 записей устарели (более 90 дней)"
-  ]
-}
-```
-
-### POST /hygiene/cleanup
-
-Выполнить очистку памяти.
-
-### POST /hygiene/config
-
-Обновить настройки гигиены.
-
-**Request:**
-```json
-{
-  "similarity_threshold": 0.9,
-  "obsolete_days": 60
-}
-```
-
----
-
-## Safety
-
-### GET /safety/stats
-
-Статистика безопасности.
-
-**Response:**
-```json
-{
-  "requests_last_minute": 5,
-  "autonomous_actions": 12,
-  "strict_mode": false,
-  "blocked_requests": 3,
-  "warnings": 5
-}
-```
-
-### POST /safety/check
-
-Проверка текста на безопасность.
-
-**Request:**
-```json
-{
-  "text": "Обычный запрос"
-}
-```
-
-**Response:**
-```json
-{
-  "passed": true,
-  "warning": null,
-  "risk_level": "low",
-  "checks": {
-    "injection": false,
-    "harmful": false,
-    "recursive": false
-  }
-}
-```
-
-### POST /safety/strict-mode
-
-Включить/выключить строгий режим.
-
-**Query:** `?enable=true`
-
----
-
-## Truth Loop
-
-### GET /truth/stats
-
-Статистика верификации.
-
-**Response:**
-```json
-{
-  "total_claims": 100,
-  "average_confidence": 0.75,
-  "verified_claims": 80,
-  "contradictions_found": 5
-}
-```
-
-### POST /truth/verify
-
-Верификация текста.
-
-**Request:**
-```json
-{
-  "text": "Python был создан в 1991 году"
-}
-```
-
-**Response:**
-```json
-{
-  "claims": [
-    {
-      "text": "Python был создан в 1991 году",
-      "confidence": 0.9,
-      "verified": true,
-      "sources": ["internal_knowledge"]
-    }
-  ],
-  "overall_confidence": 0.9
-}
-```
-
----
-
-## Events
-
-### GET /events/history
-
-История событий.
-
-**Query:** `?limit=20`
-
-**Response:**
-```json
-{
-  "events": [
-    {
-      "id": "evt_1",
-      "type": "chat.message",
-      "data": {...},
-      "timestamp": "2026-02-20T15:00:00"
-    }
-  ],
-  "total": 20
-}
-```
-
-### GET /events/stats
-
-Статистика событий.
-
-**Response:**
-```json
-{
-  "total_events": 500,
-  "handlers_count": 5,
-  "events_by_type": {
-    "chat.message": 200,
-    "memory.stored": 150,
-    "emotion.changed": 50
-  }
-}
-```
-
----
-
-## Health
-
-### GET /health
-
-Оценка когнитивного здоровья.
-
-**Response:**
-```json
-{
-  "overall_score": 0.85,
-  "status": "healthy",
-  "metrics": {
-    "cognitive_clarity": 0.9,
-    "memory_integrity": 0.85,
-    "emotional_stability": 0.8,
-    "response_quality": 0.85,
-    "learning_progress": 0.75
-  },
-  "timestamp": "2026-02-20T15:00:00"
-}
-```
-
-### GET /health/report
-
-Текстовый отчёт о здоровье.
-
-### GET /health/issues
-
-Проблемы здоровья.
-
-**Response:**
-```json
-{
-  "issues": [
-    {
-      "type": "high_load",
-      "severity": "warning",
-      "message": "Когнитивная нагрузка высока",
-      "recommendation": "Снизить активность"
-    }
-  ],
-  "total": 1
-}
-```
-
-### GET /health/recommendations
-
-Рекомендации по улучшению.
-
-### POST /health/metric
-
-Обновить метрику здоровья.
-
-**Request:**
-```json
-{
-  "name": "cognitive_clarity",
-  "value": 0.9,
-  "reason": "Хороший отдых"
-}
-```
-
-### POST /health/event
-
-Записать событие здоровья.
-
-**Request:**
-```json
-{
-  "event_type": "user_praise",
-  "impact": 0.1
-}
-```
-
----
-
-## Meta-Cognition
-
-### GET /meta/stats
-
-Статистика мета-когнитивного контроллера.
-
-**Response:**
-```json
-{
-  "state": "idle",
-  "total_requests": 500,
-  "strategy_distribution": {
-    "simple": 200,
-    "deep": 150,
-    "creative": 50,
-    "reflective": 100
-  },
-  "successful_adaptations": 25,
-  "cognitive_load": {
-    "current": 0.3,
-    "memory_usage": 0.4,
-    "processing_queue": 0,
-    "recent_errors": 0
-  },
-  "subsystems": 8,
-  "recent_decisions": 10
-}
-```
-
-### GET /meta/report
-
-Мета-когнитивный отчёт.
-
-### GET /meta/load
-
-Оценка когнитивной нагрузки.
-
-**Response:**
-```json
-{
-  "current": 0.3,
-  "memory_usage": 0.4,
-  "processing_queue": 0,
-  "recent_errors": 0,
-  "last_updated": "2026-02-20T15:00:00"
-}
-```
-
-### GET /meta/state
-
-Текущее состояние системы.
-
-### POST /meta/decide
-
-Выбрать стратегию обработки.
-
-**Request:**
-```json
-{
-  "query": "Объясни квантовую физику",
-  "context": {}
-}
-```
-
-**Response:**
-```json
-{
-  "strategy": "deep",
-  "reason": "Запрос требует глубокого анализа",
-  "confidence": 0.85,
-  "estimated_time": 4.0,
-  "resources_needed": ["rag", "knowledge_graph", "facts", "truth_loop"]
-}
-```
-
-### GET /meta/subsystems
-
-Статус подсистем.
-
-### POST /meta/adapt
-
-Адаптация на основе обратной связи.
-
-**Request:**
-```json
-{
-  "success": true,
-  "strategy": "deep",
-  "response_time": 3.5,
-  "reason": "Хороший ответ"
-}
-```
-
----
-
-## Analytics
-
-### GET /analytics/dashboard
-
-Метрики дашборда.
-
-**Query:** `?days=7`
-
-### GET /analytics/activity
-
-Граф активностей.
-
-**Query:** `?days=7`
-
-### GET /analytics/topics
-
-Статистика по темам.
-
-**Query:** `?days=7&limit=10`
-
-### GET /analytics/report
-
-Полный отчёт аналитики.
-
-**Query:** `?days=7`
-
-**Response:**
-```json
-{
-  "dashboard": {
-    "total_messages": 500,
-    "messages_by_role": {
-      "user": 250,
-      "ai": 250
-    },
-    "avg_session_length": 8
-  },
-  "activity": {
-    "hourly": {
-      "data": [5, 10, 15, ...],
-      "labels": ["00:00", "01:00", ...],
-      "peak_hour": 14
-    },
-    "weekday": {
-      "data": [50, 60, 70, ...],
-      "labels": ["Пн", "Вт", ...],
-      "peak_day": "Ср"
-    }
-  },
-  "topics": {
-    "top_topics": [
-      {"topic": "программирование", "count": 45},
-      {"topic": "API", "count": 30}
-    ]
-  }
-}
-```
-
----
-
-## Cache
-
-### GET /cache/stats
-
-Статистика кэша ответов.
-
-**Response:**
-```json
-{
-  "total_entries": 100,
-  "cache_hits": 500,
-  "cache_misses": 200,
-  "hit_rate": 0.71,
-  "total_size_bytes": 50000
-}
-```
-
-### GET /cache/top
-
-Топ запросов из кэша.
-
-**Query:** `?limit=10`
-
-### POST /cache/invalidate
-
-Инвалидация кэша.
-
-**Query:** `?all=true`
+## Dialogs
+
+Источник: `backend/api/dialog_routes.py`. Префикс `/api/v1/dialogs`.
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/dialogs` | Список диалогов (пагинация, фильтр избранного) |
+| GET | `/api/v1/dialogs/stats` | Статистика диалогов |
+| GET | `/api/v1/dialogs/search` | Поиск по диалогам |
+| GET | `/api/v1/dialogs/{dialog_id}` | Детали диалога с сообщениями |
+| DELETE | `/api/v1/dialogs/{dialog_id}` | Удалить диалог |
+| DELETE | `/api/v1/dialogs` | Очистить всю историю |
+| POST | `/api/v1/dialogs/{dialog_id}/favorite` | Вкл/выкл избранное |
+| POST | `/api/v1/dialogs/{dialog_id}/export` | Экспорт (json/txt) |
 
 ---
 
 ## Feedback
 
-### POST /feedback
+Источник: `backend/api/feedback_routes.py`. Префикс `/api/v1/feedback`.
 
-Добавить обратную связь.
-
-**Request:**
-```json
-{
-  "user_message": "Что такое Python?",
-  "ai_response": "Python — это язык программирования...",
-  "feedback_type": "thumbs_up",
-  "rating": 5,
-  "comment": "Отличный ответ!",
-  "intent": "question",
-  "provider": "gigachat"
-}
-```
-
-### GET /feedback/stats
-
-Статистика обратной связи.
-
-**Response:**
-```json
-{
-  "total_feedback": 100,
-  "by_type": {
-    "thumbs_up": 60,
-    "thumbs_down": 10,
-    "rating": 20,
-    "correction": 10
-  },
-  "average_rating": 4.5,
-  "satisfaction_rate": 0.85
-}
-```
-
-### GET /feedback/problems
-
-Проблемные области.
-
-### GET /feedback/recommendations
-
-Рекомендации по улучшению.
-
-### GET /feedback/training-data
-
-Данные для обучения (RLHF).
-
-**Query:** `?limit=100`
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/api/v1/feedback` | Отправить оценку ответа |
+| GET | `/api/v1/feedback/stats` | Статистика обратной связи |
 
 ---
 
-## Data Management
+## User & Settings
 
-### POST /data/export
+Источник: `backend/api/user_routes.py`. Префикс `/api/v1/user`.
 
-Экспорт всех данных.
-
-**Response:**
-```json
-{
-  "status": "exported",
-  "filepath": "data/backups/neuromind_2026_02_20.json",
-  "timestamp": "2026-02-20T15:00:00"
-}
-```
-
-### GET /data/exports
-
-Список backup файлов.
-
-### POST /data/import
-
-Импорт данных из backup.
-
-**Request:**
-```json
-{
-  "filepath": "data/backups/neuromind_2026_02_20.json",
-  "merge": true
-}
-```
-
-### POST /data/cleanup
-
-Очистка старых backup.
-
-**Query:** `?keep=10`
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/user/profile` | Профиль пользователя |
+| PATCH | `/api/v1/user/profile` | Обновить профиль |
+| PATCH | `/api/v1/user/password` | Смена пароля |
+| POST | `/api/v1/user/avatar` | Загрузить аватар |
+| DELETE | `/api/v1/user/avatar` | Удалить аватар |
+| GET | `/api/v1/user/persona` | Настройки persona |
+| PATCH | `/api/v1/user/persona` | Обновить настройки persona |
+| GET | `/api/v1/user/notifications` | Настройки уведомлений |
+| PATCH | `/api/v1/user/notifications` | Обновить уведомления |
+| GET | `/api/v1/user/appearance` | Настройки внешнего вида |
+| PATCH | `/api/v1/user/appearance` | Обновить внешний вид |
+| GET | `/api/v1/user/settings` | Все настройки пользователя |
 
 ---
 
-## Sessions
+## Admin
 
-### POST /sessions
+Источник: `backend/api/admin_routes.py`, `backend/api/persona_routes.py`. Префикс `/api/v1/admin`.
 
-Создать новую сессию.
-
-**Request:**
-```json
-{
-  "settings": {
-    "language": "ru",
-    "verbose": true
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "session_id": "sess_abc123",
-  "created_at": "2026-02-20T15:00:00",
-  "settings": {
-    "language": "ru",
-    "verbose": true
-  }
-}
-```
-
-### GET /sessions/{session_id}
-
-Получить сессию.
-
-### DELETE /sessions/{session_id}
-
-Завершить сессию.
-
-### GET /sessions/stats
-
-Статистика сессий.
-
-### POST /sessions/{session_id}/settings
-
-Обновить настройки сессии.
-
-**Request:**
-```json
-{
-  "settings": {
-    "language": "en"
-  }
-}
-```
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/admin/emotion` | Статистика эмоций (learner + PAD) |
+| GET | `/api/v1/admin/sync` | Статус cross-memory sync |
+| POST | `/api/v1/admin/sync/trigger` | Запуск синхронизации памяти |
+| GET | `/api/v1/admin/health` | Когнитивное здоровье системы |
+| GET | `/api/v1/admin/persona/deltas` | Дельты эволюции эмоций/импульсов/персоны |
 
 ---
 
-## Config
+## Sentry
 
-### GET /config
+Источник: `backend/api/sentry_routes.py`. Префикс `/api/v1/sentry`.
 
-Получить всю конфигурацию.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/sentry/webhook` | Верификация webhook Sentry |
+| POST | `/api/v1/sentry/webhook` | Обработка webhook Sentry (запуск HEALER) |
 
-### GET /config/{key}
+---
 
-Получить значение конфигурации.
+## Debug
 
-### POST /config
+Источник: `backend/api/debug_routes.py`. Префикс `/api/v1/debug` (только при `DEBUG=true`).
 
-Установить значение конфигурации.
-
-**Request:**
-```json
-{
-  "key": "safety.strict_mode",
-  "value": true,
-  "description": "Включить строгий режим"
-}
-```
-
-### POST /config/{key}/reset
-
-Сбросить значение к умолчанию.
-
-### GET /config/validate
-
-Валидация конфигурации.
-
-### GET /config/export
-
-Экспорт конфигурации в .env формат.
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/v1/debug/gigachat` | Диагностика GigaChat (env/URL/DNS/TCP) |
+| GET | `/api/v1/debug/key-access` | Диагностика доступа к API-ключам |
 
 ---
 
 ## WebSocket
 
-### GET /websocket/stats
-
-Статистика WebSocket соединений.
-
-**Response:**
-```json
-{
-  "active_connections": 5,
-  "total_messages": 500,
-  "total_connections": 20
-}
-```
+| Путь | Описание |
+|------|----------|
+| `WS /api/v1/xray/ws` | Real-time события X-Ray (трассы, мысли, статус) |
+| `WS /ws` или `WS /ws/{client_id}` | Общие real-time события системы |
 
 ---
 
-## Rate Limiter
-
-### GET /rate-limiter/stats
-
-Статистика Rate Limiter.
-
-**Response:**
-```json
-{
-  "total_requests": 1000,
-  "blocked_requests": 50,
-  "active_clients": 10
-}
-```
-
-### GET /rate-limiter/client/{client_id}
-
-Статистика по клиенту.
-
-### POST /rate-limiter/reset/{client_id}
-
-Сброс лимитов для клиента.
-
----
-
-## Roots Memory
-
-### GET /roots
-
-Все корневые знания.
-
-**Response:**
-```json
-{
-  "roots": [
-    {
-      "id": "root_1",
-      "category": "philosophy",
-      "content": "Сомнение — основа познания",
-      "confidence": 1.0
-    }
-  ],
-  "total": 10,
-  "categories": {
-    "philosophy": 5,
-    "ethics": 3,
-    "identity": 2
-  }
-}
-```
-
-### GET /roots/categories
-
-Категории корневых знаний.
-
-### GET /roots/philosophy
-
-Философские принципы.
-
-### GET /roots/ethics
-
-Этические принципы.
-
-### GET /roots/identity
-
-Факты об идентичности.
-
-### POST /roots/search
-
-Поиск в корневых знаниях.
-
-**Request:**
-```json
-{
-  "query": "сознание",
-  "limit": 10
-}
-```
-
-### GET /roots/context
-
-Экспорт для контекста LLM.
-
----
-
-## Mind State
-
-### GET /mind-state
-
-Полное состояние системы.
-
-**Response:**
-```json
-{
-  "emotion": {
-    "удовольствие": 0.3,
-    "возбуждение": 0.5,
-    "доминирование": 0.2,
-    "любопытство": 0.8,
-    "уверенность": 0.6,
-    "социальная_связь": 0.4,
-    "style": {
-      "tone": "friendly",
-      "verbosity": "moderate",
-      "color": "balanced"
-    }
-  },
-  "memory": {
-    "rag": {
-      "total_dialogs": 150,
-      "total_entities": 300
-    },
-    "facts": {
-      "total_facts": 50
-    }
-  },
-  "knowledge": {
-    "nodes": 10,
-    "edges": 15
-  },
-  "autonomy": {
-    "running": true,
-    "dialog_count": 42,
-    "quality_stats": {
-      "average_score": 0.75
-    }
-  },
-  "truth": {
-    "total_claims": 100,
-    "average_confidence": 0.75
-  },
-  "safety": {
-    "requests_last_minute": 5,
-    "autonomous_actions": 12
-  },
-  "events": {
-    "total_events": 200,
-    "handlers_count": 5
-  },
-  "timestamp": "2026-02-20T15:00:00"
-}
-```
-
----
-
-## Error Responses
-
-Все эндпоинты возвращают ошибки в формате:
-
-```json
-{
-  "detail": "Описание ошибки",
-  "status_code": 400
-}
-```
-
-## Rate Limiting
-
-- Стандартные запросы: 60/мин
-- Чат: 10/мин
-- Поиск: 30/мин
-
-## Interactive Documentation
-
-- **Swagger UI:** http://localhost:8007/docs
-- **ReDoc:** http://localhost:8007/redoc
-
----
-
-## Аутентификация (Supabase Auth)
-
-### POST /api/v1/auth/register
-
-Регистрация нового пользователя.
-
-**Request:**
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePass123!",
-  "full_name": "Имя Фамилия"
-}
-```
-
-**Response:**
-```json
-{
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ...",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "full_name": "Имя Фамилия"
-  }
-}
-```
-
-### POST /api/v1/auth/login
-
-Вход пользователя.
-
-**Request:**
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePass123!"
-}
-```
-
-### GET /api/v1/auth/me
-
-Получение текущего пользователя.
-
-**Headers:** `Authorization: Bearer <token>`
-
----
-
-## Управление ключами
-
-### GET /api/v1/keys
-
-Список API ключей пользователя.
-
-**Query:** `?offset=0&limit=100`
-
-**Response:**
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "provider": "gigachat",
-      "provider_display_name": "GigaChat",
-      "name": "Мой ключ",
-      "model_preference": "GigaChat",
-      "is_default": true,
-      "is_active": true,
-      "created_at": "2026-04-07T...",
-      "has_key": true
-    }
-  ]
-}
-```
-
-### POST /api/v1/keys
-
-Добавление API ключа.
-
-**Request:**
-```json
-{
-  "provider": "gigachat",
-  "api_key": "OTkyNTczMWUt...",
-  "name": "GigaChat Key",
-  "model_preference": "GigaChat",
-  "is_default": true
-}
-```
-
-### PATCH /api/v1/keys/{key_id}
-
-Обновление ключа (модель, имя, статус).
-
-**Request:**
-```json
-{
-  "model_preference": "GigaChat-Pro"
-}
-```
-
-### DELETE /api/v1/keys/{key_id}
-
-Удаление ключа.
-
-### POST /api/v1/keys/{key_id}/set-default
-
-Установить ключ по умолчанию.
-
-### POST /api/v1/keys/{key_id}/test
-
-Тест подключения ключа.
-
----
-
-## Провайдеры
-
-### GET /api/v1/providers
-
-Список всех доступных провайдеров.
-
-### GET /api/v1/models
-
-Список всех доступных моделей.
-
-**Query:** `?provider=openai`
-
-### GET /api/v1/providers/{provider_id}/models
-
-Модели конкретного провайдера.
-
-**Пример:** `GET /api/v1/providers/groq/models`
+## Прочее
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/info` | Корневой info-эндпоинт (версия 4.0) |

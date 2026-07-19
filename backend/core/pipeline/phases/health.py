@@ -3,10 +3,12 @@ import logging
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.health")
 
 
+@register_phase("health", order=23)
 class HealthMonitorPhase(PipelinePhase):
     name = "health_monitor"
 

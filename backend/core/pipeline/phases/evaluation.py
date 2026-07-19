@@ -1,16 +1,18 @@
 import logging
 from typing import Optional
 
-from core.pipeline.base import PipelinePhase
-from core.pipeline.models import PhaseResult
-from core.pipeline.context import PipelineContext
-from learning.evaluator import SelfEvaluator, get_evaluator
-from learning.collector import DataCollector, get_collector
-from learning.active import get_active_policy
+from ..base import PipelinePhase
+from ..models import PhaseResult
+from ..context import PipelineContext
+from backend.learning.evaluator import SelfEvaluator, get_evaluator
+from backend.learning.collector import DataCollector, get_collector
+from backend.learning.active import get_active_policy
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.evaluation")
 
 
+@register_phase("evaluation", order=14)
 class EvaluationPhase(PipelinePhase):
     name = "evaluation"
 

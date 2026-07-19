@@ -562,8 +562,9 @@ async def list_keys(
     supabase = get_db_client(current_user)
     if not supabase:
         raise HTTPException(status_code=500, detail="БД не подключена")
-    
+
     user_id = current_user["id"]
+    logger.info(f"?? list_keys called for user={user_id}, offset={offset}, limit={limit}")
     
     # Ограничиваем limit
     limit = min(max(limit, 1), 100)
@@ -1224,6 +1225,7 @@ async def chat(
             
             # Сохраняем диалог в fallback-пути
             try:
+                dialog_id = request.dialog_id
                 if request.dialog_id:
                     current = supabase.table("dialogs").select("message_count").eq("id", request.dialog_id).execute()
                     current_count = current.data[0].get("message_count", 0) if current.data else 0
@@ -1282,8 +1284,6 @@ async def chat(
                 final_model = model
             
             # === СОХРАНЕНИЕ ДИАЛОГА И СООБЩЕНИЙ ===
-            dialog_id = request.dialog_id
-
             try:
                 if request.dialog_id:
                     # Обновляем существующий диалог
@@ -1377,12 +1377,16 @@ async def chat(
                         "result": result_dict,
                         "provider": final_provider,
                         "model": final_model,
+                        "request_id": getattr(result, 'request_id', None),
+                        "session_id": getattr(result, 'session_id', None),
                         "pipeline": {
                             "response": result.response[:500] if hasattr(result, 'response') else "",
                             "strategy": getattr(result, 'strategy', 'unknown'),
                             "intent": getattr(result, 'intent', 'unknown'),
                             "confidence": getattr(result, 'confidence', 0),
                             "truth_confidence": getattr(result, 'truth_confidence', 0),
+                            "execution_time_ms": getattr(result, 'execution_time_ms', 0),
+                            "success": getattr(result, 'success', False),
                         }
                     })
                 except Exception as xray_err:

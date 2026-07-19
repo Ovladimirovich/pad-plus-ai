@@ -14,34 +14,8 @@ import uuid
 
 from .models import PipelineState, DegradationInfo, PhaseResult, PipelineResult
 from .context import PipelineContext
-from .phases import (
-    AntiLoopPhase,
-    SafetyPhase,
-    IntentPhase,
-    RagPhase,
-    KnowledgeGraphPhase,
-    EpisodicPhase,
-    SemanticPhase,
-    EmotionPhase,
-    ImpulsePhase,
-    PersonaPhase,
-    RootsPhase,
-    IdentityPhase,
-    GeneratePhase,
-    TruthLoopPhase,
-    EvaluationPhase,
-    SaveEpisodePhase,
-    ExtractionPhase,
-    EmotionUpdatePhase,
-    ImpulseUpdatePhase,
-    PersonaEvolutionPhase,
-    EventsBroadcastPhase,
-    HealthMonitorPhase,
-    ReflectionPhase,
-    DreamsPhase,
-    MetricsPhase,
-    ResponseGuardPhase,
-)
+from .phases import AntiLoopPhase, MetricsPhase
+from .registry import get_registry
 
 # Фазы, которые выполняются fire-and-forget после отправки ответа.
 # Не влияют на ответ, только на внутреннее состояние системы.
@@ -85,35 +59,12 @@ class PipelineExecutor:
         self._phases = self._build_phases()
 
     def _build_phases(self):
-        return [
-            ("safety", SafetyPhase()),
-            ("intent", IntentPhase()),
-            ("rag", RagPhase()),
-            ("knowledge_graph", KnowledgeGraphPhase()),
-            ("episodic", EpisodicPhase()),
-            ("semantic", SemanticPhase()),
-            ("emotion", EmotionPhase()),
-            ("impulse", ImpulsePhase()),
-            ("persona", PersonaPhase()),
-            ("roots", RootsPhase()),
-            ("identity", IdentityPhase()),
-            ("generate", GeneratePhase()),
-            ("truth_loop", TruthLoopPhase()),
-            ("evaluation", EvaluationPhase()),
-            ("save_episode", SaveEpisodePhase()),
-            ("extraction", ExtractionPhase()),
-            ("emotion_update", EmotionUpdatePhase()),
-            ("impulse_update", ImpulseUpdatePhase()),
-            ("consolidation", None),  # встроено в execute
-            ("procedure_success", None),  # встроено в execute
-            ("persona_evolution", PersonaEvolutionPhase()),
-            ("events_broadcast", EventsBroadcastPhase()),
-            ("health", HealthMonitorPhase()),
-            ("reflection", ReflectionPhase()),
-            ("dreams", DreamsPhase()),
-            ("metrics", MetricsPhase(self)),
-            ("response_guard", ResponseGuardPhase()),
-        ]
+        registry = get_registry()
+        phases = registry.build(skip={"metrics"})
+        phases.append(("metrics", MetricsPhase(self)))
+        phases.append(("consolidation", None))
+        phases.append(("procedure_success", None))
+        return phases
 
     def _mark_degraded(self, component: str, error: str, severity: str = "medium", fallback_applied: bool = False):
         degradation = DegradationInfo(
@@ -203,23 +154,39 @@ class PipelineExecutor:
         # Проверяем принудительную стратегию (установлена через API)
         override = get_strategy_override()
         if override:
+            self._log_strategy_decision(user_message, override, "override", 1.0)
             return override
 
         text_lower = user_message.lower().strip()
+        candidates = []
         if any(kw in text_lower for kw in ["почему ты", "как ты", "что ты думаешь о себе", "саморефлексия"]):
-            return "reflective"
+            sel, reason = "reflective", "Ключевые слова саморефлексии"
+            self._log_strategy_decision(user_message, sel, reason, 0.9, candidates)
+            return sel
         if any(kw in text_lower for kw in ["запомни", "выучи", "новый факт", "добавь в память", "сохрани"]):
-            return "learning"
+            sel, reason = "learning", "Ключевые слова обучения/памяти"
+            self._log_strategy_decision(user_message, sel, reason, 0.9, candidates)
+            return sel
         if any(kw in text_lower for kw in ["придумай", "сочини", "креативно", "оригинально", "необычно"]):
-            return "creative"
+            sel, reason = "creative", "Ключевые слова креативности"
+            self._log_strategy_decision(user_message, sel, reason, 0.9, candidates)
+            return sel
         if sum(1 for kw in ["почему", "как работает", "объясни", "проанализируй", "сравни", "разбери", "детально", "подробно", "глубоко"] if kw in text_lower) >= 2 or (len(user_message) > 50 and "почему" in text_lower):
-            return "reasoning"
+            sel, reason = "reasoning", "2+ аналитических ключевых слова или 'почему' в длинном сообщении"
+            self._log_strategy_decision(user_message, sel, reason, 0.8, candidates)
+            return sel
         if any(kw in text_lower for kw in ["привет", "здравствуй", "как дела", "что делаешь", "спасибо", "пока", "до свидания", "ок", "хорошо"]):
-            return "simple"
+            sel, reason = "simple", "Приветствие / короткий ответ"
+            self._log_strategy_decision(user_message, sel, reason, 0.85, candidates)
+            return sel
         if len(user_message) < 20:
-            return "simple"
+            sel, reason = "simple", "Короткое сообщение (<20 символов)"
+            self._log_strategy_decision(user_message, sel, reason, 0.7, candidates)
+            return sel
         if len(user_message) < 100:
-            return "retrieval"
+            sel, reason = "retrieval", "Среднее сообщение (<100 символов) — RAG"
+            self._log_strategy_decision(user_message, sel, reason, 0.7, candidates)
+            return sel
 
         # Meta-Learner: рекомендация на основе исторической статистики
         try:
@@ -227,11 +194,32 @@ class PipelineExecutor:
             ml = get_meta_learner()
             recommended = ml.get_strategy_recommendation()
             if recommended:
+                self._log_strategy_decision(user_message, recommended, "Рекомендация MetaLearner", 0.75, candidates)
                 return recommended
         except Exception:
             pass
 
+        self._log_strategy_decision(user_message, "reasoning", "Дефолт (2+ ключевых слова / fallback)", 0.6, candidates)
         return "reasoning"
+
+    def _log_strategy_decision(self, user_message: str, selected: str, reason: str, confidence: float, candidates: list) -> None:
+        try:
+            from backend.core.decisions import get_decision_recorder
+            rec = get_decision_recorder()
+            rec.record(
+                component="strategy_selector",
+                decision_type="strategy_selection",
+                selected=selected,
+                confidence=confidence,
+                reason=reason,
+                input_factors={
+                    "message_length": len(user_message),
+                    "message_preview": user_message[:60],
+                },
+                candidates=candidates or [],
+            )
+        except Exception as e:
+            logger.warning("Decision log (strategy) failed: %s", e)
 
     def _fire_background_phases(self, ctx: PipelineContext, result: PipelineResult, request_id: str, start_time: float):
         """Запускает background-фазы fire-and-forget после ответа пользователю."""
@@ -371,6 +359,7 @@ class PipelineExecutor:
 
         # === X-RAY: инициализация трассировки ===
         request_id = str(uuid.uuid4())
+        result.request_id = request_id
         ctx.context["xray_request_id"] = request_id
 
         # Привязываем trace_id к Sentry (если SDK активен)
@@ -716,13 +705,67 @@ class PipelineExecutor:
         try:
             from core.xray import get_trace_collector
             tc = get_trace_collector()
+
+            # B2: структурированное объяснение ответа
+            eval_data = result.metadata.get("evaluation") or {}
+            explanation = {
+                "strategy_why": (
+                    f"Выбрана стратегия '{result.strategy}' на основе намерения "
+                    f"'{result.intent}' и длины сообщения "
+                    f"({len(user_message)} символов)."
+                ),
+                "phases_ran": [
+                    name for name, _ in self._phases
+                    if name not in _BACKGROUND_PHASES
+                    and not (result.strategy == "simple" and name in _simple_skip)
+                ],
+                "memory_used": {
+                    "rag": result.sources.get("rag", {}).get("count", 0) if isinstance(result.sources.get("rag"), dict) else 0,
+                    "episodic": result.sources.get("episodic", {}).get("count", 0),
+                    "knowledge_graph": len(result.sources.get("graph", {}).get("concepts", [])),
+                },
+                "confidence_why": (
+                    f"Итоговая уверенность {result.confidence:.2f} сформирована фазами "
+                    f"генерации и идентичности; truth_confidence={result.truth_confidence:.2f}."
+                ),
+                "truth_notes": (
+                    f"Проверено утверждений: {result.claims_verified}; "
+                    f"truth_confidence={result.truth_confidence:.2f}."
+                    if result.truth_confidence else "Проверка истинности не применялась."
+                ),
+                "evaluation_notes": eval_data.get("details", {}) if isinstance(eval_data, dict) else {},
+                "evaluation": {
+                    "score": eval_data.get("score") if isinstance(eval_data, dict) else None,
+                    "passed": eval_data.get("passed") if isinstance(eval_data, dict) else None,
+                    "summary": eval_data.get("summary") if isinstance(eval_data, dict) else None,
+                    "details": eval_data.get("details", {}) if isinstance(eval_data, dict) else {},
+                },
+            }
+
             tc.complete_session(request_id, {
                 "response_preview": (result.response or "")[:200],
                 "success": result.success,
                 "strategy": result.strategy,
                 "intent": result.intent,
                 "execution_time_ms": result.execution_time_ms,
+                "provider": result.sources.get("llm", {}).get("provider", ""),
+                "model": result.sources.get("llm", {}).get("model", ""),
+                "confidence": result.confidence,
+                "truth_confidence": result.truth_confidence,
+                "explanation": explanation,
             })
+
+            # B1: сохраняем сессию трассировки в персистентное хранилище,
+            # чтобы /api/v1/xray/sessions и /api/v1/experiments/traces были заполнены.
+            try:
+                from core.xray.history_recorder import get_xray_history
+                session = tc.get_session(request_id)
+                if session is not None:
+                    session_dict = session.get_summary()
+                    session_dict["events"] = [e.to_dict() for e in session.events]
+                    get_xray_history().add_trace_session(session_dict)
+            except Exception as hist_err:
+                logger.warning(f"X-Ray history save error: {hist_err}")
         except Exception as e:
             logger.warning(f"X-Ray session complete error: {e}")
 

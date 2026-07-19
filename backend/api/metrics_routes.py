@@ -28,16 +28,33 @@ async def metrics_prometheus():
 @router.get("/dashboard")
 async def dashboard_metrics():
     """Метрики для дашборда в формате JSON"""
-    return {
-        "status": "ok",
-        "message": "Dashboard metrics"
-    }
+    try:
+        from core.metrics_collector import get_metrics
+        collector = get_metrics()
+        return collector.get_dashboard_data()
+    except Exception as e:
+        logger.warning(f"Dashboard metrics unavailable: {e}")
+        return {"error": str(e)}
 
 
 @router.get("/summary")
 async def metrics_summary():
     """Краткая сводка метрик"""
-    return {"status": "ok"}
+    try:
+        from core.metrics_collector import get_metrics
+        collector = get_metrics()
+        data = collector.get_dashboard_data()
+        return {
+            "uptime_seconds": data.get("uptime_seconds", 0),
+            "counters": data.get("counters", {}),
+            "gauges": data.get("gauges", {}),
+            "histograms": {
+                k: {"count": v.get("count"), "avg": v.get("avg"), "p95": v.get("p95")}
+                for k, v in data.get("histograms", {}).items()
+            },
+        }
+    except Exception:
+        return {"status": "ok"}
 
 
 @router.get("/db-circuit-breaker")
@@ -55,18 +72,12 @@ async def db_circuit_breaker_status():
 async def pipeline_stats():
     """Статистика пайплайна обработки"""
     try:
-        from core.pipeline.metrics_collector import get_metrics_collector
-        collector = get_metrics_collector()
-        return collector.get_stats() if hasattr(collector, 'get_stats') else {}
-    except ImportError:
-        pass
-
-    try:
-        from core.metrics_collector import get_metrics_collector
-        collector = get_metrics_collector()
-        return collector.get_stats() if hasattr(collector, 'get_stats') else {}
+        from core.metrics_collector import get_metrics
+        collector = get_metrics()
+        return collector.get_dashboard_data()
     except Exception as e:
-        return {"error": str(e)}
+        logger.warning(f"Pipeline metrics unavailable: {e}")
+        return {}
 
 
 @router.get("/system")

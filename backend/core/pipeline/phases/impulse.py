@@ -3,10 +3,12 @@ import logging
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.impulse")
 
 
+@register_phase("impulse", order=8)
 class ImpulsePhase(PipelinePhase):
     """Pre-generate: читает impulse state и кладёт bias в ctx.context."""
 

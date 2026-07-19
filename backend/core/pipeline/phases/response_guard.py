@@ -3,10 +3,12 @@ import logging
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.response_guard")
 
 
+@register_phase("response_guard", order=27)
 class ResponseGuardPhase(PipelinePhase):
     name = "response_guard"
 

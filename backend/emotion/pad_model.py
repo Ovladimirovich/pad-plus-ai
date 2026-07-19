@@ -177,6 +177,10 @@ class PADModel:
         os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
         with open(self.state_file, 'w', encoding='utf-8') as f:
             json.dump(self._state.to_dict(), f, ensure_ascii=False, indent=2)
+
+    def save(self):
+        """Публичный метод сохранения состояния (обёртка над _save)."""
+        self._save()
     
     def _start_decay_thread(self):
         """Запускает фоновое затухание эмоций"""

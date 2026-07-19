@@ -3,10 +3,12 @@ import logging
 from ..base import PipelinePhase
 from ..context import PipelineContext
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.extraction")
 
 
+@register_phase("extraction", order=16)
 class ExtractionPhase(PipelinePhase):
     """Фаза извлечения концепций из сообщения пользователя.
     Работает без LLM — только частотный анализ + шаблоны.
