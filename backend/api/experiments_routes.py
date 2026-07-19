@@ -106,7 +106,15 @@ def _process_run_dir(run_dir: Path) -> dict | None:
 
 
 def _list_runs() -> list[dict]:
+    # Гарантируем наличие директорий (на Render experiments/ не коммитится)
+    try:
+        EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
+        RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.warning(f"Cannot create experiments dirs: {e}")
     runs = _scan_dir(RUNS_DIR)
+    if not EXPERIMENTS_DIR.exists():
+        return runs
     for d in sorted(EXPERIMENTS_DIR.iterdir(), reverse=True):
         if d.name.startswith("I-") and d.is_dir():
             entry = _process_run_dir(d)
@@ -697,7 +705,8 @@ async def compare_providers(
                 _f.write(f"{provider}: api_key_type={type(api_key)} key_map_keys={list(key_map.keys())} p.key_id={p.get('key_id')} api_key_repr={repr(api_key)[:300]}\n")
         except Exception as _ef:
             try:
-                with open(r"C:\пад ал датабаз а  чистый\PAD+ AI чистый\backend\data\debug_compare.txt", "a", encoding="utf-8") as _f:
+                _fallback = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "data", "debug_compare_fallback.txt")
+                with open(_fallback, "a", encoding="utf-8") as _f:
                     _f.write(f"ERR writing: {_ef}\n")
             except Exception:
                 pass
