@@ -102,7 +102,11 @@ chroma_data/
 .playwright-mcp/
 traces/
 spans/
-experiments/
+# Experiments: seed-эксперименты (I-*) и шаблоны коммитим, runtime-данные — нет
+experiments/runs/
+experiments/snapshots/
+experiments/reports/
+experiments/__pycache__/
 HEALER/data/trace_store/
 index.json
 healer_viewer*.png
