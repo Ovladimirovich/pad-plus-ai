@@ -96,7 +96,7 @@ class GeneratePhase(PipelinePhase):
                     api_key=user_api_key,
                     model=None,
                     provider=user_provider,
-                    max_tokens=14000,
+                    max_tokens=8000,
                 )
 
                 response_data = gen_result.response

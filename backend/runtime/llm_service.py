@@ -238,30 +238,53 @@ class LLMService:
             "X-Title": "PAD+ AI",
         }
 
-        try:
-            _resp = await self._session.post(
-                f"{base_url}/chat/completions",
-                json=body,
-                headers=headers,
-                timeout=self._timeout,
-            )
-            _status = _resp.status_code
-            _raw = await _resp.aread()
-        except httpx.TimeoutException as _e:
-            raise ValueError(f"OpenRouter timeout: {_e}")
-        except Exception as _e:
-            _err_str = str(_e)
-            raise ValueError(f"OpenRouter HTTP error: {_err_str[:500]}")
-        response = _raw
-        status_code = _status
-
-        if status_code != 200:
+        # Retry при 402 (недостаточно кредитов): OpenRouter возвращает
+        # "can only afford N" — уменьшаем max_tokens с запасом и повторяем.
+        _current_max = max_tokens
+        _last_err = None
+        for _attempt in range(3):
+            if _current_max and _current_max != body.get("max_tokens"):
+                body["max_tokens"] = _current_max
             try:
-                raw = response.decode("utf-8", errors="replace")[:500]
-            except Exception:
-                raw = ""
-            logger.error(f"HTTP error {status_code}: {raw}")
-            raise ValueError(f"Ошибка API: {status_code} - {raw}")
+                _resp = await self._session.post(
+                    f"{base_url}/chat/completions",
+                    json=body,
+                    headers=headers,
+                    timeout=self._timeout,
+                )
+                _status = _resp.status_code
+                _raw = await _resp.aread()
+            except httpx.TimeoutException as _e:
+                raise ValueError(f"OpenRouter timeout: {_e}")
+            except Exception as _e:
+                _err_str = str(_e)
+                raise ValueError(f"OpenRouter HTTP error: {_err_str[:500]}")
+            response = _raw
+            status_code = _status
+
+            if status_code != 200:
+                try:
+                    raw = response.decode("utf-8", errors="replace")[:500]
+                except Exception:
+                    raw = ""
+                logger.error(f"HTTP error {status_code}: {raw}")
+                # 402: парсим доступный лимит токенов и ретраим с меньшим max_tokens
+                if status_code == 402 and _current_max:
+                    import re
+                    m = re.search(r"can only afford\s+(\d+)", raw)
+                    if m:
+                        affordable = int(m.group(1))
+                        # Запас 5%, чтобы не упереться в лимит вплотную
+                        _current_max = max(256, int(affordable * 0.95))
+                        logger.warning(
+                            f"OpenRouter 402: снижаем max_tokens до {_current_max} (было {max_tokens})"
+                        )
+                        continue
+                raise ValueError(f"Ошибка API: {status_code} - {raw}")
+            break
+        else:
+            if _last_err:
+                raise _last_err
 
         try:
             raw_text = response.decode("utf-8", errors="replace")
@@ -533,39 +556,64 @@ class LLMService:
             "X-Title": "PAD+ AI",
         }
 
-        try:
-            async with self._session.stream(
-                "POST",
-                f"{base_url}/chat/completions",
-                json=body,
-                headers=headers,
-                timeout=self._timeout,
-            ) as response:
-                if response.status_code != 200:
-                    error_body = await response.aread()
-                    error_text = error_body.decode("utf-8", errors="replace")[:500]
-                    raise ValueError(f"Ошибка API: {response.status_code} - {error_text}")
-
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    if line.startswith("data: "):
-                        data_str = line[6:].strip()
-                        if data_str == "[DONE]":
-                            break
-                        try:
-                            chunk_data = json_module.loads(data_str)
-                            delta = chunk_data.get("choices", [{}])[0].get("delta", {})
-                            content = delta.get("content", "")
-                            if content:
-                                content = content.encode("ascii", errors="replace").decode("ascii")
-                                yield content
-                        except json_module.JSONDecodeError:
-                            continue
-        except httpx.TimeoutException:
-            raise ValueError("OpenRouter timeout: сервер не отвечает. Попробуйте позже.")
-        except Exception as e:
-            raise ValueError(f"OpenRouter stream error: {e}") from e
+        _current_max = max_tokens
+        for _attempt in range(3):
+            if _current_max and _current_max != body.get("max_tokens"):
+                body["max_tokens"] = _current_max
+            _retry_402 = False
+            try:
+                async with self._session.stream(
+                    "POST",
+                    f"{base_url}/chat/completions",
+                    json=body,
+                    headers=headers,
+                    timeout=self._timeout,
+                ) as response:
+                    if response.status_code != 200:
+                        error_body = await response.aread()
+                        error_text = error_body.decode("utf-8", errors="replace")[:500]
+                        # 402: ретраим со сниженным max_tokens
+                        if response.status_code == 402 and _current_max:
+                            import re
+                            m = re.search(r"can only afford\s+(\d+)", error_text)
+                            if m:
+                                affordable = int(m.group(1))
+                                _current_max = max(256, int(affordable * 0.95))
+                                logger.warning(
+                                    f"OpenRouter 402 (stream): снижаем max_tokens до {_current_max}"
+                                )
+                                _retry_402 = True
+                        if not _retry_402:
+                            raise ValueError(f"Ошибка API: {response.status_code} - {error_text}")
+                    else:
+                        async for line in response.aiter_lines():
+                            if not line:
+                                continue
+                            if line.startswith("data: "):
+                                data_str = line[6:].strip()
+                                if data_str == "[DONE]":
+                                    break
+                                try:
+                                    chunk_data = json_module.loads(data_str)
+                                    delta = chunk_data.get("choices", [{}])[0].get("delta", {})
+                                    content = delta.get("content", "")
+                                    if content:
+                                        content = content.encode("ascii", errors="replace").decode("ascii")
+                                        yield content
+                                except json_module.JSONDecodeError:
+                                    continue
+                        break
+            except httpx.TimeoutException:
+                raise ValueError("OpenRouter timeout: сервер не отвечает. Попробуйте позже.")
+            except ValueError:
+                if _retry_402:
+                    continue
+                raise
+            except Exception as e:
+                raise ValueError(f"OpenRouter stream error: {e}") from e
+            if _retry_402:
+                continue
+            break
 
     async def _stream_gigachat(
         self,
