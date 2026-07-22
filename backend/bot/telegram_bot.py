@@ -135,7 +135,7 @@ async def cmd_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "💬 PAD+ AI Chat — сообщество для обсуждения проекта.\n\n"
-        "Ссылка: https://t.me/ВАША_ССЫЛКА_ЧАТА\n\n"
+        "Ссылка: https://t.me/padplusai_chat\n\n"
         "Обсуждаем архитектуру, фичи, баги, идеи. "
         "Сюда можно прийти с вопросом или предложением."
     )
