@@ -116,10 +116,64 @@ Open Source · Apache 2.0
 | `/pipeline` | 25 фаз когнитивного пайплайна |
 | `/article1` | Ссылка на первую статью dev.to |
 | `/article2` | https://dev.to/_a9de0f38ed294cfb7e5e/x-ray-for-ai-or-how-i-stopped-understanding-my-own-neural-network-and-built-my-own-apm-2l4p |
+| `/chat` | Ссылка на чат-группу @padplusai_chat |
 | `/github` | Ссылка на GitHub |
 | `/demo` | Ссылка на живое демо Render |
 | `/channel` | Ссылка на канал @padplusai |
 | `/feedback` | Контакт автора |
+
+---
+
+## Чат-группа @padplusai_chat
+
+### Описание чата
+
+**RU:**
+PAD+ AI Chat — сообщество для обсуждения когнитивной архитектуры, AI-наблюдаемости, X-Ray и open source.
+Сюда можно прийти с вопросом, идеей или предложением.
+
+Правила:
+• Без спама и рекламы
+• Конструктивное обсуждение
+• Английский и русский — оба приветствуются
+
+**EN:**
+PAD+ AI Chat — community for discussing cognitive architecture, AI observability, X-Ray, and open source.
+
+Rules:
+• No spam or advertising
+• Constructive discussion only
+• English and Russian are both welcome
+
+### Приветственное сообщение (закрепить в чате)
+
+```
+👋 Добро пожаловать в PAD+ AI Chat!
+
+PAD+ AI — open-source исследовательская платформа для когнитивных архитектур поверх LLM.
+25 фаз, 6 типов памяти, X-Ray наблюдаемость, Research Platform.
+
+📌 Полезные ссылки:
+🐙 GitHub: github.com/Ovladimirovich/pad-plus-ai
+📢 Канал: @padplusai
+🤖 Бот: @padplusai_bot
+📖 Статья 1: dev.to (часть 1)
+📖 Статья 2: dev.to (часть 2)
+🌐 Демо: pad-plus-ai.onrender.com
+
+Обсуждаем архитектуру, фичи, баги, идеи, open source коллаборацию.
+По вопросам к автору: @Ovladimirovich
+```
+
+### Настройка чата
+
+1. Создать группу или супергруппу в Telegram
+2. Username: `padplusai_chat`
+3. Закрепить приветственное сообщение (выше)
+4. Установить описание группы (выше)
+5. Добавить бота @padplusai_bot в группу как администратора (чтобы он мог отвечать на команды)
+
+---
 
 ### Как создать бота
 
@@ -138,6 +192,7 @@ xray — X-Ray: наблюдаемость AI-систем
 pipeline — 25 фаз когнитивного пайплайна
 article1 — Первая статья на dev.to
 article2 — Вторая статья на dev.to
+chat — Чат-группа для обсуждения проекта
 github — Ссылка на GitHub репозиторий
 demo — Живое демо на Render
 channel — Канал @padplusai
@@ -197,5 +252,9 @@ def main():
    - `/setcommands` — список команд
    - `/setdescription` — описание
    - `/setuserpic` — аватар
-5. **Опубликовать первый пост** о выходе v4.1
-6. **Пригласить меня** — я помогу с написанием первого бота на Python, если нужен будет код
+5. **Настроить чат-группу** @padplusai_chat:
+   - Создать супергруппу
+   - Добавить описание и закрепить приветствие
+   - Добавить бота @padplusai_bot
+6. **Опубликовать первый пост** о выходе v4.1
+7. **Пригласить меня** — я помогу с настройкой бота или чата

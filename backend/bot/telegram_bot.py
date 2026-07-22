@@ -30,6 +30,7 @@ COMMANDS = [
     BotCommand("demo", "Живое демо на Render"),
     BotCommand("channel", "Канал @padplusai"),
     BotCommand("feedback", "Связаться с автором"),
+    BotCommand("chat", "Чат-группа для обсуждения проекта"),
 ]
 
 WELCOME_TEXT = """
@@ -42,6 +43,7 @@ PAD+ AI — это open-source исследовательская платфор
 📡 /xray — что такое X-Ray наблюдаемость
 📖 /article1 — первая статья (Eng)
 📖 /article2 — вторая статья (Eng)
+💬 /chat — чат-группа проекта
 🐙 /github — ссылка на репозиторий
 🌐 /demo — живое демо на Render
 📢 /channel — наш канал @padplusai
@@ -130,6 +132,15 @@ async def cmd_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
+async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "💬 PAD+ AI Chat — сообщество для обсуждения проекта.\n\n"
+        "Ссылка: https://t.me/ВАША_ССЫЛКА_ЧАТА\n\n"
+        "Обсуждаем архитектуру, фичи, баги, идеи. "
+        "Сюда можно прийти с вопросом или предложением."
+    )
+
+
 async def cmd_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "💬 По вопросам и предложениям — @Ovladimirovich\n"
@@ -149,6 +160,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("github", cmd_github))
     app.add_handler(CommandHandler("demo", cmd_demo))
     app.add_handler(CommandHandler("channel", cmd_channel))
+    app.add_handler(CommandHandler("chat", cmd_chat))
     app.add_handler(CommandHandler("feedback", cmd_feedback))
 
     return app
