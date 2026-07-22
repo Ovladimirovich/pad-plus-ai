@@ -1,11 +1,20 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from telegram import BotCommand, Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 logger = logging.getLogger(__name__)
+
+# Load .env from project root or current dir
+for dotenv_path in [Path(__file__).parent.parent.parent / ".env", Path.cwd() / ".env"]:
+    if dotenv_path.exists():
+        load_dotenv(dotenv_path)
+        logger.info("Loaded environment from %s", dotenv_path)
+        break
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 BOT_ENABLED = bool(BOT_TOKEN) and BOT_TOKEN != "your_telegram_bot_token"
