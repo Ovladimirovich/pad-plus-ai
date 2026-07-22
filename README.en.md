@@ -1,7 +1,13 @@
-# PAD+ AI v4.0
+<p align="right">
+  <a href="README.md">🇷🇺 Русский</a>
+</p>
+
+# PAD+ AI v4.1
 
 <p align="center">
   <strong>Cognitive Architecture for Language Models</strong>
+  <br>
+  <a href="https://pad-plus-ai.onrender.com">🌐 pad-plus-ai.onrender.com</a>
 </p>
 
 <p align="center">
@@ -10,9 +16,10 @@
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React 18">
   <img src="https://img.shields.io/badge/PostgreSQL-15-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 15">
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase">
-  <img src="https://img.shields.io/badge/v4.0--release-6ca949c-blue?style=flat-square" alt="v4.0">
+  <img src="https://img.shields.io/badge/v4.1--release-4cc61e-blue?style=flat-square" alt="v4.1">
   <img src="https://img.shields.io/badge/license-Apache%202.0-red?style=flat-square" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/tests-400%2B-brightgreen?style=flat-square" alt="400+ tests">
+  <img src="https://img.shields.io/website?url=https%3A%2F%2Fpad-plus-ai.onrender.com&style=flat-square&label=Render&logo=render&logoColor=white&color=46E3B7" alt="Render Status">
 </p>
 
 PAD+ AI is a layer between the user and the language model that does not pass the request directly, but routes it through a sequence of cognitive phases: from determining the direction of thinking to verifying statements.

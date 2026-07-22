@@ -1,17 +1,17 @@
 # Modern AI Does Not Need Another Chatbot. It Needs a Better Architecture
-
-```mermaid
-flowchart TD
-    U[User] --> UI[Interface]
-    UI --> API[API Layer]
-    API --> PIPE[Modular Cognitive Pipeline]
-    PIPE --> MEM[Memory Systems]
-    PIPE --> PSN[Persona & Emotion]
-    PIPE --> VER[Verification & Reflection]
-    PIPE --> OBS[Observability / X-Ray]
-    PIPE --> LLM[LLM Provider]
-    VER --> RESP[Response]
-```
+> 
+> ```mermaid
+> flowchart TD
+>     U[User] --> UI[Interface]
+>     UI --> API[API Layer]
+>     API --> PIPE[Modular Cognitive Pipeline]
+>     PIPE --> MEM[Memory Systems]
+>     PIPE --> PSN[Persona & Emotion]
+>     PIPE --> VER[Verification & Reflection]
+>     PIPE --> OBS[Observability / X-Ray]
+>     PIPE --> LLM[LLM Provider]
+>     VER --> RESP[Response]
+> ```
 
 Most AI applications still look surprisingly similar.
 
@@ -34,9 +34,6 @@ That question is where PAD+ AI begins.
 PAD+ AI is not another LLM. It is not another wrapper around an API. It is not a chatbot with a nicer shell. It is an open research platform for exploring cognitive architectures around existing language models. The goal is not to replace the model. The goal is to build a system that can reason, remember, verify, adapt, and explain its behavior in ways that a single prompt-driven interaction cannot.
 
 That is a more interesting problem than most product teams admit.
-
-> Live demo: https://pad-plus-ai.onrender.com  
-> GitHub repository: https://github.com/Ovladimirovich/pad-plus-ai
 
 ## The Architectural Problem
 
@@ -134,11 +131,10 @@ That sentence is important because it explains the motivation behind the observa
 
 A dashboard is not just a UI layer. It is a way to inspect the structure of cognition. It allows us to observe the pipeline, the state transitions, the memory retrieval steps, and the verification outcomes. That kind of transparency matters for both engineering and research.
 
-[Dashboard Screenshot]
+![[Pasted image 20260717233734.png]]
+![[Pasted image 20260717234632.png]]
 
-[X-Ray Screenshot]
-
-## Why This Is Different From Ordinary LLM Orchestration
+### Why This Is Different From Ordinary LLM Orchestration
 
 It is easy to look at a system like this and assume that it is just another orchestration layer on top of a model. That is only partially true.
 
@@ -229,3 +225,13 @@ The architecture is there. The code is there. The questions are there. And the m
 ---
 
 If you want to explore the project, the best next step is to visit the GitHub repository and look at the architecture directly. That is where the system is being built, tested, and discussed.
+GitHub repository: https://github.com/Ovladimirovich/pad-plus-ai
+Do you want to see it in action?  
+ Real-time demonstration: https://pad-plus-ai.onrender.com
+
+**PAD+ AI is not an attempt to prove that one architecture is the only correct one.**
+**It is an attempt to create a platform on which various cognitive architectures can be developed, tested, evaluated, compared, and improved.**
+
+
+
+
