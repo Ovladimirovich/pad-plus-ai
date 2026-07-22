@@ -67,3 +67,4 @@ sentry-sdk==2.63.0
 
 # Production
 gunicorn==25.1.0
+python-telegram-bot>=21.0
