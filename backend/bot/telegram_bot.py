@@ -105,7 +105,7 @@ async def cmd_article1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def cmd_article2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "📖 Вторая статья: X-Ray for AI\n"
-        "https://dev.to/_a9de0f38ed294cfb7e5e/x-ray-for-ai-or-how-i-stopped-understanding-my-own-neural-network-and-built-my-own-apm"
+        "https://dev.to/_a9de0f38ed294cfb7e5e/x-ray-for-ai-or-how-i-stopped-understanding-my-own-neural-network-and-built-my-own-apm-2l4p"
     )
 
 

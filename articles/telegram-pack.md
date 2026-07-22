@@ -115,7 +115,7 @@ Open Source · Apache 2.0
 | `/xray` | Что такое X-Ray и как это работает |
 | `/pipeline` | 25 фаз когнитивного пайплайна |
 | `/article1` | Ссылка на первую статью dev.to |
-| `/article2` | Ссылка на вторую статью dev.to |
+| `/article2` | https://dev.to/_a9de0f38ed294cfb7e5e/x-ray-for-ai-or-how-i-stopped-understanding-my-own-neural-network-and-built-my-own-apm-2l4p |
 | `/github` | Ссылка на GitHub |
 | `/demo` | Ссылка на живое демо Render |
 | `/channel` | Ссылка на канал @padplusai |
