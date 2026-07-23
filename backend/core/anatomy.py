@@ -267,6 +267,20 @@ def get_module_status() -> Dict[str, Any]:
     }
 
 
+def _find_nested(d: Dict, key: str, depth: int = 0) -> Optional[Dict]:
+    """Рекурсивный поиск модуля во вложенных children."""
+    if not isinstance(d, dict):
+        return None
+    for k, v in d.items():
+        if k == key and isinstance(v, dict):
+            return v
+        if isinstance(v, dict) and "children" in v:
+            found = _find_nested(v["children"], key, depth + 1)
+            if found:
+                return found
+    return None
+
+
 def get_module_detail(module_id: str) -> Optional[Dict[str, Any]]:
     """Детальный статус конкретного модуля."""
     status = get_module_status()
@@ -276,6 +290,8 @@ def get_module_detail(module_id: str) -> Optional[Dict[str, Any]]:
         detail = dict(brain)
     else:
         detail = children.get(module_id)
+        if detail is None:
+            detail = _find_nested(children, module_id)
         if detail is None:
             return None
 
