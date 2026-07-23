@@ -85,8 +85,8 @@ class ValidationMiddleware(BaseHTTPMiddleware):
         """Обработка запроса"""
         path = request.url.path
         
-        # ✅ ПОЛНОСТЬЮ ИСКЛЮЧАЕМ WebSocket /ws ИЗ ВСЕХ ПРОВЕРОК
-        if path == "/ws":
+        # ✅ ПОЛНОСТЬЮ ИСКЛЮЧАЕМ WebSocket /ws И /api/v1/xray/ws ИЗ ВСЕХ ПРОВЕРОК
+        if path == "/ws" or path == "/api/v1/xray/ws":
             return await call_next(request)
         
         # Пропускаем исключенные пути

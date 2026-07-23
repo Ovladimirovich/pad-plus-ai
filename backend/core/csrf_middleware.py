@@ -57,6 +57,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         "/openapi.json",
         "/redoc",
         "/ws",
+        "/api/v1/xray/ws",
     }
     
     # Настройки

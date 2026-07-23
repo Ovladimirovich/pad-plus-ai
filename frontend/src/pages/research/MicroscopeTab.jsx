@@ -134,61 +134,81 @@ export default function MicroscopeTab({ navParams = {} }) {
     loadSnapshot();
 
     const token = localStorage.getItem('auth_token');
-    const wsUrl = new URL('/api/v1/xray/ws', window.location.origin);
-    if (token) wsUrl.searchParams.set('token', token);
+    let ws = null;
+    let retries = 0;
+    const MAX_RETRIES = 5;
+    let retryTimer = null;
 
-    let ws;
-    try {
-      ws = new WebSocket(wsUrl.toString());
-      wsRef.current = ws;
-    } catch (e) {
-      setError('WebSocket недоступен, используется обычное обновление.');
-      return;
+    function connect() {
+      try {
+        const wsUrl = new URL('/api/v1/xray/ws', window.location.origin);
+        if (token) wsUrl.searchParams.set('token', token);
+        ws = new WebSocket(wsUrl.toString());
+        wsRef.current = ws;
+      } catch (e) {
+        setConnected(false);
+        scheduleRetry();
+        return;
+      }
+
+      ws.onopen = () => {
+        retries = 0;
+        setConnected(true);
+        ws.send(JSON.stringify({ type: 'subscribe', channels: ['trace', 'all'] }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'trace' && msg.data && msg.data.session) {
+            const s = msg.data.session;
+            setData(prev => ({
+              ...(prev || {}),
+              user_message: s.user_message,
+              strategy: s.metadata?.strategy,
+              intent: s.metadata?.intent,
+              confidence: s.metadata?.confidence,
+              truth_confidence: s.metadata?.truth_confidence,
+              provider: s.metadata?.provider,
+              model: s.metadata?.model,
+              latency_ms: s.total_time_ms,
+              success: s.metadata?.success,
+              phases: s.events || prev?.phases || [],
+              explanation: s.metadata?.explanation || prev?.explanation,
+              evaluation: s.metadata?.explanation?.evaluation,
+              status: 'ok',
+            }));
+            setLoading(false);
+          } else if (msg.type === 'pipeline' || msg.type === 'all') {
+            loadSnapshot();
+          }
+        } catch (e) {
+          console.warn('Microscope WS parse error:', e);
+        }
+      };
+
+      ws.onerror = () => setConnected(false);
+
+      ws.onclose = () => {
+        setConnected(false);
+        wsRef.current = null;
+        if (retries < MAX_RETRIES) scheduleRetry();
+      };
     }
 
-    ws.onopen = () => {
-      setConnected(true);
-      ws.send(JSON.stringify({ type: 'subscribe', channels: ['trace', 'all'] }));
-    };
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'trace' && msg.data && msg.data.session) {
-          const s = msg.data.session;
-          setData(prev => ({
-            ...(prev || {}),
-            user_message: s.user_message,
-            strategy: s.metadata?.strategy,
-            intent: s.metadata?.intent,
-            confidence: s.metadata?.confidence,
-            truth_confidence: s.metadata?.truth_confidence,
-            provider: s.metadata?.provider,
-            model: s.metadata?.model,
-            latency_ms: s.total_time_ms,
-            success: s.metadata?.success,
-            phases: s.events || prev?.phases || [],
-            explanation: s.metadata?.explanation || prev?.explanation,
-            evaluation: s.metadata?.explanation?.evaluation,
-            status: 'ok',
-          }));
-          setLoading(false);
-        } else if (msg.type === 'pipeline' || msg.type === 'all') {
-          loadSnapshot();
-        }
-      } catch (e) {
-        console.warn('Microscope WS parse error:', e);
-      }
-    };
-    ws.onerror = () => setConnected(false);
-    ws.onclose = () => {
-      setConnected(false);
-      wsRef.current = null;
-    };
+    function scheduleRetry() {
+      if (retryTimer) clearTimeout(retryTimer);
+      retries++;
+      const delay = Math.min(1000 * Math.pow(2, retries), 15000);
+      retryTimer = setTimeout(connect, delay);
+    }
+
+    connect();
 
     return () => {
+      if (retryTimer) clearTimeout(retryTimer);
       try {
-        ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null;
-        ws.close();
+        if (ws) { ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null; ws.close(); }
       } catch {}
       wsRef.current = null;
     };

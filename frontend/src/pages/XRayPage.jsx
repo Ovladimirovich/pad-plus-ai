@@ -33,59 +33,72 @@ export default function XRayPage() {
   }, []);
 
   useEffect(() => {
-    // IMPORTANT:
-    // Используем относительный URL, чтобы Vite проксирал WebSocket на backend (127.0.0.1:8007).
-    // Иначе при dev на 5174 браузер пытается открыть ws на 5174 и сервер закрывает соединение.
     const token = localStorage.getItem('auth_token');
+    let ws = null;
+    let retries = 0;
+    const MAX_RETRIES = 5;
+    let retryTimer = null;
 
-    // Строго проксируем через Vite: клиент подключается к origin текущей страницы (5174),
-    // а Vite proxy проксирует WS на backend (8007).
-    const wsUrl = new URL('/api/v1/xray/ws', window.location.origin);
+    function connect() {
+      const wsUrl = new URL('/api/v1/xray/ws', window.location.origin);
+      if (token) wsUrl.searchParams.set('token', token);
 
-    if (token) {
-      wsUrl.searchParams.set('token', token);
+      console.log('🔌 X-Ray WS connecting to:', wsUrl.toString());
+
+      try {
+        ws = new WebSocket(wsUrl.toString(), []);
+        wsRef.current = ws;
+      } catch (e) {
+        console.warn('X-Ray WS creation failed:', e);
+        setConnected(false);
+        scheduleRetry();
+        return;
+      }
+
+      ws.onopen = () => {
+        retries = 0;
+        setConnected(true);
+        ws.send(JSON.stringify({
+          type: 'subscribe',
+          channels: ['trace', 'pipeline', 'all']
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleMessage(msg);
+        } catch (e) {
+          console.warn('X-Ray WS parse error:', e);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.warn('X-Ray WS error:', err);
+        setConnected(false);
+      };
+
+      ws.onclose = (event) => {
+        console.warn('X-Ray WS closed:', event?.code, event?.reason);
+        setConnected(false);
+        wsRef.current = null;
+        if (retries < MAX_RETRIES) scheduleRetry();
+      };
     }
 
-    console.log('🔌 X-Ray WS connecting to:', wsUrl.toString());
+    function scheduleRetry() {
+      if (retryTimer) clearTimeout(retryTimer);
+      retries++;
+      const delay = Math.min(1000 * Math.pow(2, retries), 15000);
+      retryTimer = setTimeout(connect, delay);
+    }
 
-    const ws = new WebSocket(wsUrl.toString(), []);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnected(true);
-      ws.send(JSON.stringify({
-        type: 'subscribe',
-        channels: ['trace', 'pipeline', 'all']
-      }));
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        handleMessage(msg);
-      } catch (e) {
-        console.warn('X-Ray WS parse error:', e);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.warn('X-Ray WS error:', err);
-    };
-
-    ws.onclose = (event) => {
-      // Логируем причины закрытия (код/причина важны для диагностики)
-      console.warn('X-Ray WS closed:', event?.code, event?.reason);
-      setConnected(false);
-    };
+    connect();
 
     return () => {
-      // Мягкий cleanup: не закрываем соединение во время unmount, чтобы не ловить race-condition в DEV/StrictMode.
-      // Дать сокету завершить handshake/подписку.
+      if (retryTimer) clearTimeout(retryTimer);
       try {
-        ws.onopen = null;
-        ws.onmessage = null;
-        ws.onerror = null;
-        ws.onclose = null;
+        if (ws) { ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null; ws.close(); }
       } catch {}
       wsRef.current = null;
     };
