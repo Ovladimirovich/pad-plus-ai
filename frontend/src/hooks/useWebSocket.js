@@ -2,23 +2,41 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getAuthToken, getRefreshToken } from '../services/api';
 
 const MAX_MESSAGES = 5;
+const MAX_RETRIES = 5;
 
 // Глобальный экземпляр для предотвращения множественных подключений
 let globalWsInstance = null;
 let globalSubscribers = 0;
+let globalRetries = 0;
+let globalRetryTimer = null;
 
 export function useWebSocket(url = null) {
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState([]);
   const wsRef = useRef(null);
-  const reconnectTimeout = useRef(null);
+  const retryCountRef = useRef(0);
   const isMountedRef = useRef(false);
+
+  const scheduleRetry = useCallback(() => {
+    if (globalRetryTimer) clearTimeout(globalRetryTimer);
+    globalRetries++;
+    retryCountRef.current = globalRetries;
+    if (globalRetries > MAX_RETRIES) return;
+    const delay = Math.min(1000 * Math.pow(2, globalRetries), 15000);
+    console.log(`🔌 WebSocket retry ${globalRetries}/${MAX_RETRIES} in ${delay}ms`);
+    globalRetryTimer = setTimeout(() => {
+      if (isMountedRef.current) connectRef.current();
+    }, delay);
+  }, []);
+
+  const connectRef = useRef();
 
   const connect = useCallback(() => {
     // Если уже есть глобальное подключение - используем его
     if (globalWsInstance && globalWsInstance.readyState === WebSocket.OPEN) {
       wsRef.current = globalWsInstance;
       setConnected(true);
+      globalRetries = 0;
       return;
     }
 
@@ -28,9 +46,9 @@ export function useWebSocket(url = null) {
     }
 
     // Очищаем предыдущий таймаут если есть
-    if (reconnectTimeout.current) {
-      clearTimeout(reconnectTimeout.current);
-      reconnectTimeout.current = null;
+    if (globalRetryTimer) {
+      clearTimeout(globalRetryTimer);
+      globalRetryTimer = null;
     }
 
     const token = getAuthToken();
@@ -54,6 +72,8 @@ export function useWebSocket(url = null) {
       ws.onopen = () => {
         if (!isMountedRef.current) return;
         console.log('✅ WebSocket подключен');
+        globalRetries = 0;
+        retryCountRef.current = 0;
         setConnected(true);
         
         // Подписка на обновления
@@ -78,11 +98,7 @@ export function useWebSocket(url = null) {
         console.log('🔌 WebSocket отключен', event.code, event.reason);
         setConnected(false);
         globalWsInstance = null;
-        
-        // Автоматическое переподключение только если соединение было разорвано не корректно
-        if (!event.wasClean && event.code !== 1000 && event.code !== 1001) {
-          reconnectTimeout.current = setTimeout(connect, 5000);
-        }
+        scheduleRetry();
       };
 
       ws.onerror = (error) => {
@@ -92,17 +108,19 @@ export function useWebSocket(url = null) {
     } catch (error) {
       console.error('❌ Ошибка создания WebSocket:', error);
       if (isMountedRef.current) {
-        reconnectTimeout.current = setTimeout(connect, 5000);
+        scheduleRetry();
       }
     }
-  }, [url]);
+  }, [url, scheduleRetry]);
+
+  connectRef.current = connect;
 
   const disconnect = useCallback(() => {
     globalSubscribers--;
     
-    if (reconnectTimeout.current) {
-      clearTimeout(reconnectTimeout.current);
-      reconnectTimeout.current = null;
+    if (globalRetryTimer) {
+      clearTimeout(globalRetryTimer);
+      globalRetryTimer = null;
     }
 
     // Закрываем соединение только если больше нет подписчиков
@@ -110,6 +128,7 @@ export function useWebSocket(url = null) {
       wsRef.current.close(1000, 'Normal closure');
       wsRef.current = null;
       globalWsInstance = null;
+      globalRetries = 0;
     }
     
     setConnected(false);

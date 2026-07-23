@@ -722,16 +722,24 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[Dict[str, Any
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket эндпоинт для real-time обновлений"""
-    await websocket.accept()
+    client_host = websocket.client.host if websocket.client else "unknown"
+    try:
+        await websocket.accept()
+    except Exception as e:
+        logger.error(f"🔴 WebSocket accept failed from {client_host}: {e}", exc_info=True)
+        return
 
     current_user = await authenticate_websocket(websocket)
     if not current_user:
-        await websocket.send_json({"type": "error", "message": "Authentication failed"})
-        await websocket.close(code=4401)
+        try:
+            await websocket.send_json({"type": "error", "message": "Authentication failed"})
+            await websocket.close(code=4401)
+        except Exception as e:
+            logger.warning(f"🔴 WebSocket auth close failed: {e}")
         return
 
     manager.active_connections.append(websocket)
-    logger.info(f"📡 WebSocket подключен. Всего: {len(manager.active_connections)}")
+    logger.info(f"📡 WebSocket подключен от {client_host}. Всего: {len(manager.active_connections)}")
 
     # Heartbeat интервал для Render (25 сек < 30 сек таймаут Render)
     heartbeat_interval = int(os.getenv("WEBSOCKET_HEARTBEAT_INTERVAL", "25"))
@@ -1076,5 +1084,7 @@ if __name__ == "__main__":
         port=backend_port,
         reload=reload,
         log_level="info" if is_production else "debug",
-        lifespan="on"
+        lifespan="on",
+        ws_ping_interval=20,
+        ws_ping_timeout=10,
     )
