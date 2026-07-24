@@ -75,6 +75,23 @@ This is not a chatbot, not an agent, and not an API wrapper. It is a research im
 > PAD+ AI is not designed to imitate consciousness.  
 > It is designed to preserve causal continuity of cognition across multiple reasoning layers.
 
+### Evolution of the Project
+
+```mermaid
+graph TD
+    A[PAD+ AI Core] -->|Complexity grew| B[Lost visibility inside pipeline]
+    B --> C[X-Ray: Observability Layer]
+    C -->|Found anomalies| D[HEALER: Diagnostics & Self-healing]
+    C -->|Accumulated experiment data| E[Research Platform: Experiment tracking]
+    
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style C fill:#bbf,stroke:#333,stroke-width:2px
+    style D fill:#bfb,stroke:#333,stroke-width:2px
+    style E fill:#fbf,stroke:#333,stroke-width:2px
+```
+
+PAD+ AI was not designed top-down. Each subsystem appeared because the previous version exposed a real engineering limitation. Losing visibility led to X-Ray. Finding problems wasn't enough, leading to HEALER. Accumulating experiment data led to the Research Platform.
+
 ---
 
 ## Cognitive Hierarchy
@@ -142,7 +159,7 @@ This hierarchy is not an abstraction. Each level is implemented as an isolated m
 
 <dl>
 <dt><strong>Observability</strong></dt>
-<dd>Every processing step is traced in real time. X-Ray captures all 24 pipeline phases, strategy decisions, emotion changes, and verification results. The system has no "dark" segments.</dd>
+<dd>Every processing step is traced in real time. X-Ray captures all 25 pipeline phases, strategy decisions, emotion changes, and verification results. The system has no "dark" segments.</dd>
 
 <dt><strong>Cognitive Predisposition</strong></dt>
 <dd>Before generating a response, the system determines the direction of thinking through Impulse Core — four orthogonal dimensions that shift the prior probabilities of the response without direct instructions.</dd>
@@ -197,7 +214,7 @@ graph TB
     end
 
     subgraph CognitiveCore ["Cognitive Core"]
-        Pipeline[Pipeline v4.0 — 24 phases]
+        Pipeline[Pipeline v5.0 — 25 phases]
         Impulse[Impulse Core — 4 dimensions]
         Persona[Persona — 8 traits]
         Emotions[Emotion Engine — PAD+ 6D]
@@ -318,7 +335,7 @@ flowchart LR
     Evolve --> Emit
 ```
 
-The pipeline includes 24 phases grouped into 8 stages: Safety → Intent → Retrieve → Persona → Generate → Truth → Remember → Evolve → Emit.
+The pipeline includes 25 phases grouped into 8 stages: Safety → Intent → Retrieve → Persona → Generate → Truth → Remember → Evolve → Emit.
 
 ---
 
@@ -362,7 +379,7 @@ X-Ray is a full observability system embedded in every request. Not logs and not
 **What is logged:**
 
 - Strategy selection and reason
-- Each of the 24 pipeline phases with duration
+- Each of the 25 pipeline phases with duration
 - Emotion changes
 - Truth Loop verification results
 - Errors and degradations
@@ -643,6 +660,7 @@ The Consolidation Engine moves knowledge upward: episodes are distilled into sem
 | **X-Ray** | TraceCollector + WebSocket Broadcaster + ThoughtVisualizer |
 | **HEALER** | Self-contained module, zero external dependencies |
 | **Research** | AI Under Microscope (WebSocket), Replay, Compare Providers, Decision Log |
+| **Graph Visualization** | ReactFlow (knowledge graph + anatomy) |
 | **CI** | GitHub Actions (pytest, ruff, black, mypy) |
 | **Deployment** | Render (Web Service + Static Site), Docker |
 | **Testing** | pytest, 400+ test functions |

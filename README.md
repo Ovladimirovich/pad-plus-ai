@@ -1,5 +1,5 @@
 [English](README.en.md) 
-# PAD+ AI v4.0
+# PAD+ AI v4.1
 
 <p align="center">
   <strong>Когнитивная архитектура для языковых моделей</strong>
@@ -11,9 +11,10 @@
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React 18">
   <img src="https://img.shields.io/badge/PostgreSQL-15-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 15">
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase">
-  <img src="https://img.shields.io/badge/v4.0--release-6ca949c-blue?style=flat-square" alt="v4.0">
+  <img src="https://img.shields.io/badge/v4.1--release-4cc61e-blue?style=flat-square" alt="v4.1">
   <img src="https://img.shields.io/badge/license-Apache%202.0-red?style=flat-square" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/tests-400%2B-brightgreen?style=flat-square" alt="400+ tests">
+  <img src="https://img.shields.io/website?url=https%3A%2F%2Fpad-plus-ai.onrender.com&style=flat-square&label=Render&logo=render&logoColor=white&color=46E3B7" alt="Render Status">
 </p>
 
 PAD+ AI — это слой между пользователем и языковой моделью, который не передаёт запрос напрямую, а проводит его через последовательность когнитивных фаз: от определения направленности мышления до верификации утверждений.
@@ -69,6 +70,23 @@ PAD+ AI построен на другой идее.
 
 > PAD+ AI is not designed to imitate consciousness.  
 > It is designed to preserve causal continuity of cognition across multiple reasoning layers.
+
+### Эволюция проекта
+
+```mermaid
+graph TD
+    A[PAD+ AI Core] -->|Сложность выросла| B[Потеря видимости внутри pipeline]
+    B --> C[X-Ray: Уровень наблюдаемости]
+    C -->|Обнаружены аномалии| D[HEALER: Диагностика и самовосстановление]
+    C -->|Накоплены данные экспериментов| E[Research Platform: Трекинг экспериментов]
+    
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style C fill:#bbf,stroke:#333,stroke-width:2px
+    style D fill:#bfb,stroke:#333,stroke-width:2px
+    style E fill:#fbf,stroke:#333,stroke-width:2px
+```
+
+PAD+ AI не проектировался сверху вниз. Каждая подсистема появилась потому, что предыдущая версия вскрыла реальное инженерное ограничение. Потеря видимости привела к X-Ray. Обнаружение проблем без их исправления — к HEALER. Накопление данных экспериментов — к Research Platform.
 
 ---
 
@@ -137,7 +155,7 @@ PAD+ AI построен на другой идее.
 
 <dl>
 <dt><strong>Observability</strong></dt>
-<dd>Каждый шаг обработки трассируется в реальном времени. X-Ray фиксирует все 24 фазы pipeline, решения о стратегии, изменения эмоций и результаты верификации. Система не имеет «тёмных» участков.</dd>
+<dd>Каждый шаг обработки трассируется в реальном времени. X-Ray фиксирует все 25 фаз pipeline, решения о стратегии, изменения эмоций и результаты верификации. Система не имеет «тёмных» участков.</dd>
 
 <dt><strong>Cognitive Predisposition</strong></dt>
 <dd>Перед генерацией ответа система определяет направленность мышления через Impulse Core — четыре ортогональных измерения, смещающих априорные вероятности ответа без прямых инструкций.</dd>
@@ -192,7 +210,7 @@ graph TB
     end
 
     subgraph CognitiveCore ["Когнитивное ядро"]
-        Pipeline[Pipeline v4.0 — 24 phases]
+        Pipeline[Pipeline v5.0 — 25 phases]
         Impulse[Impulse Core — 4 dimensions]
         Persona[Persona — 8 traits]
         Emotions[Emotion Engine — PAD+ 6D]
@@ -313,7 +331,7 @@ flowchart LR
     Evolve --> Emit
 ```
 
-Pipeline включает 24 фазы, сгруппированные в 8 этапов: Safety → Intent → Retrieve → Persona → Generate → Truth → Remember → Evolve → Emit.
+Pipeline включает 25 фаз, сгруппированные в 8 этапов: Safety → Intent → Retrieve → Persona → Generate → Truth → Remember → Evolve → Emit.
 
 ---
 
@@ -671,9 +689,11 @@ Consolidation Engine переносит знания снизу вверх: эп
 | **Cache** | Redis 7 (опционально) |
 | **LLM Providers** | OpenRouter, GigaChat |
 | **LLM Interface** | ProviderManager (единый SDK-интерфейс) |
-| **Pipeline** | PipelineExecutor v4.0, 24 stages |
+| **Pipeline** | PipelineExecutor v5.0, 25 stages |
 | **X-Ray** | TraceCollector + WebSocket Broadcaster + ThoughtVisualizer |
 | **HEALER** | Self-contained module, zero external dependencies |
+| **Research** | AI Under Microscope (WebSocket), Replay, Compare Providers, Decision Log |
+| **Graph Visualization** | ReactFlow (knowledge graph + anatomy) |
 | **CI** | GitHub Actions (pytest, ruff, black, mypy) |
 | **Deployment** | Render (Web Service + Static Site), Docker |
 | **Testing** | pytest, 400+ test functions |
