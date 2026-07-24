@@ -122,6 +122,9 @@ AGENTS.md
 habr_article_discrepancies_report.md
 testing_feedback.md
 
+# Publications (local-only, AI engineers work here)
+publications/
+
 # Production
 .env.production
 .env.staging
