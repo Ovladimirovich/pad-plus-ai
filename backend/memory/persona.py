@@ -18,6 +18,9 @@ import logging
 logger = logging.getLogger("PAD+.persona")
 
 from core.config import USE_PG_STORAGE
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 
 @dataclass
@@ -266,10 +269,28 @@ class PersonaMemory:
     
     def get_trait(self, name: str) -> Optional[PersonalityTrait]:
         """Получить черту характера"""
-        return self.traits.get(name)
+        trait = self.traits.get(name)
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            object_id=name,
+            result=MemoryResult.FOUND if trait else MemoryResult.NOT_FOUND,
+            phase="persona.get_trait",
+            payload_size_bytes=len(name),
+        )
+        return trait
     
     def get_all_traits(self) -> Dict[str, PersonalityTrait]:
         """Все черты характера"""
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            result=MemoryResult.FOUND,
+            phase="persona.get_all_traits",
+            payload_size_bytes=len(self.traits),
+        )
         return self.traits.copy()
     
     def adjust_trait(self, name: str, delta: float) -> bool:
@@ -280,10 +301,28 @@ class PersonaMemory:
         стабильные черты меняются медленно
         """
         if name not in self.traits:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.PERSONA_MEMORY,
+                object_type=MemoryObjectType.PERSONA_TRAITS,
+                object_id=name,
+                result=MemoryResult.NOT_FOUND,
+                phase="persona.adjust_trait",
+            )
             return False
         
         self.traits[name].adjust(delta)
         self._save()
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            object_id=name,
+            result=MemoryResult.UPDATED,
+            phase="persona.adjust_trait",
+            payload_size_bytes=len(name),
+            payload_preview=f"delta={delta:+.3f}, value={self.traits[name].value:.3f}",
+        )
         return True
     
     def add_reflection(
@@ -305,10 +344,30 @@ class PersonaMemory:
             self.reflections = self.reflections[-100:]
         
         self._save()
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            object_id="reflections",
+            result=MemoryResult.CREATED,
+            phase="persona.add_reflection",
+            payload_size_bytes=len(insight),
+            payload_preview=insight[:80],
+        )
     
     def get_recent_reflections(self, limit: int = 5) -> List[SelfReflection]:
         """Недавние рефлексии"""
-        return self.reflections[-limit:]
+        reflections = self.reflections[-limit:]
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            object_id="reflections",
+            result=MemoryResult.FOUND if reflections else MemoryResult.NOT_FOUND,
+            phase="persona.get_recent_reflections",
+            payload_size_bytes=len(reflections),
+        )
+        return reflections
     
     def get_persona_context(self) -> str:
         """
@@ -331,6 +390,15 @@ class PersonaMemory:
 """
         
         values_text = "\n".join(f"- {v}" for v in self.values[:3])
+        
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            result=MemoryResult.FOUND,
+            phase="persona.get_persona_context",
+            payload_size_bytes=sum(len(t.value) for t in self.traits.values()),
+        )
         
         return f"""Моя личность:
 {chr(10).join(traits_desc)}
@@ -395,6 +463,16 @@ class PersonaMemory:
         if "?" in user_message and len(user_message) > 20:
             self.adjust_trait("curiosity", 0.01)
             changes.append("curiosity+")
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            result=MemoryResult.UPDATED if changes else MemoryResult.SKIPPED,
+            phase="persona.evolve_from_dialog",
+            payload_size_bytes=len(user_message) + len(ai_response),
+            payload_preview=f"changes={changes}",
+        )
         
         return {
             "changes": changes,

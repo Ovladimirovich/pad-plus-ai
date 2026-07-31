@@ -38,6 +38,10 @@ else:
     from .rag import get_rag as get_rag_memory
 from .roots import get_roots_memory
 
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
+
 logger = logging.getLogger("PAD+.consolidation")
 
 
@@ -114,6 +118,17 @@ class MemoryConsolidator:
 
         # 4. Обновление связей
         results["update_connections"] = self.update_knowledge_connections(user_id=user_id)
+
+        emit_memory_event(
+            operation=MemoryOperation.CONSOLIDATE,
+            component=MemoryComponent.CONSOLIDATION,
+            object_type=MemoryObjectType.FACT,
+            result=MemoryResult.CONSOLIDATED,
+            phase="consolidation.consolidate_all",
+            session_id=user_id,
+            payload_size_bytes=len(results),
+            payload_preview=", ".join(results.keys()),
+        )
 
         return results
     
@@ -192,6 +207,17 @@ class MemoryConsolidator:
         
         self._history.append(result)
         logger.info(f"🔄 Консолидация Episodic→Semantic: {items_consolidated}/{items_processed}")
+        
+        emit_memory_event(
+            operation=MemoryOperation.CONSOLIDATE,
+            component=MemoryComponent.CONSOLIDATION,
+            object_type=MemoryObjectType.EPISODE,
+            result=MemoryResult.CONSOLIDATED,
+            phase="consolidation.episodic_to_semantic",
+            session_id=user_id,
+            payload_size_bytes=items_processed,
+            payload_preview=f"{items_consolidated}/{items_processed}",
+        )
         
         return result
     
@@ -273,6 +299,17 @@ class MemoryConsolidator:
         self._history.append(result)
         logger.info(f"🔄 Консолидация RAG→Semantic: {items_consolidated}/{items_processed}")
         
+        emit_memory_event(
+            operation=MemoryOperation.CONSOLIDATE,
+            component=MemoryComponent.CONSOLIDATION,
+            object_type=MemoryObjectType.FACT,
+            result=MemoryResult.CONSOLIDATED,
+            phase="consolidation.rag_to_semantic",
+            session_id=user_id,
+            payload_size_bytes=items_processed,
+            payload_preview=f"{items_consolidated}/{items_processed}",
+        )
+        
         return result
     
     def consolidate_semantic_to_roots(self, user_id: Optional[str] = None) -> ConsolidationResult:
@@ -326,6 +363,17 @@ class MemoryConsolidator:
         self._history.append(result)
         logger.info(f"🔄 Консолидация Semantic→Roots: {items_consolidated}/{items_processed}")
         
+        emit_memory_event(
+            operation=MemoryOperation.CONSOLIDATE,
+            component=MemoryComponent.CONSOLIDATION,
+            object_type=MemoryObjectType.ROOT,
+            result=MemoryResult.CONSOLIDATED,
+            phase="consolidation.semantic_to_roots",
+            session_id=user_id,
+            payload_size_bytes=items_processed,
+            payload_preview=f"{items_consolidated}/{items_processed}",
+        )
+        
         return result
     
     def update_knowledge_connections(self, user_id: Optional[str] = None) -> ConsolidationResult:
@@ -378,6 +426,17 @@ class MemoryConsolidator:
         
         self._history.append(result)
         logger.info(f"🔄 Обновление связей: {items_consolidated}/{items_processed}")
+        
+        emit_memory_event(
+            operation=MemoryOperation.CONSOLIDATE,
+            component=MemoryComponent.CONSOLIDATION,
+            object_type=MemoryObjectType.CONTEXT,
+            result=MemoryResult.CONSOLIDATED,
+            phase="consolidation.update_connections",
+            session_id=user_id,
+            payload_size_bytes=items_processed,
+            payload_preview=f"{items_consolidated}/{items_processed}",
+        )
         
         return result
     

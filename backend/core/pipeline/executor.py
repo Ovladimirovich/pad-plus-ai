@@ -17,6 +17,9 @@ from .context import PipelineContext
 from .phases import AntiLoopPhase, MetricsPhase
 from .registry import get_registry
 from .contracts import ContractValidator, FOREGROUND_CONTRACTS
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 # Фазы, которые выполняются fire-and-forget после отправки ответа.
 # Не влияют на ответ, только на внутреннее состояние системы.
@@ -24,6 +27,25 @@ _BACKGROUND_PHASES: Set[str] = {
     "consolidation", "procedure_success",
     "persona_evolution", "health",
     "reflection", "dreams", "metrics",
+}
+
+# Маппинг фаз pipeline → компонент памяти (для MemoryEvent в X-Ray).
+# Фазы, не задействующие память, отсутствуют (не эмитят событий).
+_PHASE_MEMORY_COMPONENT: Dict[str, MemoryComponent] = {
+    "rag": MemoryComponent.RAG_MEMORY,
+    "episodic": MemoryComponent.EPISODIC_MEMORY,
+    "semantic": MemoryComponent.SEMANTIC_MEMORY,
+    "roots": MemoryComponent.ROOTS_MEMORY,
+    "persona": MemoryComponent.PERSONA_MEMORY,
+    "persona_evolution": MemoryComponent.PERSONA_MEMORY,
+    "emotion": MemoryComponent.EMOTION_ENGINE,
+    "emotion_update": MemoryComponent.EMOTION_ENGINE,
+    "impulse": MemoryComponent.IMPULSE_CORE,
+    "impulse_update": MemoryComponent.IMPULSE_CORE,
+    "save_episode": MemoryComponent.EPISODIC_MEMORY,
+    "consolidation": MemoryComponent.CONSOLIDATION,
+    "reflection": MemoryComponent.META_LEARNER,
+    "dreams": MemoryComponent.META_LEARNER,
 }
 
 logger = logging.getLogger("padplus.pipeline.executor")
@@ -312,6 +334,30 @@ class PipelineExecutor:
         except Exception as e:
             logger.warning(f"X-Ray background record error: {e}")
 
+    def _record_memory_phase_event(self, pname: str, pdata: dict, dur_ms: float, ctx: PipelineContext, pstatus: str = "success", perror: str = None):
+        """Авто-инструментация: MemoryEvent для фаз, работающих с памятью."""
+        component = _PHASE_MEMORY_COMPONENT.get(pname)
+        if component is None:
+            return
+        op = MemoryOperation.READ if pstatus == "success" else MemoryOperation.ERROR
+        result = MemoryResult.FOUND if pstatus == "success" else MemoryResult.ERROR
+        try:
+            emit_memory_event(
+                operation=op,
+                component=component,
+                object_type=MemoryObjectType.CONTEXT,
+                object_id=pname,
+                result=result,
+                duration_ms=dur_ms,
+                error=perror,
+                session_id=ctx.session_id,
+                phase=pname,
+                payload_size_bytes=len(pdata),
+                payload_preview=pname,
+            )
+        except Exception as e:
+            logger.warning(f"MemoryEvent record error [{pname}]: {e}")
+
     async def execute(
         self,
         user_message: str,
@@ -487,6 +533,8 @@ class PipelineExecutor:
                         phase_perror = pr.errors[0] if pr.errors else None
                         tc = get_trace_collector()
                         tc.record_event(request_id, stage, {**(pr.data or {}), "phase": n}, phase_pdur, phase_pstatus, phase_perror)
+                        # MemoryEvent: авто-инструментация памяти
+                        self._record_memory_phase_event(n, pr.data or {}, phase_pdur, ctx, pstatus=phase_pstatus, perror=phase_perror)
                     except Exception as e:
                         logger.warning(f"{__name__} error: {e}")
                     if not pr.success:
@@ -538,6 +586,8 @@ class PipelineExecutor:
             phase_status = "error" if not phase_result.success else "success"
             phase_error = phase_result.errors[0] if phase_result.errors else None
             await _record_xray_phase(phase_name, phase_result.data or {}, phase_dur, pstatus=phase_status, perror=phase_error)
+            # MemoryEvent: авто-инструментация памяти
+            self._record_memory_phase_event(phase_name, phase_result.data or {}, phase_dur, ctx, pstatus=phase_status, perror=phase_error)
 
             if not phase_result.success:
                 if phase_result.degradation:

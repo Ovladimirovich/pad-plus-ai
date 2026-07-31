@@ -15,6 +15,10 @@ import os
 import uuid
 import logging
 
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
+
 logger = logging.getLogger("PAD+.session")
 
 
@@ -227,20 +231,55 @@ class SessionManager:
         self._save()
         
         logger.info(f"🔐 Session created: {session_id}")
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.SESSION_MANAGER,
+            object_type=MemoryObjectType.SESSION,
+            object_id=session_id,
+            result=MemoryResult.CREATED,
+            phase="session_manager.create_session",
+            payload_size_bytes=len(session_id),
+            metadata={"via_user_id": bool(user_id)},
+        )
         return session
     
     def get_session(self, session_id: str) -> Optional[Session]:
         """Получает сессию по ID"""
         if session_id not in self._sessions:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                object_id=session_id,
+                result=MemoryResult.NOT_FOUND,
+                phase="session_manager.get_session",
+            )
             return None
         
         session = self._sessions[session_id]
         
         if session.is_expired(self.max_age_hours):
             self.end_session(session_id)
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                object_id=session_id,
+                result=MemoryResult.EXPIRED,
+                phase="session_manager.get_session",
+            )
             return None
         
         session.touch()
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.SESSION_MANAGER,
+            object_type=MemoryObjectType.SESSION,
+            object_id=session_id,
+            result=MemoryResult.FOUND,
+            phase="session_manager.get_session",
+            payload_size_bytes=len(session_id),
+        )
         return session
     
     def get_or_create(
@@ -279,6 +318,14 @@ class SessionManager:
             self._save()
             
             logger.info(f"🔐 Session ended: {session_id}")
+            emit_memory_event(
+                operation=MemoryOperation.DELETED,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                object_id=session_id,
+                result=MemoryResult.DELETED,
+                phase="session_manager.end_session",
+            )
     
     def record_message(
         self,
@@ -309,6 +356,16 @@ class SessionManager:
             session.context.add_emotion(emotion)
         
         self._save()
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.SESSION_MANAGER,
+            object_type=MemoryObjectType.SESSION,
+            object_id=session_id,
+            result=MemoryResult.UPDATED,
+            phase="session_manager.record_message",
+            payload_size_bytes=len(session_id),
+            payload_preview=f"intent={intent}, topic={topic}",
+        )
     
     def update_settings(
         self,
@@ -379,6 +436,15 @@ class SessionManager:
         
         if to_remove:
             logger.info(f"Cleaned up {len(to_remove)} expired sessions")
+            emit_memory_event(
+                operation=MemoryOperation.DELETED,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                result=MemoryResult.EXPIRED,
+                phase="session_manager.cleanup_expired",
+                payload_size_bytes=len(to_remove),
+                payload_preview=f"expired={len(to_remove)}",
+            )
     
     def get_sessions_by_ip(self, ip_address: str) -> List[Session]:
         """Возвращает сессии по IP"""
