@@ -14,10 +14,11 @@ class RagPhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from memory import get_rag
-            rag = get_rag()
             user_id = ctx.context.get("user_id") if ctx.context else None
-            context_data = rag.get_context(ctx.user_message, user_id=user_id)
+            session_id = ctx.session_id
+            from memory.session_store import get_session_rag_store
+            rag_store = get_session_rag_store()
+            context_data = rag_store.get_context(session_id, ctx.user_message, user_id=user_id)
 
             sources = {"count": 1 if context_data else 0, "confidence": 0.8 if context_data else 0.0}
 

@@ -24,6 +24,7 @@ class SaveEpisodePhase(PipelinePhase):
             truth_confidence = ctx.context.get("truth_confidence", 0.5)
             emotion_state = ctx.context.get("emotion_state", {})
             user_id = ctx.context.get("user_id")
+            session_id = ctx.session_id
 
             significance = 0.5
             if rag_used:
@@ -50,6 +51,14 @@ class SaveEpisodePhase(PipelinePhase):
                 concepts=[intent],
                 user_id=user_id,
             )
+
+            # D'-2: инвалидация per-session кэша эпизодов после записи
+            try:
+                if session_id:
+                    from memory.session_store import get_session_episodic_store
+                    get_session_episodic_store().clear_session(session_id)
+            except Exception:
+                pass
 
             return PhaseResult(
                 success=True,

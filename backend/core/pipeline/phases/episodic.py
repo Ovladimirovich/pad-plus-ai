@@ -14,10 +14,11 @@ class EpisodicPhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from memory import get_episodic_memory
-            episodic = get_episodic_memory()
             user_id = ctx.context.get("user_id") if ctx.context else None
-            similar = episodic.search_episodes(ctx.user_message, limit=2, user_id=user_id)
+            session_id = ctx.session_id
+            from memory.session_store import get_session_episodic_store
+            episodic_store = get_session_episodic_store()
+            similar = episodic_store.search_episodes(session_id, ctx.user_message, limit=2, user_id=user_id)
 
             context_text = ""
             if similar:
