@@ -51,6 +51,7 @@ export default function ProvidersCompareTab() {
   const [providers, setProviders] = useState([]);
   const [selected, setSelected] = useState([]);
   const [seeds, setSeeds] = useState([]);
+  const [liveModels, setLiveModels] = useState([]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -69,6 +70,26 @@ export default function ProvidersCompareTab() {
     } catch (e) { console.error(e); }
   }, []);
 
+  // Живой список моделей OpenRouter — чтобы честно видеть, какие модели актуальны
+  const loadLiveModels = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/v1/providers/openrouter/models');
+      if (res.ok) {
+        const data = await res.json();
+        setLiveModels(data.models || []);
+      }
+    } catch (e) { console.error(e); }
+  }, []);
+
+  const normalizeId = (id) => String(id || '').replace(/^openrouter\//, '').toLowerCase().trim();
+  const isModelLive = (p) => {
+    if (!p.model || p.model === 'auto') return true;
+    if (p.provider !== 'openrouter') return true;
+    if (liveModels.length === 0) return true; // список не загрузился — не блокируем
+    const want = normalizeId(p.model);
+    return liveModels.some(m => normalizeId(m.id) === want);
+  };
+
   const loadSeeds = useCallback(async () => {
     try {
       const res = await apiFetch('/api/v1/experiments/seed-experiments');
@@ -79,7 +100,7 @@ export default function ProvidersCompareTab() {
     } catch (e) { console.error(e); }
   }, []);
 
-  useEffect(() => { loadKeys(); loadSeeds(); }, [loadKeys, loadSeeds]);
+  useEffect(() => { loadKeys(); loadSeeds(); loadLiveModels(); }, [loadKeys, loadSeeds, loadLiveModels]);
 
   const runCompare = async () => {
     setLoading(true);
@@ -150,12 +171,16 @@ export default function ProvidersCompareTab() {
         <CardHeader><CardTitle className="text-base">Провайдеры ({selected.length} выбрано)</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {providers.length === 0 && <div className="text-sm text-text-secondary">Нет ключей. Добавьте в «Провайдеры».</div>}
-          {providers.map(p => (
-            <label key={p.key_id} className="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 rounded bg-gray-800/50">
-              <input type="checkbox" checked={selected.includes(p.key_id)} onChange={() => toggle(p.key_id)} />
-              <span className="text-text-primary">{p.label}</span>
-            </label>
-          ))}
+          {providers.map(p => {
+            const live = isModelLive(p);
+            return (
+              <label key={p.key_id} className={`flex items-center gap-2 text-sm cursor-pointer px-2 py-1 rounded ${live ? 'bg-gray-800/50' : 'bg-red-900/20 border border-red-500/30'}`}>
+                <input type="checkbox" checked={selected.includes(p.key_id)} onChange={() => toggle(p.key_id)} />
+                <span className="text-text-primary">{p.label}</span>
+                {!live && <span className="text-xs text-red-400" title="Модель отсутствует в актуальном списке OpenRouter">⚠ недоступна</span>}
+              </label>
+            );
+          })}
         </CardContent>
       </Card>
 
