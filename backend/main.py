@@ -848,9 +848,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     if prompt:
                         from core.pipeline import get_pipeline
                         pipeline = get_pipeline()
+                        # Use session_id from message context for per-session state
+                        session_id = message.get("context", {}).get("user_id")
                         result = await pipeline.execute(
                             user_message=prompt,
-                            context=message.get("context")
+                            context=message.get("context"),
+                            session_id=session_id,
                         )
                         await manager.send_personal(websocket, {
                             "type": "chat_response",

@@ -3,7 +3,7 @@ import json
 import os
 import tempfile
 from scripts.impulse import (
-    ImpulseCore, ImpulseDimension, ImpulseState,
+    ImpulseCore, ImpulseDimension,
     ImpulseManager, default_dimensions, IMPULSE_LABELS
 )
 

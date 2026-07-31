@@ -13,8 +13,14 @@ from typing import Optional, Dict, List, Any
 import json
 import os
 import logging
+import time
+import uuid
 
 logger = logging.getLogger("PAD+.roots")
+
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 from .base import MemoryRecord
 
@@ -274,34 +280,68 @@ class RootsMemory:
     
     def get(self, root_id: str) -> Optional[RootKnowledge]:
         """Получает знание по ID"""
-        return self._roots.get(root_id)
+        import time
+        start_time = time.perf_counter()
+        
+        root = self._roots.get(root_id)
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.ROOTS_MEMORY,
+            object_type=MemoryObjectType.ROOT,
+            object_id=root_id,
+            result=MemoryResult.FOUND if root else MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="get",
+        )
+        return root
     
     def get_all(self) -> List[RootKnowledge]:
         """Возвращает все корневые знания"""
-        return sorted(self._roots.values(), key=lambda x: -x.priority)
-    
-    def get_by_category(self, category: str) -> List[RootKnowledge]:
-        """Получает знания по категории"""
-        roots = [r for r in self._roots.values() if r.category == category]
-        return sorted(roots, key=lambda x: -x.priority)
-    
-    def get_categories(self) -> List[str]:
-        """Возвращает все категории"""
-        return list(set(r.category for r in self._roots.values()))
+        import time
+        start_time = time.perf_counter()
+        
+        result = sorted(self._roots.values(), key=lambda x: -x.priority)
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.ROOTS_MEMORY,
+            object_type=MemoryObjectType.ROOT,
+            object_id="",
+            result=MemoryResult.FOUND,
+            duration_ms=duration_ms,
+            phase="get_all",
+            payload_size_bytes=len(str(r) for r in result),
+        )
+        return result
     
     def search(self, query: str, limit: int = 10) -> List[RootKnowledge]:
         """Поиск по тексту"""
+        import time
+        start_time = time.perf_counter()
+        
         query_lower = query.lower()
         results = [
             r for r in self._roots.values()
             if query_lower in r.text.lower()
         ]
-        return sorted(results, key=lambda x: -x.priority)[:limit]
-    
-    def get_top_priorities(self, n: int = 10) -> List[RootKnowledge]:
-        """Возвращает N самых приоритетных знаний"""
-        sorted_roots = sorted(self._roots.values(), key=lambda x: -x.priority)
-        return sorted_roots[:n]
+        result = sorted(results, key=lambda x: -x.priority)[:limit]
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.SEARCH,
+            component=MemoryComponent.ROOTS_MEMORY,
+            object_type=MemoryObjectType.ROOT,
+            object_id="",
+            result=MemoryResult.FOUND if result else MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="search",
+            payload_size_bytes=sum(len(str(r)) for r in result) if result else 0,
+            payload_preview=f"query={query}, limit={limit}",
+        )
+        return result
     
     def add(self, text: str, category: str, priority: int = 50,
             immutable: bool = True, source: str = "learned",
@@ -309,7 +349,46 @@ class RootsMemory:
         """
         Добавляет новое корневое знание
         
-        ВНИМАНИЕ:immutable=False позволяет изменять/удалять
+        ВНИМАНИЕ: immutable=False позволяет изменять/удалять
+        """
+        import time
+        import uuid
+        start_time = time.perf_counter()
+        
+        root = RootKnowledge(
+            id=f"root_{uuid.uuid4().hex[:8]}",
+            text=text,
+            category=category,
+            priority=priority,
+            immutable=immutable,
+            source=source,
+            metadata=metadata or {}
+        )
+        self._roots[root.id] = root
+        self._save()
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.ROOTS_MEMORY,
+            object_type=MemoryObjectType.ROOT,
+            object_id=root.id,
+            result=MemoryResult.CREATED,
+            duration_ms=duration_ms,
+            phase="add",
+            payload_size_bytes=len(text),
+            payload_preview=f"category={category}, priority={priority}",
+        )
+        return root
+    
+    def add(self, text: str, category: str, priority: int = 50,
+            immutable: bool = True, source: str = "learned",
+            metadata: dict = None) -> RootKnowledge:
+        """
+        Добавляет новое корневое знание
+        
+        ВНИМАНИЕ: immutable=False позволяет изменять/удалять
         """
         import uuid
         root = RootKnowledge(
@@ -327,36 +406,119 @@ class RootsMemory:
     
     def update(self, root_id: str, **kwargs) -> bool:
         """Обновляет знание (если не immutable)"""
+        import time
+        start_time = time.perf_counter()
+        
         root = self._roots.get(root_id)
         if not root:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.ROOTS_MEMORY,
+                object_type=MemoryObjectType.ROOT,
+                object_id=root_id,
+                result=MemoryResult.NOT_FOUND,
+                duration_ms=(time.perf_counter() - start_time) * 1000,
+                phase="update",
+            )
             return False
         
         if root.immutable and 'text' in kwargs:
-            return False  # Нельзя изменять immutable текст
+            emit_memory_event(
+                operation=MemoryOperation.WRITE,
+                component=MemoryComponent.ROOTS_MEMORY,
+                object_type=MemoryObjectType.ROOT,
+                object_id=root_id,
+                result=MemoryResult.CONFLICT,
+                duration_ms=(time.perf_counter() - start_time) * 1000,
+                phase="update",
+                error="immutable",
+            )
+            return False
         
         for key, value in kwargs.items():
             if hasattr(root, key) and key != 'id':
                 setattr(root, key, value)
         
         self._save()
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.ROOTS_MEMORY,
+            object_type=MemoryObjectType.ROOT,
+            object_id=root_id,
+            result=MemoryResult.UPDATED,
+            duration_ms=duration_ms,
+            phase="update",
+        )
         return True
     
     def delete(self, root_id: str) -> bool:
         """Удаляет знание (если не immutable)"""
+        import time
+        start_time = time.perf_counter()
+        
         root = self._roots.get(root_id)
         if not root:
+            emit_memory_event(
+                operation=MemoryOperation.DELETE,
+                component=MemoryComponent.ROOTS_MEMORY,
+                object_type=MemoryObjectType.ROOT,
+                object_id=root_id,
+                result=MemoryResult.NOT_FOUND,
+                duration_ms=(time.perf_counter() - start_time) * 1000,
+                phase="delete",
+            )
             return False
         
         if root.immutable:
+            emit_memory_event(
+                operation=MemoryOperation.DELETE,
+                component=MemoryComponent.ROOTS_MEMORY,
+                object_type=MemoryObjectType.ROOT,
+                object_id=root_id,
+                result=MemoryResult.CONFLICT,
+                duration_ms=(time.perf_counter() - start_time) * 1000,
+                phase="delete",
+                error="immutable",
+            )
             return False
         
         del self._roots[root_id]
         self._save()
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.DELETE,
+            component=MemoryComponent.ROOTS_MEMORY,
+            object_type=MemoryObjectType.ROOT,
+            object_id=root_id,
+            result=MemoryResult.DELETED,
+            duration_ms=duration_ms,
+            phase="delete",
+        )
         return True
     
     def count(self) -> int:
         """Возвращает количество знаний"""
-        return len(self._roots)
+        import time
+        start_time = time.perf_counter()
+        
+        result = len(self._roots)
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.ROOTS_MEMORY,
+            object_type=MemoryObjectType.ROOT,
+            object_id="",
+            result=MemoryResult.FOUND,
+            duration_ms=duration_ms,
+            phase="count",
+        )
+        return result
     
     def count_by_category(self) -> Dict[str, int]:
         """Возвращает количество знаний по категориям"""

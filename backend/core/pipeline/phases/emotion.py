@@ -14,8 +14,10 @@ class EmotionPhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from emotion.pad_model import get_pad_model
-            pad = get_pad_model()
+            from emotion.session_store import get_session_emotion_store
+
+            store = get_session_emotion_store()
+            pad = store.get_or_create(ctx.session_id)
             state = pad.get_state()
             return PhaseResult(
                 success=True,

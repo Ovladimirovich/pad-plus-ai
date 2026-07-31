@@ -35,29 +35,6 @@ class PersonalityTrait:
 
 
 @dataclass
-class InteractionMemory:
-    """Память о взаимодействии с пользователем"""
-    user_id: str
-    first_seen: str
-    last_interaction: str
-    total_interactions: int
-    topics_discussed: List[str]
-    emotional_tone: str
-    preferences: Dict[str, Any]
-    
-    def to_dict(self) -> dict:
-        return {
-            "user_id": self.user_id,
-            "first_seen": self.first_seen,
-            "last_interaction": self.last_interaction,
-            "total_interactions": self.total_interactions,
-            "topics_discussed": self.topics_discussed,
-            "emotional_tone": self.emotional_tone,
-            "preferences": self.preferences
-        }
-
-
-@dataclass
 class SelfReflection:
     """Запись саморефлексии"""
     timestamp: str
@@ -108,9 +85,6 @@ class PersonaMemory:
         self.values: List[str] = []  # Ценности
         self.principles: List[str] = []  # Принципы
         
-        # Память о пользователях
-        self.users: Dict[str, InteractionMemory] = {}
-        
         # Саморефлексия
         self.reflections: List[SelfReflection] = []
         
@@ -140,8 +114,7 @@ class PersonaMemory:
                 pg = PgStorage("persona_state", mode="singleton")
                 data = pg.load_singleton(self._default_factory)
                 self._from_dict(data)
-                logger.info(f"✅ Persona загружена из PostgreSQL: {len(self.traits)} черт, "
-                           f"{len(self.users)} пользователей")
+                logger.info(f"✅ Persona загружена из PostgreSQL: {len(self.traits)} черт")
                 return
             except Exception as e:
                 logger.warning(f"PostgreSQL недоступен, fallback на файл: {e}")
@@ -152,8 +125,7 @@ class PersonaMemory:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self._from_dict(data)
-                logger.info(f"✅ Persona загружена из файла: {len(self.traits)} черт, "
-                           f"{len(self.users)} пользователей")
+                logger.info(f"✅ Persona загружена из файла: {len(self.traits)} черт")
                 return
             except Exception as e:
                 logger.warning(f"Ошибка загрузки persona из файла: {e}")
@@ -243,7 +215,6 @@ class PersonaMemory:
             },
             "values": self.values,
             "principles": self.principles,
-            "users": {k: u.to_dict() for k, u in self.users.items()},
             "reflections": [r.to_dict() for r in self.reflections[-50:]],
             "style_preferences": self.style_preferences
         }
@@ -275,19 +246,6 @@ class PersonaMemory:
         
         self.values = data.get("values", [])
         self.principles = data.get("principles", [])
-        
-        # Пользователи
-        self.users = {}
-        for k, v in data.get("users", {}).items():
-            self.users[k] = InteractionMemory(
-                user_id=v["user_id"],
-                first_seen=v["first_seen"],
-                last_interaction=v["last_interaction"],
-                total_interactions=v["total_interactions"],
-                topics_discussed=v.get("topics_discussed", []),
-                emotional_tone=v.get("emotional_tone", "neutral"),
-                preferences=v.get("preferences", {})
-            )
         
         # Рефлексии
         self.reflections = []
@@ -327,39 +285,6 @@ class PersonaMemory:
         self.traits[name].adjust(delta)
         self._save()
         return True
-    
-    def record_interaction(
-        self,
-        user_id: str,
-        topic: Optional[str] = None,
-        emotion: str = "neutral"
-    ) -> None:
-        """Записывает взаимодействие с пользователем"""
-        now = datetime.now().isoformat()
-        
-        if user_id not in self.users:
-            self.users[user_id] = InteractionMemory(
-                user_id=user_id,
-                first_seen=now,
-                last_interaction=now,
-                total_interactions=1,
-                topics_discussed=[topic] if topic else [],
-                emotional_tone=emotion,
-                preferences={}
-            )
-        else:
-            user = self.users[user_id]
-            user.last_interaction = now
-            user.total_interactions += 1
-            if topic and topic not in user.topics_discussed:
-                user.topics_discussed.append(topic)
-            user.emotional_tone = emotion
-        
-        self._save()
-    
-    def get_user_memory(self, user_id: str) -> Optional[InteractionMemory]:
-        """Получить память о пользователе"""
-        return self.users.get(user_id)
     
     def add_reflection(
         self,
@@ -425,10 +350,6 @@ class PersonaMemory:
                     reverse=True
                 )[:3]
             ],
-            "users_known": len(self.users),
-            "total_interactions": sum(
-                u.total_interactions for u in self.users.values()
-            ),
             "reflections_count": len(self.reflections),
             "created_at": self.created_at,
             "last_updated": self.last_updated

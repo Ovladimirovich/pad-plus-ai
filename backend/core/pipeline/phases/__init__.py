@@ -28,6 +28,7 @@ from .dreams import DreamsPhase
 from .metrics import MetricsPhase
 from .response_guard import ResponseGuardPhase
 from .evaluation import EvaluationPhase
+from .memory_maintenance import MemoryMaintenancePhase
 
 __all__ = [
     "AntiLoopPhase",
@@ -56,4 +57,5 @@ __all__ = [
     "MetricsPhase",
     "ResponseGuardPhase",
     "EvaluationPhase",
+    "MemoryMaintenancePhase",
 ]

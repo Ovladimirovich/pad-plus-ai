@@ -10,7 +10,6 @@ from .core import (
     Impulse,
     ImpulseCore,
     ImpulseDimension,
-    ImpulseState,
     default_dimensions,
 )
 from .deltas import IMPULSE_DELTAS, MIN_SIGNIFICANCE, apply_deltas
@@ -33,7 +32,6 @@ from .signals import ensure_experience_in_context, infer_experience
 __all__ = [
     "Impulse",
     "ImpulseDimension",
-    "ImpulseState",
     "ImpulseCore",
     "ImpulseManager",
     "BiasBlock",

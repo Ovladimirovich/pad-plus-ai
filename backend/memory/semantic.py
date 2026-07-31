@@ -16,6 +16,10 @@ import json
 import os
 import sqlite3
 import logging
+import time
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 logger = logging.getLogger("PAD+.semantic")
 
@@ -264,6 +268,8 @@ class SemanticMemory:
         Добавляет новое знание в память
         """
         import uuid
+        import time
+        start_time = time.perf_counter()
         
         knowledge_id = str(uuid.uuid4())[:12]
         now = datetime.now()
@@ -291,12 +297,29 @@ class SemanticMemory:
         if knowledge_type == KnowledgeType.PROCEDURAL:
             self._procedures_cache[knowledge_id] = knowledge
         
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.SEMANTIC_MEMORY,
+            object_type=MemoryObjectType.FACT if knowledge_type == KnowledgeType.DECLARATIVE else MemoryObjectType.PROCEDURE,
+            object_id=knowledge_id,
+            result=MemoryResult.CREATED,
+            duration_ms=duration_ms,
+            phase="add_knowledge",
+            payload_size_bytes=len(content) + len(summary),
+            payload_preview=f"type={knowledge_type.value}, domain={domain}, confidence={confidence:.2f}",
+        )
+        
         logger.info(f"📚 Знание добавлено: {knowledge_id} ({knowledge_type.value}, domain: {domain})")
         
         return knowledge
     
     def _save_knowledge(self, knowledge: SemanticKnowledge):
         """Сохраняет знание в БД"""
+        import time
+        start_time = time.perf_counter()
+        
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -333,9 +356,26 @@ class SemanticMemory:
         
         conn.commit()
         conn.close()
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.SEMANTIC_MEMORY,
+            object_type=MemoryObjectType.FACT if knowledge.knowledge_type == KnowledgeType.DECLARATIVE else MemoryObjectType.PROCEDURE,
+            object_id=knowledge.id,
+            result=MemoryResult.CREATED,
+            duration_ms=duration_ms,
+            phase="_save_knowledge",
+            payload_size_bytes=len(knowledge.content) + len(knowledge.summary),
+            payload_preview=f"type={knowledge.knowledge_type.value}, domain={knowledge.domain}",
+        )
     
     def get_knowledge(self, knowledge_id: str) -> Optional[SemanticKnowledge]:
         """Получает знание по ID"""
+        import time
+        start_time = time.perf_counter()
+        
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -344,8 +384,29 @@ class SemanticMemory:
         row = cursor.fetchone()
         conn.close()
         
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
         if row:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.SEMANTIC_MEMORY,
+                object_type=MemoryObjectType.FACT,
+                object_id=knowledge_id,
+                result=MemoryResult.FOUND,
+                duration_ms=duration_ms,
+                phase="get_knowledge",
+            )
             return self._row_to_knowledge(row)
+        
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.SEMANTIC_MEMORY,
+            object_type=MemoryObjectType.FACT,
+            object_id=knowledge_id,
+            result=MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="get_knowledge",
+        )
         return None
     
     def search_knowledge(
@@ -360,6 +421,9 @@ class SemanticMemory:
         """
         Поиск знаний по критериям
         """
+        import time
+        start_time = time.perf_counter()
+        
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -401,6 +465,20 @@ class SemanticMemory:
         cursor.execute(sql, params)
         rows = cursor.fetchall()
         conn.close()
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.SEARCH,
+            component=MemoryComponent.SEMANTIC_MEMORY,
+            object_type=MemoryObjectType.FACT,
+            object_id="",
+            result=MemoryResult.FOUND if rows else MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="search_knowledge",
+            payload_size_bytes=sum(len(str(r)) for r in rows) if rows else 0,
+            payload_preview=f"query={query}, type={knowledge_type}, domain={domain}, limit={limit}",
+        )
         
         results = [self._row_to_knowledge(row) for row in rows]
         

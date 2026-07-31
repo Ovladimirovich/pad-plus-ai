@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional
 
 from ..base import PipelinePhase
 from ..models import PhaseResult
+from ..registry import register_phase
 
 logger = logging.getLogger("padplus.pipeline.memory_maintenance")
 
@@ -10,6 +11,7 @@ FUSION_INTERVAL_DIALOGS = 10
 FORGETTING_INTERVAL_DIALOGS = 25
 
 
+@register_phase("memory_maintenance", order=19)
 class MemoryMaintenancePhase(PipelinePhase):
     def __init__(self):
         self._dialogs_since_fusion = 0

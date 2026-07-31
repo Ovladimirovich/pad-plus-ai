@@ -208,7 +208,7 @@ class MemoryConsolidator:
         
         # Получаем недавние диалоги
         try:
-            recent = self.rag.get_recent(days=7, limit=self.config["max_consolidation_batch"])
+            recent = self.rag.get_recent(days=7, n_results=self.config["max_consolidation_batch"])
             items_processed = len(recent)
         except Exception as e:
             logger.warning(f"Не удалось получить RAG записи: {e}")

@@ -23,7 +23,6 @@ from core.impulse.core import (  # noqa: E402
     Impulse,
     ImpulseCore,
     ImpulseDimension,
-    ImpulseState,
     default_dimensions,
 )
 from core.impulse.deltas import (  # noqa: E402
@@ -47,7 +46,6 @@ from core.impulse.manager import (  # noqa: E402
 __all__ = [
     "Impulse",
     "ImpulseDimension",
-    "ImpulseState",
     "ImpulseCore",
     "ImpulseManager",
     "IMPULSE_LABELS",

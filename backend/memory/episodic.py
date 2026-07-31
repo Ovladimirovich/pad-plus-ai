@@ -18,6 +18,10 @@ import json
 import os
 import sqlite3
 import logging
+import time
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 logger = logging.getLogger("PAD+.episodic")
 
@@ -264,10 +268,12 @@ class EpisodicMemory:
         Добавляет новый эпизод в память
         
         Args:
-            user_id: ID владельца эпизода (None для общих записей)
+            user_id: ID владельца эпизода (None для общих)
         """
         import uuid
+        import time
 
+        start_time = time.perf_counter()
         episode_id = str(uuid.uuid4())[:12]
         now = datetime.now()
 
@@ -312,10 +318,30 @@ class EpisodicMemory:
         if len(self._recent_episodes) > self._max_recent:
             self._recent_episodes.pop(0)
         
-        logger.info(f"📝 Эпизод добавлен: {episode_id} (тема: {topic}, значимость: {significance:.2f})")
+        duration_ms = (time.perf_counter() - start_time) * 1000
         
+        # Emit MemoryEvent for X-Ray
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component="EpisodicMemory",
+            object_type="Episode",
+            object_id=episode_id,
+            result="CREATED",
+            duration_ms=duration_ms,
+            payload_size_bytes=len(str(episode)) if episode else 0,
+            session_id=user_id,
+            phase="SaveEpisodePhase",
+            metadata={
+                "topic": topic,
+                "intent": intent,
+                "significance": significance,
+                "duration_seconds": duration_seconds,
+            }
+        )
+        logger.info(f"📝 Эпизод добавлен: {episode_id} (тема: {topic}, значимость: {significance:.2f})")
+
         return episode
-    
+
     def _save_episode(self, episode: Episode):
         """Сохраняет эпизод в БД"""
         conn = sqlite3.connect(self.db_path)
@@ -364,9 +390,21 @@ class EpisodicMemory:
     
     def get_episode(self, episode_id: str) -> Optional[Episode]:
         """Получает эпизод по ID"""
+        import time
+        start_time = time.perf_counter()
         # Сначала проверяем кэш
         for ep in self._recent_episodes:
             if ep.id == episode_id:
+                duration_ms = (time.perf_counter() - start_time) * 1000
+                emit_memory_event(
+                    operation=MemoryOperation.READ,
+                    component=MemoryComponent.EPISODIC_MEMORY,
+                    object_type=MemoryObjectType.EPISODE,
+                    object_id=episode_id,
+                    result=MemoryResult.FOUND,
+                    duration_ms=(time.perf_counter() - start_time) * 1000,
+                    phase="get_episode",
+                )
                 return ep
         
         conn = sqlite3.connect(self.db_path)
@@ -377,8 +415,29 @@ class EpisodicMemory:
         row = cursor.fetchone()
         conn.close()
         
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
         if row:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.EPISODIC_MEMORY,
+                object_type=MemoryObjectType.EPISODE,
+                object_id=episode_id,
+                result=MemoryResult.FOUND,
+                duration_ms=duration_ms,
+                phase="get_episode",
+            )
             return self._row_to_episode(row)
+        
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.EPISODIC_MEMORY,
+            object_type=MemoryObjectType.EPISODE,
+            object_id=episode_id,
+            result=MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="get_episode",
+        )
         return None
     
     def _row_to_episode(self, row: sqlite3.Row) -> Episode:
@@ -435,6 +494,9 @@ class EpisodicMemory:
         Args:
             user_id: ID владельца (None для поиска по всем + общим записям)
         """
+        import time
+        start_time = time.perf_counter()
+        
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -477,40 +539,40 @@ class EpisodicMemory:
         cursor.execute(sql, params)
         rows = cursor.fetchall()
         conn.close()
-
-        episodes = [self._row_to_episode(row) for row in rows]
-
-        # Обновляем access_count
-        for ep in episodes:
-            ep.access_count += 1
-            ep.last_accessed = datetime.now()
-            self._save_episode(ep)
-
-        return episodes
-    
-    def get_timeline(
-        self,
-        days: int = 7,
-        limit: int = 50
-    ) -> List[Episode]:
-        """
-        Получает хронологию эпизодов за период
-        """
-        from datetime import timedelta
         
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.SEARCH,
+            component=MemoryComponent.EPISODIC_MEMORY,
+            object_type=MemoryObjectType.EPISODE,
+            object_id="",
+            result=MemoryResult.FOUND if rows else MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="search_episodes",
+            payload_size_bytes=sum(len(str(r)) for r in rows) if rows else 0,
+            payload_preview=f"query={query}, topic={topic}, intent={intent}, limit={limit}",
+        )
+        
+        return [self._row_to_episode(row) for row in rows]
+    
+    def get_all_episodes(self, limit: int = 100, user_id: Optional[str] = None) -> List[Episode]:
+        """
+        Получает все эпизоды (последние первыми)
+        """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        sql = "SELECT * FROM episodes"
+        params = []
+        if user_id:
+            sql += " WHERE user_id = ?"
+            params.append(user_id)
+        sql += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
         
-        cursor.execute("""
-            SELECT * FROM episodes 
-            WHERE timestamp >= ?
-            ORDER BY timestamp ASC
-            LIMIT ?
-        """, (cutoff, limit))
-        
+        cursor.execute(sql, params)
         rows = cursor.fetchall()
         conn.close()
         

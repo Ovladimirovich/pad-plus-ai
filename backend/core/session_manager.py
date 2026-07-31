@@ -195,10 +195,17 @@ class SessionManager:
         self,
         ip_address: str = "",
         user_agent: str = "",
-        settings: Dict = None
+        settings: Dict = None,
+        user_id: str = None
     ) -> Session:
-        """Создаёт новую сессию"""
-        session_id = f"sess_{uuid.uuid4().hex[:12]}"
+        """Создаёт новую сессию.
+        
+        Если передан user_id (Supabase user_id), использует его как session_id.
+        """
+        if user_id:
+            session_id = user_id
+        else:
+            session_id = f"sess_{uuid.uuid4().hex[:12]}"
         
         session = Session(
             session_id=session_id,
@@ -239,9 +246,20 @@ class SessionManager:
     def get_or_create(
         self,
         session_id: str = None,
-        ip_address: str = ""
+        ip_address: str = "",
+        user_id: str = None
     ) -> Session:
-        """Получает существующую или создаёт новую сессию"""
+        """Получает существующую или создаёт новую сессию.
+        
+        Если передан user_id (Supabase user_id), использует его как session_id.
+        """
+        # Если передан user_id, используем его как session_id
+        if user_id:
+            session = self.get_session(user_id)
+            if session:
+                return session
+            return self.create_session(user_id=user_id)
+        
         if session_id:
             session = self.get_session(session_id)
             if session:

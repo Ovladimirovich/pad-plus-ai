@@ -16,14 +16,15 @@ class EmotionUpdatePhase(PipelinePhase):
         try:
             user_message = ctx.user_message
             response = ctx.context.get("response", "")
-            from emotion.pad_model import get_pad_model
+            from emotion.session_store import get_session_emotion_store
             from emotion.emotion_learner import get_emotion_learner
 
-            pad = get_pad_model()
+            store = get_session_emotion_store()
+            pad = store.get_or_create(ctx.session_id)
             learner = get_emotion_learner()
             analysis = learner.learn_from_dialog(user_message, response)
             pad.apply_event(analysis["event"], analysis["intensity"])
-            pad.save()
+            store.save(ctx.session_id)
 
             return PhaseResult(success=True, data={
                 "emotion_event": analysis["event"],
