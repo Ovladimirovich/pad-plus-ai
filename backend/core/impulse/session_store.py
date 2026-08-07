@@ -36,10 +36,12 @@ class SessionImpulseStore:
 
     def __init__(self, base_path: str | None = None):
         if base_path is None:
-            base_path = str(
+            # По умолчанию — каталог данных проекта (data/), как у остальных storage
+            base_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(
                     os.path.dirname(__file__)
-                )))
+                ))),
+                SESSION_IMPULSE_DATA_DIR,
             )
         self.base_path = base_path
         self._sessions: Dict[str, ImpulseCore] = {}
@@ -107,6 +109,7 @@ class SessionImpulseStore:
     def _persist(self, session_id: str, core: ImpulseCore) -> None:
         """Сохраняет ImpulseCore в JSON-файл сессии."""
         try:
+            os.makedirs(self.base_path, exist_ok=True)
             path = os.path.join(self.base_path, f"impulse_state_{session_id}.json")
             with open(path, "w", encoding="utf-8") as f:
                 f.write(core.to_json())
