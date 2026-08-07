@@ -162,6 +162,31 @@ def generate_encryption_key() -> str:
     return Fernet.generate_key().decode()
 
 
+def mask_api_key(api_key: str, visible_head: int = 6, visible_tail: int = 4) -> str:
+    """
+    Безопасно маскирует API-ключ для логирования.
+
+    Показывает только первые `visible_head` и последние `visible_tail` символов,
+    остальное — звёздочками. Не раскрывает ключ в логах, но позволяет
+    отличить битый/посторонний ключ от рабочего и определить его источник.
+
+    Args:
+        api_key: Ключ (или пустая строка).
+        visible_head: сколько символов открыть в начале.
+        visible_tail: сколько символов открыть в конце.
+
+    Returns:
+        str: Замаскированное представление, либо "(пусто)" при пустом ключе.
+    """
+    if not api_key:
+        return "(пусто)"
+    if len(api_key) <= (visible_head + visible_tail):
+        return "*" * len(api_key)
+    head = api_key[:visible_head]
+    tail = api_key[-visible_tail:]
+    return f"{head}…{tail}"
+
+
 def initialize_encryptor(encryption_key: str) -> KeyEncryptor:
     """
     Принудительно инициализирует шифровальщик

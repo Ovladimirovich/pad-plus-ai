@@ -30,7 +30,7 @@ import os
 T = TypeVar('T')
 
 # Импорты шифрования и БД
-from core.encryption import get_encryptor
+from core.encryption import get_encryptor, mask_api_key as _mask_api_key
 from core.supabase_client import (
     get_supabase,
     get_supabase_service,
@@ -1113,6 +1113,7 @@ async def chat(
             api_key = raw_key.strip().encode("ascii", errors="ignore").decode("ascii")
             provider = key_data["provider"]  # ВСЕГДА из БД, не от фронтенда
             model = key_data.get("model_preference") or "auto"
+            logger.info(f"? Key loaded: provider={provider}, key={_mask_api_key(api_key)}")
         else:
             logger.warning(f"?? Key {request.key_id} not found for user {user_id}, falling back to default")
     else:
@@ -1134,6 +1135,7 @@ async def chat(
             api_key = raw_key.strip().encode("ascii", errors="ignore").decode("ascii")
             provider = key_data["provider"]  # ВСЕГДА из БД
             model = key_data.get("model_preference") or "auto"
+            logger.info(f"? Default key loaded: provider={provider}, key={_mask_api_key(api_key)}")
 
     if not api_key:
         # Нет ключа у пользователя — ошибка!
@@ -1814,7 +1816,7 @@ async def chat_stream(
             enc_len = len(key_data.get("api_key_encrypted", ""))
             logger.info(f"?? Stream: encrypted_len={enc_len}")
             api_key = encryptor.decrypt(key_data["api_key_encrypted"])
-            logger.info(f"?? Stream: decrypted_len={len(api_key)}")
+            logger.info(f"?? Stream: decrypted_len={len(api_key)}, key={_mask_api_key(api_key)}")
             provider = key_data["provider"]
             model = key_data.get("model_preference") or "auto"
     else:
@@ -1828,6 +1830,7 @@ async def chat_stream(
         if key_result.data:
             key_data = key_result.data[0]
             api_key = encryptor.decrypt(key_data["api_key_encrypted"])
+            logger.info(f"?? Stream default key loaded: provider={key_data['provider']}, key={_mask_api_key(api_key)}")
             provider = key_data["provider"]  # ВСЕГДА из БД
             model = key_data.get("model_preference") or "auto"
 
