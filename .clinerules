@@ -47,6 +47,14 @@ PAD+ AI — AI-ассистент с когнитивной архитектур
 - `\xa0` (неразрывный пробел) ломает Authorization header
 - Фикс: `.encode("ascii", errors="ignore")` при сохранении и чтении ключа
 
+### Повреждённые ключи в проде → OpenRouter 401 «User not found»
+- **Симптомы:** локально провайдеры работают, на Render OpenRouter отвечает `401 {"error":{"message":"User not found."}}`.
+- **Причина (как правило НЕ в коде):** ключ добрался до OpenRouter, но не распознан — запись в БД прода (Supabase) повреждена. Часто — битый ключ, сохранённый ДО фикса `\xa0`/ascii-очистки, или введённый под другим аккаунтом/укороченный. Ключ, добавленный в старую инфраструктуру, не чинится сам: пересохранение записи в БД прода для нового кода не даёт результата.
+- **Первое, что проверить:** пересохранить ключ через интерфейс «Провайдеры» (⚡) на ПРОДЕ (не локально) → кнопка «Тестировать ключ».
+- **Сек реды:** `ENCRYPTION_KEY` на Render — пароль (passphrase) для PBKDF2HMAC (SHA256, соль `ENCRYPTION_SALT`, fallback `b'PAD+AI_fallback_salt_v1'`). Если `ENCRYPTION_KEY`/`ENCRYPTION_SALT` на Render отличаются от тех, что были при сохранении ключа — дешифровка даёт мусор → 401. НЕ менять эти env после того как ключи сохранены (иначе все сохранённые ключи станут нерасшифров.уемыми).
+- **Диагностика логами:** `mask_api_key()` в `backend/core/encryption.py` — логирует `sk-…head…tail` (без раскрытия ключа) в chat/stream и `session_provider_manager.py`, чтобы отличить «зашифровано с другим ENCRYPTION_KEY» от «ключ в базе битый».
+- **Важно:** не путать с пустым ключом — если `decrypt` вернул пустое, будет ошибка «API ключ не настроен», а не 401 от OpenRouter. 401 значит ключ дошёл до провайдера, но невалиден.
+
 ### Persona deltas import (500)
 - `GET /api/v1/admin/persona/deltas` — **ImportError**: импорт `_IMPULSE_DELTAS` из `core.pipeline.phases.impulse_update`, где его нет. Фактически определён в `core.impulse.deltas`.
 - Фикс: `backend/api/persona_routes.py:51` — заменить импорт на `from core.impulse.deltas import _IMPULSE_DELTAS`
