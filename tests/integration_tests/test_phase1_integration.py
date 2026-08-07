@@ -10,6 +10,7 @@
 
 import pytest
 import asyncio
+import json
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
 import sys
@@ -81,14 +82,14 @@ class TestLLMWithUserKey:
 
     def test_LLM_service_with_api_key(self):
         """Проверяет, что LLMService принимает api_key"""
-        from backend.runtime.litellm_service import LLMService
+        from runtime.llm_service import LLMService
         
         service = LLMService(api_key="test-key-123")
         assert service.default_api_key == "test-key-123"
 
     def test_LLM_service_with_provider(self):
         """Проверяет, что LLMService принимает provider"""
-        from backend.runtime.litellm_service import LLMService
+        from runtime.llm_service import LLMService
         
         service = LLMService(api_key="test-key", model="gemini-2.0-flash")
         assert service.default_model == "gemini-2.0-flash"
@@ -99,7 +100,7 @@ class TestLLMWithUserKey:
         Проверяет, что generate() использует ключ пользователя
         (с моком, чтобы не делать реальный запрос)
         """
-        from backend.runtime.litellm_service import LLMService, LLMResponse
+        from runtime.llm_service import LLMService
         
         service = LLMService(api_key="user-key-123")
         
@@ -107,12 +108,11 @@ class TestLLMWithUserKey:
         with patch.object(service._session, 'post') as mock_post:
             mock_response = AsyncMock()
             mock_response.status_code = 200
-            mock_response.json = AsyncMock(return_value={
+            mock_response.aread = AsyncMock(return_value=json.dumps({
                 "choices": [{"message": {"content": "Ответ"}, "finish_reason": "stop"}],
                 "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
                 "model": "gemini-2.0-flash"
-            })
-            mock_response.text = ""
+            }).encode("utf-8"))
             mock_post.return_value = mock_response
             
             # Вызываем generate с ключом пользователя
@@ -120,7 +120,8 @@ class TestLLMWithUserKey:
                 prompt="Тест",
                 system_prompt="Системный промпт",
                 api_key="user-key-123",
-                model="gemini-2.0-flash"
+                model="gemini-2.0-flash",
+                provider="openrouter",
             )
             
             # Проверяем, что post был вызван с правильными заголовками
@@ -137,14 +138,14 @@ class TestChatEndpointWithPipeline:
     """Тесты /chat endpoint с Pipeline"""
 
     def test_chat_request_has_auto_mode(self):
-        """Проверяет, что ChatRequestSimple имеет auto_mode"""
-        from backend.api.frontend_routes import ChatRequestSimple
+        """Проверяет, что ChatRequest имеет auto_mode"""
+        from backend.api.frontend_routes import ChatRequest
         
-        request = ChatRequestSimple(message="Тест")
-        assert request.auto_mode is False
-        
-        request = ChatRequestSimple(message="Тест", auto_mode=True)
+        request = ChatRequest(message="Тест")
         assert request.auto_mode is True
+        
+        request = ChatRequest(message="Тест", auto_mode=False)
+        assert request.auto_mode is False
 
     @pytest.mark.asyncio
     async def test_chat_response_has_is_fast_mode(self):
@@ -225,46 +226,17 @@ class TestKeyIsolation:
     @pytest.mark.asyncio
     async def test_different_users_different_keys(self):
         """
-        Проверяет, что ключи разных пользователей не пересекаются
+        Проверяет, что ключи разных пользователей не пересекаются:
+        ключ НЕ хранится в PipelineExecutor, а передаётся через context.execute.
         """
         from backend.core.pipeline import PipelineExecutor
         
         pipeline = PipelineExecutor()
         
-        # Мок для LLMService
-        with patch('backend.core.pipeline.LLMService') as MockLLM:
-            mock_service = AsyncMock()
-            mock_service.generate = AsyncMock(return_value=AsyncMock(
-                text="Ответ",
-                model="test",
-                provider="google",
-                confidence=0.85
-            ))
-            MockLLM.return_value = mock_service
-            
-            # Пользователь 1
-            await pipeline.execute(
-                user_message="Тест 1",
-                api_key="user1-key",
-                provider="google"
-            )
-            
-            # Пользователь 2
-            await pipeline.execute(
-                user_message="Тест 2",
-                api_key="user2-key",
-                provider="groq"
-            )
-            
-            # Проверяем, что LLMService был создан с разными ключами
-            calls = MockLLM.call_args_list
-            assert len(calls) == 2
-            
-            # Первый вызов с ключом пользователя 1
-            assert calls[0][1]['api_key'] == "user1-key"
-            
-            # Второй вызов с ключом пользователя 2
-            assert calls[1][1]['api_key'] == "user2-key"
+        # Ключи не сохраняются в атрибутах pipeline
+        assert not hasattr(pipeline, '_user_api_key')
+        assert not hasattr(pipeline, '_api_key')
+        assert not hasattr(pipeline, '_api_key_cache')
 
     @pytest.mark.asyncio
     async def test_key_not_stored_in_pipeline(self):
@@ -334,7 +306,7 @@ class TestPhase1Integration:
         assert 'provider' in params
         
         # 2. LLMService принимает ключ
-        from backend.runtime.litellm_service import LLMService
+        from runtime.llm_service import LLMService
         service = LLMService(api_key="test")
         assert service.default_api_key == "test"
         

@@ -101,12 +101,14 @@ class TestPipelineIntegration:
 
     def test_pipeline_source_has_consolidation_user_id(self):
         """
-        Проверяет, что в коде Pipeline есть передача user_id в Consolidation
+        Проверяет, что в коде Pipeline есть передача user_id в Consolidation.
+        В v5.0 консолидация выполняется в фоне (background path),
+        а не в hot-path execute().
         """
         from backend.core.pipeline import PipelineExecutor
         import inspect
         
-        source = inspect.getsource(PipelineExecutor.execute)
+        source = inspect.getsource(PipelineExecutor._run_background_consolidation)
         
         # Проверяем, что есть передача user_id
         assert 'user_id' in source
@@ -220,7 +222,7 @@ class TestPhase5Integration:
         # 2. Pipeline передаёт user_id
         from backend.core.pipeline import PipelineExecutor
         
-        source = inspect.getsource(PipelineExecutor.execute)
+        source = inspect.getsource(PipelineExecutor._run_background_consolidation)
         assert 'run_scheduled_consolidation' in source
         assert 'user_id' in source
         

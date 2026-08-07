@@ -313,7 +313,7 @@ class RootsMemory:
             result=MemoryResult.FOUND,
             duration_ms=duration_ms,
             phase="get_all",
-            payload_size_bytes=len(str(r) for r in result),
+            payload_size_bytes=sum(len(r.text or "") for r in result),
         )
         return result
     
@@ -536,7 +536,7 @@ class RootsMemory:
             "mutable_count": sum(1 for r in self._roots.values() if not r.immutable),
             "top_priorities": [
                 {"id": r.id, "text": r.text[:50], "priority": r.priority}
-                for r in self.get_top_priorities(5)
+                for r in sorted(self._roots.values(), key=lambda x: -x.priority)[:5]
             ]
         }
     
@@ -554,7 +554,7 @@ class RootsMemory:
     
     def export_for_context(self, max_items: int = 20) -> str:
         """Экспортирует знания для контекста LLM"""
-        roots = self.get_top_priorities(max_items)
+        roots = sorted(self.get_all(), key=lambda r: r.priority, reverse=True)[:max_items]
         lines = ["# Фундаментальные принципы PAD+ AI:\n"]
         
         for root in roots:

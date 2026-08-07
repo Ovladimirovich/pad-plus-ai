@@ -391,13 +391,19 @@ class PersonaMemory:
         
         values_text = "\n".join(f"- {v}" for v in self.values[:3])
         
+        # Размер payload: сумма длин строковых значений (значения черт — числа)
+        payload = 0
+        for t in self.traits.values():
+            val = t.value
+            if isinstance(val, str):
+                payload += len(val)
         emit_memory_event(
             operation=MemoryOperation.READ,
             component=MemoryComponent.PERSONA_MEMORY,
             object_type=MemoryObjectType.PERSONA_TRAITS,
             result=MemoryResult.FOUND,
             phase="persona.get_persona_context",
-            payload_size_bytes=sum(len(t.value) for t in self.traits.values()),
+            payload_size_bytes=payload,
         )
         
         return f"""Моя личность:

@@ -94,7 +94,7 @@ class TestMigrations:
         sql_dir = Path(__file__).resolve().parent.parent / "backend" / "database" / "migrations"
         sql_files = sorted(f.name for f in sql_dir.glob("*.sql"))
 
-        assert len(sql_files) == 16, f"Expected 16 SQL files, found {len(sql_files)}"
-        expected_prefixes = [f"{i:03d}" for i in range(1, 23)] + ["017"]
+        assert len(sql_files) == 18, f"Expected 18 SQL files, found {len(sql_files)}"
+        expected_prefixes = [f"{i:03d}" for i in range(1, 25)]
         for sf in sql_files:
             assert any(sf.startswith(p) for p in expected_prefixes), f"Unexpected SQL file: {sf}"

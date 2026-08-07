@@ -150,17 +150,23 @@ class TestPipelineIntegration:
 
     def test_pipeline_source_has_user_id(self):
         """
-        Проверяет, что в коде Pipeline есть передача user_id в Episodic
+        Проверяет, что фазы Pipeline передают user_id в Episodic.
+        В v5.0 эпизаписы сохраняются через отдельные фазы
+        (episodic / save_episode), а не напрямую в execute().
         """
-        from backend.core.pipeline import PipelineExecutor
         import inspect
+        from backend.core.pipeline.phases import episodic, save_episode
         
-        source = inspect.getsource(PipelineExecutor.execute)
+        src_search = inspect.getsource(episodic.EpisodicPhase.execute)
+        src_save = inspect.getsource(save_episode.SaveEpisodePhase.execute)
         
-        # Проверяем, что есть передача user_id
-        assert 'user_id' in source
-        assert 'episodic.add_episode' in source
-        assert 'episodic.search_episodes' in source
+        # Поиск эпизодов фильтруется по user_id
+        assert 'user_id' in src_search
+        assert 'search_episodes' in src_search
+        
+        # Сохранение эпизодов с user_id
+        assert 'user_id' in src_save
+        assert 'add_episode' in src_save
 
 
 # ============================================================================
@@ -206,12 +212,13 @@ class TestPhase3Integration:
             sig = inspect.signature(episodic.search_episodes)
             assert 'user_id' in list(sig.parameters.keys())
         
-        # 4. Pipeline передаёт user_id
-        from backend.core.pipeline import PipelineExecutor
+        # 4. Pipeline передаёт user_id (в фазах Episodic и save_episode)
+        from backend.core.pipeline.phases import episodic, save_episode
         
-        source = inspect.getsource(PipelineExecutor.execute)
-        assert 'user_id' in source
-        assert 'episodic.add_episode' in source
+        src_search = inspect.getsource(episodic.EpisodicPhase.execute)
+        src_save = inspect.getsource(save_episode.SaveEpisodePhase.execute)
+        assert 'user_id' in src_search
+        assert 'add_episode' in src_save
         
         # 5. Миграция существует
         migration_script = Path(__file__).parent.parent.parent / "scripts" / "migrate_episodic_user_id.py"

@@ -68,6 +68,12 @@ from .lifecycle import (
     get_lifecycle, reset_lifecycle,
 )
 
+# === Unified Memory Service (D'-4: типизированный доступ ко всей памяти) ===
+try:
+    from core.memory_service import MemoryService, MemorySnapshot, get_memory_service
+except ImportError:
+    pass
+
 # === Утилиты ===
 from .hygiene import MemoryHygiene, get_hygiene
 
@@ -114,4 +120,9 @@ __all__ = [
     "MemoryLifecycleManager",
     "get_lifecycle",
     "reset_lifecycle",
+
+    # Unified Memory Service (D'-4)
+    "MemoryService",
+    "MemorySnapshot",
+    "get_memory_service",
 ]

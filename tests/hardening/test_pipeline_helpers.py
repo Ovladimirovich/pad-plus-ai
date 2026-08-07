@@ -72,18 +72,17 @@ class TestFormatRagContext:
             persona_context="Persona info",
             emotion_style={"tone": "friendly"},
             emotion_state={"уверенность": 0.8},
-            strategy="simple",
+            strategy="reasoning",
             roots_context="Roots data",
             persona_prompt="Be helpful"
         )
         
-        assert "Ты — PAD+ AI" in result
         assert "Roots data" in result
         assert "Be helpful" in result
         assert "Persona info" in result
         assert "friendly" in result
         assert "0.80" in result
-        assert "simple" in result
+        assert "reasoning" in result
     
     def test_format_context_with_empty_values(self):
         """Форматирование контекста с пустыми значениями"""

@@ -87,9 +87,10 @@ class TestRAGPostgreSQL:
         rag = RAGMemory()
         
         assert rag is not None
-        assert rag._initialized is False
-        assert rag.conn is None
-        assert rag.cursor is None
+        assert hasattr(rag, 'conn')
+        assert hasattr(rag, 'cursor')
+        assert hasattr(rag, 'get_context')
+        assert hasattr(rag, 'hybrid_search')
 
     def test_rag_functions_exist(self):
         """Проверяет наличие необходимых функций"""

@@ -203,12 +203,11 @@ class TestRateLimiting:
         cache_manager.redis.get = AsyncMock(return_value=None)
         cache_manager.set_redis = AsyncMock()
         
-        is_limited, remaining = await cache_manager.is_rate_limited(
+        is_limited = await cache_manager.is_rate_limited(
             "user1", limit=10, window=60
         )
         
         assert is_limited is False
-        assert remaining == 9
     
     @pytest.mark.asyncio
     async def test_rate_limit_exceeded(self, cache_manager):
@@ -223,12 +222,11 @@ class TestRateLimiting:
         cache_manager.redis.get = AsyncMock(return_value=recent_requests)
         cache_manager.set_redis = AsyncMock()
         
-        is_limited, remaining = await cache_manager.is_rate_limited(
+        is_limited = await cache_manager.is_rate_limited(
             "user2", limit=10, window=60
         )
         
         assert is_limited is True
-        assert remaining == 0
     
     @pytest.mark.asyncio
     async def test_rate_limit_error_handling(self, cache_manager):
@@ -236,7 +234,9 @@ class TestRateLimiting:
         cache_manager.redis = AsyncMock()
         cache_manager.redis.get = AsyncMock(side_effect=Exception("Redis error"))
         
-        is_limited, remaining = await cache_manager.is_rate_limited("user3")
+        is_limited = await cache_manager.is_rate_limited(
+            "user3", limit=10, window=60
+        )
         
         # При ошибке не блокируем
         assert is_limited is False

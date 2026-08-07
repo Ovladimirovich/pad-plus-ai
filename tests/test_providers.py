@@ -164,47 +164,29 @@ class TestProviderManagerGenerate:
     @patch.dict(os.environ, {"GIGACHAT_AUTH_KEY": "sys-gigachat-key"})
     async def test_fallback_openrouter_to_gigachat(self, mock_llm_service):
         """
-        Fallback OpenRouter → GigaChat при ошибке OpenRouter.
-        GigaChat берётся из системного ключа.
+        Явный провайдер OpenRouter падает — НЕТ кросс-fallback на GigaChat
+        (системный ключ GigaChat убран; ProviderManager работает только с
+        пользовательским ключом для указанного провайдера).
         """
-        # OpenRouter падает, GigaChat работает
-        call_count = 0
-        
         async def mock_generate_with_fallback(**kwargs):
-            nonlocal call_count
-            call_count += 1
-            provider = kwargs.get('provider', '')
-            
-            if provider == 'openrouter':
-                raise ValueError("500 Server Error")
-            elif provider == 'gigachat':
-                return LLMResponse(
-                    text="Ответ от GigaChat (fallback)",
-                    model="GigaChat",
-                    provider="gigachat",
-                    usage={"total_tokens": 5},
-                    finish_reason="stop",
-                )
-            raise ValueError(f"Unknown provider: {provider}")
-        
+            raise ValueError("500 Server Error")
+
         mock_llm_service.generate = mock_generate_with_fallback
         pm = ProviderManager(llm_service=mock_llm_service)
-        
-        result = await pm.generate(
-            prompt="Привет",
-            api_key="sk-test",
-            provider="openrouter",
-        )
-        
-        assert result.fallback_used is True
-        assert result.fallback_from == "openrouter"
-        assert result.fallback_to == "gigachat"
-        assert result.response.provider == "gigachat"
-        assert call_count == 2
+
+        with pytest.raises(AllProvidersFailedError) as exc_info:
+            await pm.generate(
+                prompt="Привет",
+                api_key="sk-test",
+                provider="openrouter",
+            )
+
+        assert "openrouter" in exc_info.value.errors
+        assert "gigachat" not in exc_info.value.errors
 
     @patch.dict(os.environ, {"GIGACHAT_AUTH_KEY": ""})
     async def test_fallback_all_fail(self, mock_llm_service):
-        """Оба провайдера падают — AllProvidersFailedError."""
+        """Единственный провайдер падает — AllProvidersFailedError."""
         async def mock_generate_fail(**kwargs):
             raise ValueError("500 Server Error")
         
@@ -219,7 +201,6 @@ class TestProviderManagerGenerate:
             )
         
         assert "openrouter" in exc_info.value.errors
-        assert "gigachat" in exc_info.value.errors
         assert exc_info.value.original_provider == "openrouter"
 
     @patch.dict(os.environ, {"GIGACHAT_AUTH_KEY": ""})
@@ -239,7 +220,8 @@ class TestProviderManagerGenerate:
                 api_key="sk-test",
                 provider="openrouter",
             )
-        assert "критическую ошибку" in str(exc_info.value)
+        assert "Провайдер openrouter недоступен" in str(exc_info.value)
+        assert "400 Bad Request" in str(exc_info.value)
 
     @patch.dict(os.environ, {"GIGACHAT_AUTH_KEY": ""})
     async def test_auto_provider_selection(self, mock_llm_service):
@@ -270,10 +252,12 @@ class TestProviderManagerGenerate:
 
     @patch.dict(os.environ, {"GIGACHAT_AUTH_KEY": "sys-gigachat-key"})
     async def test_gigachat_key_from_env(self, mock_llm_service):
-        """Системный GigaChat ключ из .env."""
+        """
+        Системный GigaChat ключ из .env больше НЕ используется:
+        ключ передаётся пользовательский (api_key). Проверяем работу с явной моделью.
+        """
         async def mock_generate_gigachat(**kwargs):
             key = kwargs.get('api_key', '')
-            assert key == "sys-gigachat-key", "Должен использовать системный ключ"
             return LLMResponse(
                 text="Ответ от GigaChat",
                 model="GigaChat",
@@ -281,13 +265,13 @@ class TestProviderManagerGenerate:
                 usage={},
                 finish_reason="stop",
             )
-        
+
         mock_llm_service.generate = mock_generate_gigachat
         pm = ProviderManager(llm_service=mock_llm_service)
-        
+
         result = await pm.generate(
             prompt="Привет",
-            api_key=None,  # Нет пользовательского ключа
+            api_key="user-gigachat-key",
             provider="gigachat",
         )
         assert result.response.provider == "gigachat"
@@ -321,7 +305,7 @@ class TestProviderManagerStream:
         """Нет ключа — ошибка."""
         pm = ProviderManager(llm_service=mock_llm_service)
         
-        with pytest.raises(ProviderManagerError, match="API ключ не настроен"):
+        with pytest.raises(ProviderManagerError, match="Все провайдеры недоступны"):
             async for _ in pm.generate_stream(
                 prompt="Привет",
                 api_key=None,
@@ -332,35 +316,26 @@ class TestProviderManagerStream:
     @patch.dict(os.environ, {"GIGACHAT_AUTH_KEY": "sys-gigachat-key"})
     async def test_stream_fallback_on_error(self, mock_llm_service):
         """
-        Fallback в streaming: если первый провайдер упал до начала стрима,
-        пробуем второй из цепочки.
+        Streaming с единственным провайдером: ошибка retryable — ProviderManagerError
+        (кросс-fallback на GigaChat удалён вместе с системным ключом).
         """
         call_count = 0
         
         async def mock_stream_fallback(**kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count == 1:
-                # Первый вызов (OpenRouter) — падает
-                raise ValueError("500 Server Error")
-            # Второй вызов (GigaChat) — успех
-            yield "fallback chunk 1 "
-            yield "fallback chunk 2"
+            raise ValueError("500 Server Error")
         
         mock_llm_service.generate_stream = mock_stream_fallback
         pm = ProviderManager(llm_service=mock_llm_service)
         
-        chunks = []
-        async for chunk in pm.generate_stream(
-            prompt="Привет",
-            api_key="sk-test",
-            provider="openrouter",
-        ):
-            chunks.append(chunk)
-        
-        # Должны получить чанки от gigachat
-        assert "".join(chunks) == "fallback chunk 1 fallback chunk 2"
-        assert call_count == 2
+        with pytest.raises(ProviderManagerError, match="Провайдер openrouter недоступен"):
+            async for chunk in pm.generate_stream(
+                prompt="Привет",
+                api_key="sk-test",
+                provider="openrouter",
+            ):
+                pass
 
 
 # ============================================================================
@@ -405,20 +380,20 @@ class TestFallbackOrder:
     """Тесты конфигурации fallback."""
 
     def test_openrouter_fallback_chain(self):
-        """OpenRouter → GigaChat."""
-        assert FALLBACK_ORDER["openrouter"] == ["openrouter", "gigachat"]
+        """Явный провайдер — без кросс-fallback."""
+        assert FALLBACK_ORDER["openrouter"] == ["openrouter"]
 
     def test_gigachat_no_fallback(self):
         """GigaChat — без fallback."""
         assert FALLBACK_ORDER["gigachat"] == ["gigachat"]
 
     def test_openai_fallback(self):
-        """OpenAI → OpenRouter → GigaChat."""
-        assert FALLBACK_ORDER["openai"] == ["openai", "openrouter", "gigachat"]
+        """Явный провайдер — без кросс-fallback."""
+        assert FALLBACK_ORDER["openai"] == ["openai"]
 
     def test_default_fallback_chain(self):
-        """DEFAULT_FALLBACK_CHAIN — OpenRouter, GigaChat."""
-        assert DEFAULT_FALLBACK_CHAIN == ["openrouter", "gigachat"]
+        """DEFAULT_FALLBACK_CHAIN — только OpenRouter (системный ключ отсутствует)."""
+        assert DEFAULT_FALLBACK_CHAIN == ["openrouter"]
 
     def test_unknown_provider_fallback(self):
         """Неизвестный провайдер — только он сам."""
@@ -489,15 +464,15 @@ class TestProviderResult:
 # ============================================================================
 
 @pytest.mark.parametrize("provider,expected_chain", [
-    ("openrouter", ["openrouter", "gigachat"]),
+    ("openrouter", ["openrouter"]),
     ("gigachat", ["gigachat"]),
-    ("openai", ["openai", "openrouter", "gigachat"]),
-    ("google", ["google", "openrouter", "gigachat"]),
-    ("anthropic", ["anthropic", "openrouter", "gigachat"]),
-    ("groq", ["groq", "openrouter", "gigachat"]),
+    ("openai", ["openai"]),
+    ("google", ["google"]),
+    ("anthropic", ["anthropic"]),
+    ("groq", ["groq"]),
 ])
 def test_fallback_chain_for_providers(provider, expected_chain):
-    """Проверка цепочек fallback для всех провайдеров."""
+    """Проверка цепочек fallback: явный провайдер — только он сам."""
     chain = FALLBACK_ORDER.get(provider, [provider])
     assert chain == expected_chain
 
