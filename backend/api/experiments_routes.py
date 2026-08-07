@@ -17,6 +17,24 @@ RUNS_DIR = EXPERIMENTS_DIR / "runs"
 REPORTS_DIR = EXPERIMENTS_DIR / "reports"
 
 
+def _format_provider_error(e: Exception, provider: str, model: str) -> str:
+    """Превращает сырое исключение провайдера в понятное сообщение для сравнения."""
+    raw = str(e)
+    # 400 not a valid model ID → модель снята/переименована провайдером
+    if "not a valid model" in raw or "model ID" in raw:
+        return (
+            f"Модель «{model}» недоступна у провайдера «{provider}» "
+            f"(снята или переименована). Выберите актуальную модель из списка."
+        )
+    # 401 / 403 → проблема с ключом
+    if "401" in raw or "403" in raw or "authentication" in raw.lower():
+        return f"Ключ «{provider}» не авторизован провайдером. Проверьте ключ в «Провайдеры»."
+    # 402 → нет кредитов
+    if "402" in raw or "insufficient" in raw.lower() or "quota" in raw.lower():
+        return f"У провайдера «{provider}» недостаточно средств/квоты для модели «{model}»."
+    return raw[:500]
+
+
 def _scan_dir(directory: Path) -> list[dict]:
     if not directory.exists():
         return []
@@ -739,7 +757,7 @@ async def compare_providers(
             logger.error(f"Compare provider {provider} error: {e}\n{_tb.format_exc()}")
             results.append({
                 "provider": provider, "model": model,
-                "success": False, "error": f"{type(e).__name__}: {e}",
+                "success": False, "error": _format_provider_error(e, provider, model),
                 "traceback": _tb.format_exc()[-1500:],
             })
 

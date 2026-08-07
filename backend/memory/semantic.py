@@ -9,13 +9,17 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from enum import Enum
 import json
 import os
 import sqlite3
 import logging
+import time
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 logger = logging.getLogger("PAD+.semantic")
 
@@ -264,6 +268,8 @@ class SemanticMemory:
         Добавляет новое знание в память
         """
         import uuid
+        import time
+        start_time = time.perf_counter()
         
         knowledge_id = str(uuid.uuid4())[:12]
         now = datetime.now()
@@ -291,12 +297,29 @@ class SemanticMemory:
         if knowledge_type == KnowledgeType.PROCEDURAL:
             self._procedures_cache[knowledge_id] = knowledge
         
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.SEMANTIC_MEMORY,
+            object_type=MemoryObjectType.FACT if knowledge_type == KnowledgeType.DECLARATIVE else MemoryObjectType.PROCEDURE,
+            object_id=knowledge_id,
+            result=MemoryResult.CREATED,
+            duration_ms=duration_ms,
+            phase="add_knowledge",
+            payload_size_bytes=len(content) + len(summary),
+            payload_preview=f"type={knowledge_type.value}, domain={domain}, confidence={confidence:.2f}",
+        )
+        
         logger.info(f"📚 Знание добавлено: {knowledge_id} ({knowledge_type.value}, domain: {domain})")
         
         return knowledge
     
     def _save_knowledge(self, knowledge: SemanticKnowledge):
         """Сохраняет знание в БД"""
+        import time
+        start_time = time.perf_counter()
+        
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -333,9 +356,26 @@ class SemanticMemory:
         
         conn.commit()
         conn.close()
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.SEMANTIC_MEMORY,
+            object_type=MemoryObjectType.FACT if knowledge.knowledge_type == KnowledgeType.DECLARATIVE else MemoryObjectType.PROCEDURE,
+            object_id=knowledge.id,
+            result=MemoryResult.CREATED,
+            duration_ms=duration_ms,
+            phase="_save_knowledge",
+            payload_size_bytes=len(knowledge.content) + len(knowledge.summary),
+            payload_preview=f"type={knowledge.knowledge_type.value}, domain={knowledge.domain}",
+        )
     
     def get_knowledge(self, knowledge_id: str) -> Optional[SemanticKnowledge]:
         """Получает знание по ID"""
+        import time
+        start_time = time.perf_counter()
+        
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -344,8 +384,29 @@ class SemanticMemory:
         row = cursor.fetchone()
         conn.close()
         
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
         if row:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.SEMANTIC_MEMORY,
+                object_type=MemoryObjectType.FACT,
+                object_id=knowledge_id,
+                result=MemoryResult.FOUND,
+                duration_ms=duration_ms,
+                phase="get_knowledge",
+            )
             return self._row_to_knowledge(row)
+        
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.SEMANTIC_MEMORY,
+            object_type=MemoryObjectType.FACT,
+            object_id=knowledge_id,
+            result=MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="get_knowledge",
+        )
         return None
     
     def search_knowledge(
@@ -360,6 +421,9 @@ class SemanticMemory:
         """
         Поиск знаний по критериям
         """
+        import time
+        start_time = time.perf_counter()
+        
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -402,6 +466,20 @@ class SemanticMemory:
         rows = cursor.fetchall()
         conn.close()
         
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        emit_memory_event(
+            operation=MemoryOperation.SEARCH,
+            component=MemoryComponent.SEMANTIC_MEMORY,
+            object_type=MemoryObjectType.FACT,
+            object_id="",
+            result=MemoryResult.FOUND if rows else MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="search_knowledge",
+            payload_size_bytes=sum(len(str(r)) for r in rows) if rows else 0,
+            payload_preview=f"query={query}, type={knowledge_type}, domain={domain}, limit={limit}",
+        )
+        
         results = [self._row_to_knowledge(row) for row in rows]
         
         # Обновляем access_count
@@ -411,7 +489,124 @@ class SemanticMemory:
             self._save_knowledge(k)
         
         return results
-    
+
+    # === D'-3: Lifecycle / Forgetting методы ===
+
+    def get_count(self) -> int:
+        """Возвращает количество знаний в семантической памяти."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM semantic_knowledge")
+        total = cursor.fetchone()[0]
+        conn.close()
+        return total
+
+    def get_all(self, limit: int = 1000) -> List[SemanticKnowledge]:
+        """Возвращает все знания (для lifecycle/forgetting)."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM semantic_knowledge ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [self._row_to_knowledge(row) for row in rows]
+
+    def delete_by_id(self, knowledge_id: str) -> bool:
+        """Удаляет знание по ID. Возвращает True, если удалено."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM semantic_knowledge WHERE id = ?", (knowledge_id,))
+        deleted = cursor.rowcount > 0
+        cursor.execute("DELETE FROM procedure_applications WHERE procedure_id = ?", (knowledge_id,))
+        conn.commit()
+        conn.close()
+
+        if deleted:
+            self._procedures_cache.pop(knowledge_id, None)
+            emit_memory_event(
+                operation=MemoryOperation.DELETE,
+                component=MemoryComponent.SEMANTIC_MEMORY,
+                object_type=MemoryObjectType.FACT,
+                object_id=knowledge_id,
+                result=MemoryResult.DELETED,
+                phase="semantic.delete_by_id",
+            )
+            logger.info("🗑️ Знание удалено: %s", knowledge_id)
+        return deleted
+
+    def delete_expired(
+        self,
+        max_age_hours: float,
+        min_confidence: float = 0.7,
+        min_access_count: int = 5,
+    ) -> tuple:
+        """
+        Удаляет знания старше max_age_hours, сохраняя важные
+        (высокая уверенность или частое использование).
+
+        Returns:
+            (expired_count, protected_count)
+        """
+        import time as _time
+        start_time = _time.perf_counter()
+
+        cutoff = datetime.now() - timedelta(hours=max_age_hours)
+        protected = 0
+        expired = 0
+
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id, created_at, confidence, access_count FROM semantic_knowledge")
+        rows = cursor.fetchall()
+
+        delete_ids = []
+        for row in rows:
+            ts = datetime.fromisoformat(row["created_at"])
+            ts_aware = ts if ts.tzinfo else ts.astimezone()
+            cutoff_aware = cutoff if cutoff.tzinfo else cutoff.astimezone()
+            if ts_aware >= cutoff_aware:
+                continue
+            if (row["confidence"] or 0) >= min_confidence or (row["access_count"] or 0) >= min_access_count:
+                protected += 1
+            else:
+                delete_ids.append(row["id"])
+
+        if delete_ids:
+            placeholders = ",".join("?" * len(delete_ids))
+            cursor.execute(f"DELETE FROM semantic_knowledge WHERE id IN ({placeholders})", delete_ids)
+            conn.commit()
+            expired = len(delete_ids)
+
+        conn.close()
+
+        for kid in delete_ids:
+            self._procedures_cache.pop(kid, None)
+
+        duration_ms = (_time.perf_counter() - start_time) * 1000
+        logger.info(
+            "⏰ Semantic TTL: удалено=%d, защищено=%d (max_age=%sh)",
+            expired, protected, max_age_hours,
+        )
+
+        if expired:
+            emit_memory_event(
+                operation=MemoryOperation.EVICT,
+                component=MemoryComponent.SEMANTIC_MEMORY,
+                object_type=MemoryObjectType.FACT,
+                result=MemoryResult.EXPIRED,
+                phase="semantic.delete_expired",
+                duration_ms=duration_ms,
+                payload_size_bytes=expired,
+                metadata={"protected": protected, "max_age_hours": max_age_hours},
+            )
+
+        return expired, protected
+
     # === Процедурные знания ===
     
     def learn_procedure(

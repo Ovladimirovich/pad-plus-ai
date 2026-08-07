@@ -46,6 +46,9 @@ data/
 *.json.bak
 *.backup
 
+# Runtime state (Impulse per-session persistence, written to repo root or data/)
+impulse_state_*.json
+
 # IDE
 .idea/
 .vscode/

@@ -99,7 +99,10 @@ class CognitiveHealthMonitor:
             ("coherence", 0.9, 0.9),
             ("response_quality", 0.8, 0.95),
             ("safety_compliance", 1.0, 1.0),
-            ("emotional_balance", 0.7, 0.7)
+            ("emotional_balance", 0.7, 0.7),
+            ("cache_health", 1.0, 1.0),
+            ("database_health", 1.0, 1.0),
+            ("llm_health", 1.0, 1.0)
         ]
         
         for name, value, weight in default_metrics:

@@ -6,6 +6,7 @@ import sys
 import os
 import pytest
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock, MagicMock
 
@@ -145,6 +146,44 @@ def mock_memory_record():
     record.metadata = {"type": "test"}
     record.timestamp = "2024-01-01T00:00:00Z"
     return record
+
+
+@pytest.fixture
+def mock_cache_data():
+    """Mock данные для кэша (общий для CacheManager-тестов)."""
+    return {}
+
+
+@pytest.fixture
+def mock_cache_manager(mock_cache_data, monkeypatch):
+    """Mock CacheManager с async get/set/delete."""
+    cache = MagicMock()
+
+    async def mock_get(key, *args, **kwargs):
+        entry = mock_cache_data.get(key)
+        if entry:
+            if datetime.now().timestamp() < entry.get("expires", 0):
+                return entry["value"]
+            else:
+                del mock_cache_data[key]
+        return None
+
+    async def mock_set(key, value, ttl=None, *args, **kwargs):
+        mock_cache_data[key] = {
+            "value": value,
+            "expires": datetime.now().timestamp() + (ttl or 60)
+        }
+
+    async def mock_delete(key, *args, **kwargs):
+        if key in mock_cache_data:
+            del mock_cache_data[key]
+
+    cache.get = mock_get
+    cache.set = mock_set
+    cache.delete = mock_delete
+    cache.connect = AsyncMock()
+    cache.is_rate_limited = AsyncMock(return_value=False)
+    return cache
 
 
 @pytest.fixture

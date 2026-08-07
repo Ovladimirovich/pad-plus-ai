@@ -5,9 +5,10 @@ from core.pipeline.phases.emotion_update import EmotionUpdatePhase
 
 
 async def test_emotion_update_success():
-    with patch("emotion.pad_model.get_pad_model") as mock_get:
-        mock_pad = MagicMock()
-        mock_get.return_value = mock_pad
+    mock_pad = MagicMock()
+
+    with patch("emotion.session_store.get_session_emotion_store") as mock_store:
+        mock_store.return_value.get_or_create.return_value = mock_pad
 
         phase = EmotionUpdatePhase()
         ctx = PipelineContext(
@@ -21,11 +22,11 @@ async def test_emotion_update_success():
 
 
 async def test_emotion_update_error():
-    with patch("emotion.pad_model.get_pad_model") as mock_get:
-        mock_get.side_effect = Exception("pad unavailable")
+    with patch("emotion.session_store.get_session_emotion_store") as mock_store:
+        mock_store.side_effect = Exception("store unavailable")
 
         phase = EmotionUpdatePhase()
-        ctx = PipelineContext(user_message="С‚РµСЃС‚", context={})
+        ctx = PipelineContext(user_message="тест", context={})
         result = await phase.execute(ctx)
 
     assert result.success

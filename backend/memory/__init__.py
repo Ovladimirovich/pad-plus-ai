@@ -56,6 +56,24 @@ Persona = PersonaMemory
 from .user_persona import UserPersona, get_user_persona_manager
 from .roots import RootsMemory, get_roots_memory
 
+# === Session Stores (D'-2: per-session cache-слои) ===
+from .session_store import (
+    SessionRAGStore, SessionSemanticStore, SessionEpisodicStore,
+    get_session_rag_store, get_session_semantic_store, get_session_episodic_store,
+)
+
+# === Lifecycle & Forgetting (D'-3: TTL/quota/importance eviction) ===
+from .lifecycle import (
+    MemoryLifecycleConfig, ForgettingResult, MemoryLifecycleManager,
+    get_lifecycle, reset_lifecycle,
+)
+
+# === Unified Memory Service (D'-4: типизированный доступ ко всей памяти) ===
+try:
+    from core.memory_service import MemoryService, MemorySnapshot, get_memory_service
+except ImportError:
+    pass
+
 # === Утилиты ===
 from .hygiene import MemoryHygiene, get_hygiene
 
@@ -87,4 +105,24 @@ __all__ = [
     "get_memory_hygiene",
     "MemoryConsolidator",
     "get_consolidator",
+
+    # Session Stores (D'-2)
+    "SessionRAGStore",
+    "SessionSemanticStore",
+    "SessionEpisodicStore",
+    "get_session_rag_store",
+    "get_session_semantic_store",
+    "get_session_episodic_store",
+
+    # Lifecycle & Forgetting (D'-3)
+    "MemoryLifecycleConfig",
+    "ForgettingResult",
+    "MemoryLifecycleManager",
+    "get_lifecycle",
+    "reset_lifecycle",
+
+    # Unified Memory Service (D'-4)
+    "MemoryService",
+    "MemorySnapshot",
+    "get_memory_service",
 ]

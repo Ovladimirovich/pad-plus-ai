@@ -6,7 +6,7 @@ Session Provider Manager — Управление ключами пользов�
 
 from typing import Optional, Dict
 from core.supabase_client import get_supabase
-from core.encryption import get_encryptor
+from core.encryption import get_encryptor, mask_api_key as _mask_api_key
 import logging
 
 logger = logging.getLogger("padplus.session_provider")
@@ -101,6 +101,7 @@ class UserManager:
         # Расшифровываем ключ
         try:
             api_key = self.encryptor.decrypt(key_data["api_key_encrypted"])
+            logger.debug(f"Ключ расшифрован: provider={key_data['provider']}, key={_mask_api_key(api_key)}")
             return {
                 "provider": key_data["provider"],
                 "api_key": api_key,
@@ -119,6 +120,7 @@ class UserManager:
         
         try:
             api_key = self.encryptor.decrypt(default_key["api_key_encrypted"])
+            logger.debug(f"Default ключ расшифрован: provider={default_key['provider']}, key={_mask_api_key(api_key)}")
             return {
                 "provider": default_key["provider"],
                 "api_key": api_key,

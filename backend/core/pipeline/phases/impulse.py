@@ -16,9 +16,10 @@ class ImpulsePhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from core.impulse import get_impulse_core
+            from core.impulse.session_store import get_session_impulse_store
 
-            core = get_impulse_core()
+            store = get_session_impulse_store()
+            core = store.get_or_create(ctx.session_id)
             state = core.to_dict()
             bias = core.get_bias_block()
             primary = core.get_primary_label()

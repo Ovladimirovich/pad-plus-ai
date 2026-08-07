@@ -18,6 +18,9 @@ import logging
 logger = logging.getLogger("PAD+.persona")
 
 from core.config import USE_PG_STORAGE
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 
 @dataclass
@@ -32,29 +35,6 @@ class PersonalityTrait:
         """Медленно корректирует черту"""
         max_change = (1 - self.stability) * abs(delta)
         self.value = max(0, min(1, self.value + max_change * (1 if delta > 0 else -1)))
-
-
-@dataclass
-class InteractionMemory:
-    """Память о взаимодействии с пользователем"""
-    user_id: str
-    first_seen: str
-    last_interaction: str
-    total_interactions: int
-    topics_discussed: List[str]
-    emotional_tone: str
-    preferences: Dict[str, Any]
-    
-    def to_dict(self) -> dict:
-        return {
-            "user_id": self.user_id,
-            "first_seen": self.first_seen,
-            "last_interaction": self.last_interaction,
-            "total_interactions": self.total_interactions,
-            "topics_discussed": self.topics_discussed,
-            "emotional_tone": self.emotional_tone,
-            "preferences": self.preferences
-        }
 
 
 @dataclass
@@ -108,9 +88,6 @@ class PersonaMemory:
         self.values: List[str] = []  # Ценности
         self.principles: List[str] = []  # Принципы
         
-        # Память о пользователях
-        self.users: Dict[str, InteractionMemory] = {}
-        
         # Саморефлексия
         self.reflections: List[SelfReflection] = []
         
@@ -140,8 +117,7 @@ class PersonaMemory:
                 pg = PgStorage("persona_state", mode="singleton")
                 data = pg.load_singleton(self._default_factory)
                 self._from_dict(data)
-                logger.info(f"✅ Persona загружена из PostgreSQL: {len(self.traits)} черт, "
-                           f"{len(self.users)} пользователей")
+                logger.info(f"✅ Persona загружена из PostgreSQL: {len(self.traits)} черт")
                 return
             except Exception as e:
                 logger.warning(f"PostgreSQL недоступен, fallback на файл: {e}")
@@ -152,8 +128,7 @@ class PersonaMemory:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self._from_dict(data)
-                logger.info(f"✅ Persona загружена из файла: {len(self.traits)} черт, "
-                           f"{len(self.users)} пользователей")
+                logger.info(f"✅ Persona загружена из файла: {len(self.traits)} черт")
                 return
             except Exception as e:
                 logger.warning(f"Ошибка загрузки persona из файла: {e}")
@@ -243,7 +218,6 @@ class PersonaMemory:
             },
             "values": self.values,
             "principles": self.principles,
-            "users": {k: u.to_dict() for k, u in self.users.items()},
             "reflections": [r.to_dict() for r in self.reflections[-50:]],
             "style_preferences": self.style_preferences
         }
@@ -276,19 +250,6 @@ class PersonaMemory:
         self.values = data.get("values", [])
         self.principles = data.get("principles", [])
         
-        # Пользователи
-        self.users = {}
-        for k, v in data.get("users", {}).items():
-            self.users[k] = InteractionMemory(
-                user_id=v["user_id"],
-                first_seen=v["first_seen"],
-                last_interaction=v["last_interaction"],
-                total_interactions=v["total_interactions"],
-                topics_discussed=v.get("topics_discussed", []),
-                emotional_tone=v.get("emotional_tone", "neutral"),
-                preferences=v.get("preferences", {})
-            )
-        
         # Рефлексии
         self.reflections = []
         for r in data.get("reflections", []):
@@ -308,10 +269,28 @@ class PersonaMemory:
     
     def get_trait(self, name: str) -> Optional[PersonalityTrait]:
         """Получить черту характера"""
-        return self.traits.get(name)
+        trait = self.traits.get(name)
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            object_id=name,
+            result=MemoryResult.FOUND if trait else MemoryResult.NOT_FOUND,
+            phase="persona.get_trait",
+            payload_size_bytes=len(name),
+        )
+        return trait
     
     def get_all_traits(self) -> Dict[str, PersonalityTrait]:
         """Все черты характера"""
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            result=MemoryResult.FOUND,
+            phase="persona.get_all_traits",
+            payload_size_bytes=len(self.traits),
+        )
         return self.traits.copy()
     
     def adjust_trait(self, name: str, delta: float) -> bool:
@@ -322,44 +301,29 @@ class PersonaMemory:
         стабильные черты меняются медленно
         """
         if name not in self.traits:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.PERSONA_MEMORY,
+                object_type=MemoryObjectType.PERSONA_TRAITS,
+                object_id=name,
+                result=MemoryResult.NOT_FOUND,
+                phase="persona.adjust_trait",
+            )
             return False
         
         self.traits[name].adjust(delta)
         self._save()
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            object_id=name,
+            result=MemoryResult.UPDATED,
+            phase="persona.adjust_trait",
+            payload_size_bytes=len(name),
+            payload_preview=f"delta={delta:+.3f}, value={self.traits[name].value:.3f}",
+        )
         return True
-    
-    def record_interaction(
-        self,
-        user_id: str,
-        topic: Optional[str] = None,
-        emotion: str = "neutral"
-    ) -> None:
-        """Записывает взаимодействие с пользователем"""
-        now = datetime.now().isoformat()
-        
-        if user_id not in self.users:
-            self.users[user_id] = InteractionMemory(
-                user_id=user_id,
-                first_seen=now,
-                last_interaction=now,
-                total_interactions=1,
-                topics_discussed=[topic] if topic else [],
-                emotional_tone=emotion,
-                preferences={}
-            )
-        else:
-            user = self.users[user_id]
-            user.last_interaction = now
-            user.total_interactions += 1
-            if topic and topic not in user.topics_discussed:
-                user.topics_discussed.append(topic)
-            user.emotional_tone = emotion
-        
-        self._save()
-    
-    def get_user_memory(self, user_id: str) -> Optional[InteractionMemory]:
-        """Получить память о пользователе"""
-        return self.users.get(user_id)
     
     def add_reflection(
         self,
@@ -380,10 +344,30 @@ class PersonaMemory:
             self.reflections = self.reflections[-100:]
         
         self._save()
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            object_id="reflections",
+            result=MemoryResult.CREATED,
+            phase="persona.add_reflection",
+            payload_size_bytes=len(insight),
+            payload_preview=insight[:80],
+        )
     
     def get_recent_reflections(self, limit: int = 5) -> List[SelfReflection]:
         """Недавние рефлексии"""
-        return self.reflections[-limit:]
+        reflections = self.reflections[-limit:]
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            object_id="reflections",
+            result=MemoryResult.FOUND if reflections else MemoryResult.NOT_FOUND,
+            phase="persona.get_recent_reflections",
+            payload_size_bytes=len(reflections),
+        )
+        return reflections
     
     def get_persona_context(self) -> str:
         """
@@ -407,6 +391,21 @@ class PersonaMemory:
         
         values_text = "\n".join(f"- {v}" for v in self.values[:3])
         
+        # Размер payload: сумма длин строковых значений (значения черт — числа)
+        payload = 0
+        for t in self.traits.values():
+            val = t.value
+            if isinstance(val, str):
+                payload += len(val)
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            result=MemoryResult.FOUND,
+            phase="persona.get_persona_context",
+            payload_size_bytes=payload,
+        )
+        
         return f"""Моя личность:
 {chr(10).join(traits_desc)}
 
@@ -425,10 +424,6 @@ class PersonaMemory:
                     reverse=True
                 )[:3]
             ],
-            "users_known": len(self.users),
-            "total_interactions": sum(
-                u.total_interactions for u in self.users.values()
-            ),
             "reflections_count": len(self.reflections),
             "created_at": self.created_at,
             "last_updated": self.last_updated
@@ -474,6 +469,16 @@ class PersonaMemory:
         if "?" in user_message and len(user_message) > 20:
             self.adjust_trait("curiosity", 0.01)
             changes.append("curiosity+")
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.PERSONA_MEMORY,
+            object_type=MemoryObjectType.PERSONA_TRAITS,
+            result=MemoryResult.UPDATED if changes else MemoryResult.SKIPPED,
+            phase="persona.evolve_from_dialog",
+            payload_size_bytes=len(user_message) + len(ai_response),
+            payload_preview=f"changes={changes}",
+        )
         
         return {
             "changes": changes,

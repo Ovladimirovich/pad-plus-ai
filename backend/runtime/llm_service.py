@@ -14,6 +14,7 @@ import os
 import asyncio
 import json
 import logging
+import time
 
 import httpx
 
@@ -121,12 +122,17 @@ OPENROUTER_FREE_MODELS = [
 class LLMService:
     """HTTP-сервис для основных провайдеров LLM (OpenRouter, GigaChat, HuggingFace)."""
 
+    _MODELS_CACHE_TTL_SECONDS = 600
+
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, timeout: Optional[int] = None):
         self.default_api_key = api_key
         self.default_model = model
         self._timeout = timeout or int(os.getenv("LLM_TIMEOUT", "30"))
         self._verify_tls = os.getenv("LLM_VERIFY_TLS", "true").strip().lower() not in ("0", "false", "no")
         self._session = httpx.AsyncClient(timeout=self._timeout, verify=self._verify_tls)
+        self._models_cache: List[Dict[str, Any]] = []
+        self._models_cache_ts: Optional[float] = None
+        self._models_cache_ttl: float = self._MODELS_CACHE_TTL_SECONDS
 
     async def generate(
         self,
@@ -660,8 +666,16 @@ class LLMService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def fetch_openrouter_models(self) -> List[Dict[str, Any]]:
-        """Загружает актуальный список моделей из OpenRouter API."""
+    async def fetch_openrouter_models(self, force: bool = False) -> List[Dict[str, Any]]:
+        """Загружает актуальный список моделей из OpenRouter API.
+
+        Результат кэшируется на 10 минут, чтобы не дёргать OpenRouter
+        при каждом запросе списка моделей.
+        """
+        now = time.time()
+        if not force and self._models_cache_ts is not None:
+            if now - self._models_cache_ts < self._models_cache_ttl:
+                return self._models_cache
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.get("https://openrouter.ai/api/v1/models")
@@ -695,6 +709,8 @@ class LLMService:
                 "provider": "openrouter",
                 "supports_function_calling": True,
             })
+        self._models_cache = result
+        self._models_cache_ts = now
         return result
 
     def get_available_models(self, provider: Optional[str] = None) -> List[Dict[str, Any]]:

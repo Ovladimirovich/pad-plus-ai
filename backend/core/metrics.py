@@ -109,6 +109,46 @@ PIPELINE_QUEUE_SIZE = Gauge(
 )
 
 # ============================================================================
+# SESSION ISOLATION METRICS
+# ============================================================================
+
+SESSION_ISOLATION_OK = Gauge(
+    'padplus_session_isolation_ok',
+    'Session isolation status (1=ok, 0=broken)',
+    ['component']
+)
+
+ACTIVE_SESSIONS = Gauge(
+    'padplus_active_sessions',
+    'Active sessions count',
+    ['component']
+)
+
+SESSION_EMOTION_LEAKAGE = Gauge(
+    'padplus_session_emotion_leakage',
+    'Cross-session emotion leakage detected count'
+)
+
+SESSION_IMPULSE_LEAKAGE = Gauge(
+    'padplus_session_impulse_leakage',
+    'Cross-session impulse leakage detected count'
+)
+
+SESSION_STORE_ERRORS = Gauge(
+    'padplus_session_store_errors',
+    'Session store errors count',
+    ['component']
+)
+
+SESSION_STORE_ACTIVE = Gauge(
+    'padplus_session_store_active',
+    'Active sessions in store',
+    ['component']
+)
+
+# ============================================================================
+# УТИЛИТЫ
+# ============================================================================
 # ДЕКОРАТОРЫ
 # ============================================================================
 
@@ -191,6 +231,52 @@ def track_llm_request(provider: str):
         
         return wrapper
     return decorator
+
+
+# ============================================================================
+# УТИЛИТЫ
+# ============================================================================
+
+def update_websocket_count(count: int):
+    """Обновляет количество активных WebSocket"""
+    ACTIVE_WEBSOCKETS.set(count)
+
+
+def update_pipeline_queue_size(size: int):
+    """Обновляет размер очереди Pipeline"""
+    PIPELINE_QUEUE_SIZE.set(size)
+
+
+# ============================================================================
+# SESSION ISOLATION METRICS UPDATERS
+# ============================================================================
+
+def update_session_isolation(component: str, ok: bool):
+    """Обновляет статус изоляции сессии для компонента"""
+    SESSION_ISOLATION_OK.labels(component=component).set(1 if ok else 0)
+
+
+def update_active_sessions(component: str, count: int):
+    """Обновляет количество активных сессий"""
+    ACTIVE_SESSIONS.labels(component=component).set(count)
+
+
+def update_session_leakage(component: str, count: int):
+    """Обновляет счетчик утечек между сессиями"""
+    if component == 'emotion':
+        SESSION_EMOTION_LEAKAGE.set(count)
+    elif component == 'impulse':
+        SESSION_IMPULSE_LEAKAGE.set(count)
+
+
+def update_session_store_errors(component: str, count: int):
+    """Обновляет счетчик ошибок store"""
+    SESSION_STORE_ERRORS.labels(component=component).set(count)
+
+
+def update_session_store_active(component: str, count: int):
+    """Обновляет количество активных сессий в store"""
+    SESSION_STORE_ACTIVE.labels(component=component).set(count)
 
 
 # ============================================================================

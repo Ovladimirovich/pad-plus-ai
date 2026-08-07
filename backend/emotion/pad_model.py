@@ -16,10 +16,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 import json
+import logging
 import os
 import threading
 
 from core.config import USE_PG_STORAGE
+
+logger = logging.getLogger("padplus.emotion.pad_model")
 
 
 @dataclass

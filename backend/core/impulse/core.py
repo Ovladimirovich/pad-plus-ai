@@ -8,7 +8,7 @@ Impulse Core — многомерное ядро когнитивной напр
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
@@ -98,19 +98,6 @@ _DOMINANT_HINTS = {
 
 def default_dimensions() -> list[ImpulseDimension]:
     return [ImpulseDimension(label=k, question=v) for k, v in _QUESTIONS.items()]
-
-
-@dataclass
-class ImpulseState:
-    """DTO-снимок (не source of truth; канон — ImpulseCore.to_dict())."""
-
-    question: str = ""
-    label: str = ""
-    dimensions: list[ImpulseDimension] = field(default_factory=list)
-    stack: list[dict] = field(default_factory=list)
-    created_at: str = ""
-    modified_at: str = ""
-
 
 class ImpulseCore:
     def __init__(self, dimensions: list[ImpulseDimension] | None = None):
@@ -204,8 +191,13 @@ class ImpulseCore:
     def get_active_questions(self, threshold: float = 0.5) -> list[ImpulseDimension]:
         return [d for d in self.dimensions if d.weight >= threshold]
 
+    MAX_STACK_DEPTH = 50  # D'-3: лимит стека (stack+ttl стратегия)
+
     def push(self):
         self._stack.append([d.to_dict() for d in self.dimensions])
+        # D'-3: ограничиваем глубину стека, чтобы избежать неограниченного роста
+        if len(self._stack) > self.MAX_STACK_DEPTH:
+            del self._stack[:len(self._stack) - self.MAX_STACK_DEPTH]
 
     def pop(self) -> bool:
         if not self._stack:

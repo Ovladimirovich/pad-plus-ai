@@ -15,7 +15,9 @@ from fastapi.testclient import TestClient
 def client():
     app = FastAPI()
     from api.frontend_routes import router
+    from api.metrics_routes import router as metrics_router
     app.include_router(router)
+    app.include_router(metrics_router)
     with TestClient(app) as c:
         yield c
 

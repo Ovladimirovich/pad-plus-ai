@@ -19,7 +19,9 @@ class ReflectionPhase(PipelinePhase):
 
             reflection = get_reflection_loop()
             state_manager = get_system_state_manager()
-            state_manager.update(ctx.context.get("result_dict", {}))
+            pipeline_result = ctx.context.get("pipeline_result")
+            result_dict = pipeline_result.to_dict() if pipeline_result else {}
+            state_manager.update(result_dict)
         except Exception as e:
             logger.warning(f"{__name__} error: {e}")
 

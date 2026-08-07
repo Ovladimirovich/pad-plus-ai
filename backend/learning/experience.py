@@ -71,6 +71,11 @@ class ExperienceLearner:
         if self._dirty_count % self.SAVE_INTERVAL == 0:
             self._save()
 
+    def save(self) -> None:
+        """Принудительно сохраняет текущее состояние на диск."""
+        self._save()
+        self._dirty_count = 0
+
     def get_strategy_recommendation(
         self, prompt: str, context: Optional[Dict[str, Any]] = None
     ) -> Optional[str]:

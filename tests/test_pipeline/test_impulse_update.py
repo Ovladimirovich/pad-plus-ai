@@ -3,7 +3,6 @@
 import pytest
 
 from core.impulse.core import ImpulseCore
-from core.impulse.manager import ImpulseManager, reset_manager
 from core.impulse.signals import infer_experience, ensure_experience_in_context
 from core.pipeline.context import PipelineContext
 from core.pipeline.phases.impulse_update import ImpulseUpdatePhase
@@ -42,76 +41,71 @@ class TestSignals:
 
 
 @pytest.mark.asyncio
-async def test_impulse_update_applies_on_criticism(tmp_path, monkeypatch):
-    monkeypatch.setenv("IMPULSE_USE_PG", "false")
-    reset_manager()
-    mgr = ImpulseManager(base_path=str(tmp_path), use_pg=False)
+async def test_impulse_update_applies_on_criticism(monkeypatch):
+    from unittest.mock import patch
+
     core = ImpulseCore()
     core.set_from_labels({"understand": 0.5, "improve": 0.3})
-    mgr.save(core)
-    import core.impulse.manager as m
+    improve_before = next(d.weight for d in core.dimensions if d.label == "improve")
 
-    m._manager = mgr
+    with patch("core.impulse.session_store.get_session_impulse_store") as mock_store:
+        store = mock_store.return_value
+        store.get_or_create.return_value = core
 
-    phase = ImpulseUpdatePhase()
-    ctx = PipelineContext(
-        user_message="Это плохо и ошибка",
-        context={},
-    )
-    result = await phase.execute(ctx)
+        phase = ImpulseUpdatePhase()
+        ctx = PipelineContext(
+            user_message="Это плохо и ошибка",
+            context={},
+        )
+        result = await phase.execute(ctx)
 
     assert result.success
     assert result.data["impulse_updated"] is True
     assert result.data["experience_interaction_type"] == "criticism"
-    # improve should have increased
-    loaded = mgr.load()
-    improve_w = next(d.weight for d in loaded.dimensions if d.label == "improve")
-    assert improve_w > 0.3
+    improve_after = next(d.weight for d in core.dimensions if d.label == "improve")
+    assert improve_after > improve_before
+    store.save.assert_called_once_with(ctx.session_id)
 
 
 @pytest.mark.asyncio
-async def test_impulse_update_noop_low_significance(tmp_path, monkeypatch):
-    monkeypatch.setenv("IMPULSE_USE_PG", "false")
-    reset_manager()
-    mgr = ImpulseManager(base_path=str(tmp_path), use_pg=False)
+async def test_impulse_update_noop_low_significance():
+    from unittest.mock import patch
+
     core = ImpulseCore()
     core.set_from_labels({"understand": 0.5})
-    mgr.save(core)
-    import core.impulse.manager as m
 
-    m._manager = mgr
+    with patch("core.impulse.session_store.get_session_impulse_store") as mock_store:
+        mock_store.return_value.get_or_create.return_value = core
 
-    phase = ImpulseUpdatePhase()
-    result = await phase.execute(
-        PipelineContext(user_message="просто фраза без маркеров", context={})
-    )
+        phase = ImpulseUpdatePhase()
+        result = await phase.execute(
+            PipelineContext(user_message="просто фраза без маркеров", context={})
+        )
     assert result.success
     assert result.data["impulse_updated"] is False
     assert result.data.get("reason") == "low_significance"
 
 
 @pytest.mark.asyncio
-async def test_impulse_update_uses_explicit_context(tmp_path, monkeypatch):
-    monkeypatch.setenv("IMPULSE_USE_PG", "false")
-    reset_manager()
-    mgr = ImpulseManager(base_path=str(tmp_path), use_pg=False)
+async def test_impulse_update_uses_explicit_context():
+    from unittest.mock import patch
+
     core = ImpulseCore()
     core.set_from_labels({"understand": 0.5})
-    mgr.save(core)
-    import core.impulse.manager as m
 
-    m._manager = mgr
+    with patch("core.impulse.session_store.get_session_impulse_store") as mock_store:
+        mock_store.return_value.get_or_create.return_value = core
 
-    phase = ImpulseUpdatePhase()
-    result = await phase.execute(
-        PipelineContext(
-            user_message="нейтрально",
-            context={
-                "experience_interaction_type": "exploration",
-                "experience_significance": 0.5,
-            },
+        phase = ImpulseUpdatePhase()
+        result = await phase.execute(
+            PipelineContext(
+                user_message="нейтрально",
+                context={
+                    "experience_interaction_type": "exploration",
+                    "experience_significance": 0.5,
+                },
+            )
         )
-    )
     assert result.success
     assert result.data["impulse_updated"] is True
     assert result.data["experience_interaction_type"] == "exploration"

@@ -15,6 +15,10 @@ import os
 import uuid
 import logging
 
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
+
 logger = logging.getLogger("PAD+.session")
 
 
@@ -195,10 +199,17 @@ class SessionManager:
         self,
         ip_address: str = "",
         user_agent: str = "",
-        settings: Dict = None
+        settings: Dict = None,
+        user_id: str = None
     ) -> Session:
-        """Создаёт новую сессию"""
-        session_id = f"sess_{uuid.uuid4().hex[:12]}"
+        """Создаёт новую сессию.
+        
+        Если передан user_id (Supabase user_id), использует его как session_id.
+        """
+        if user_id:
+            session_id = user_id
+        else:
+            session_id = f"sess_{uuid.uuid4().hex[:12]}"
         
         session = Session(
             session_id=session_id,
@@ -220,28 +231,74 @@ class SessionManager:
         self._save()
         
         logger.info(f"🔐 Session created: {session_id}")
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.SESSION_MANAGER,
+            object_type=MemoryObjectType.SESSION,
+            object_id=session_id,
+            result=MemoryResult.CREATED,
+            phase="session_manager.create_session",
+            payload_size_bytes=len(session_id),
+            metadata={"via_user_id": bool(user_id)},
+        )
         return session
     
     def get_session(self, session_id: str) -> Optional[Session]:
         """Получает сессию по ID"""
         if session_id not in self._sessions:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                object_id=session_id,
+                result=MemoryResult.NOT_FOUND,
+                phase="session_manager.get_session",
+            )
             return None
         
         session = self._sessions[session_id]
         
         if session.is_expired(self.max_age_hours):
             self.end_session(session_id)
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                object_id=session_id,
+                result=MemoryResult.EXPIRED,
+                phase="session_manager.get_session",
+            )
             return None
         
         session.touch()
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.SESSION_MANAGER,
+            object_type=MemoryObjectType.SESSION,
+            object_id=session_id,
+            result=MemoryResult.FOUND,
+            phase="session_manager.get_session",
+            payload_size_bytes=len(session_id),
+        )
         return session
     
     def get_or_create(
         self,
         session_id: str = None,
-        ip_address: str = ""
+        ip_address: str = "",
+        user_id: str = None
     ) -> Session:
-        """Получает существующую или создаёт новую сессию"""
+        """Получает существующую или создаёт новую сессию.
+        
+        Если передан user_id (Supabase user_id), использует его как session_id.
+        """
+        # Если передан user_id, используем его как session_id
+        if user_id:
+            session = self.get_session(user_id)
+            if session:
+                return session
+            return self.create_session(user_id=user_id)
+        
         if session_id:
             session = self.get_session(session_id)
             if session:
@@ -261,6 +318,14 @@ class SessionManager:
             self._save()
             
             logger.info(f"🔐 Session ended: {session_id}")
+            emit_memory_event(
+                operation=MemoryOperation.DELETED,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                object_id=session_id,
+                result=MemoryResult.DELETED,
+                phase="session_manager.end_session",
+            )
     
     def record_message(
         self,
@@ -291,6 +356,16 @@ class SessionManager:
             session.context.add_emotion(emotion)
         
         self._save()
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.SESSION_MANAGER,
+            object_type=MemoryObjectType.SESSION,
+            object_id=session_id,
+            result=MemoryResult.UPDATED,
+            phase="session_manager.record_message",
+            payload_size_bytes=len(session_id),
+            payload_preview=f"intent={intent}, topic={topic}",
+        )
     
     def update_settings(
         self,
@@ -361,6 +436,15 @@ class SessionManager:
         
         if to_remove:
             logger.info(f"Cleaned up {len(to_remove)} expired sessions")
+            emit_memory_event(
+                operation=MemoryOperation.DELETED,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                result=MemoryResult.EXPIRED,
+                phase="session_manager.cleanup_expired",
+                payload_size_bytes=len(to_remove),
+                payload_preview=f"expired={len(to_remove)}",
+            )
     
     def get_sessions_by_ip(self, ip_address: str) -> List[Session]:
         """Возвращает сессии по IP"""

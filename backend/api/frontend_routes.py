@@ -30,7 +30,7 @@ import os
 T = TypeVar('T')
 
 # Импорты шифрования и БД
-from core.encryption import get_encryptor
+from core.encryption import get_encryptor, mask_api_key as _mask_api_key
 from core.supabase_client import (
     get_supabase,
     get_supabase_service,
@@ -1113,6 +1113,7 @@ async def chat(
             api_key = raw_key.strip().encode("ascii", errors="ignore").decode("ascii")
             provider = key_data["provider"]  # ВСЕГДА из БД, не от фронтенда
             model = key_data.get("model_preference") or "auto"
+            logger.info(f"? Key loaded: provider={provider}, key={_mask_api_key(api_key)}")
         else:
             logger.warning(f"?? Key {request.key_id} not found for user {user_id}, falling back to default")
     else:
@@ -1134,6 +1135,7 @@ async def chat(
             api_key = raw_key.strip().encode("ascii", errors="ignore").decode("ascii")
             provider = key_data["provider"]  # ВСЕГДА из БД
             model = key_data.get("model_preference") or "auto"
+            logger.info(f"? Default key loaded: provider={provider}, key={_mask_api_key(api_key)}")
 
     if not api_key:
         # Нет ключа у пользователя — ошибка!
@@ -1166,111 +1168,112 @@ async def chat(
             }
         )
 
-    # === ПОЛНЫЙ PIPELINE ===
+# === ПОЛНЫЙ PIPELINE ===
     # Все запросы идут через полную систему (Pipeline)
     try:
-            # === ФАЗА 1: ПЕРЕДАЁМ API КЛЮЧ В PIPELINE ===
+        # === ФАЗА 1: ПЕРЕДАЁМ API КЛЮЧ В PIPELINE ===
+        try:
+            pipeline = get_pipeline()
+            result = await pipeline.execute(
+                user_message=request.text,
+                context={"user_id": user_id, "key_id": request.key_id},
+                api_key=api_key,
+                provider=provider,
+                session_id=user_id,
+            )
+        except Exception as pipeline_error:
+            logger.error(f"? Pipeline execution failed: {pipeline_error}")
+            # Fallback: если пайплайн упал - используем быстрый режим напрямую через ProviderManager
+            provider_result = await pm.generate(
+                prompt=request.text,
+                system_prompt="Вы полезный ассистент PAD+ AI.",
+                api_key=api_key,
+                model=model,
+                provider=provider
+            )
+            response = provider_result.response
+
+            # Записываем в Meta-Learner (fallback рассматриваем как "simple")
             try:
-                pipeline = get_pipeline()
-                result = await pipeline.execute(
-                    user_message=request.text,
-                    context={"user_id": user_id, "key_id": request.key_id},
-                    api_key=api_key,        # === ФАЗА 1: Передаём ключ ===
-                    provider=provider       # === ФАЗА 1: Передаём провайдера ===
-                )
-            except Exception as pipeline_error:
-                logger.error(f"? Pipeline execution failed: {pipeline_error}")
-                # Fallback: если пайплайн упал - используем быстрый режим напрямую через ProviderManager
-                provider_result = await pm.generate(
-                    prompt=request.text,
-                    system_prompt="Вы полезный ассистент PAD+ AI.",
-                    api_key=api_key,
-                    model=model,
-                    provider=provider
-                )
-                response = provider_result.response
-                
-                # Записываем в Meta-Learner (fallback рассматриваем как "simple")
-                try:
-                    from core.xray import get_meta_learner
-                    get_meta_learner().record_outcome("simple", {
-                        "success": True,
-                        "confidence": 0.7,
-                    })
-                except Exception:
-                    pass
-                
-                # Обновляем last_used_at у ключа
-                if request.key_id:
-                    get_db_client(current_user).table("user_api_keys").update({
-                        "last_used_at": datetime.now().isoformat()
-                    }).eq("id", request.key_id).execute()
-                
-                return ChatResponse(
-                    text=response.text,
-                    model=response.model,
-                    provider=response.provider,
-                    usage=response.usage,
-                    finish_reason=response.finish_reason,
-                    timestamp=datetime.now().isoformat(),
-                    is_fast_mode=True,
-                    confidence=0.7,
-                    truth_confidence=0.6,
-                    meta={
-                        "fallback_used": provider_result.fallback_used,
-                        "fallback_from": provider_result.fallback_from,
-                        "fallback_to": provider_result.fallback_to,
-                    } if provider_result.fallback_used else None,
-                )
-            
-            # Сохраняем диалог в fallback-пути
-            try:
-                dialog_id = request.dialog_id
-                if request.dialog_id:
-                    current = supabase.table("dialogs").select("message_count").eq("id", request.dialog_id).execute()
-                    current_count = current.data[0].get("message_count", 0) if current.data else 0
-                    supabase.table("dialogs").update({
-                        "message_count": current_count + 2,
-                        "last_message_at": datetime.now().isoformat()
-                    }).eq("id", request.dialog_id).execute()
-                else:
-                    dialog_result = supabase.table("dialogs").insert({
-                        "user_id": user_id,
-                        "title": request.text[:100],
-                        "message_count": 2,
-                        "last_message_at": datetime.now().isoformat()
-                    }).execute()
-                    dialog_id = dialog_result.data[0]["id"] if dialog_result.data else None
-                
-                if dialog_id:
-                    svc = get_supabase_service()
-                    usage = response.usage or {}
-                    cost = 0.0
-                    if usage:
-                        prompt_tokens = usage.get('prompt_tokens', 0)
-                        completion_tokens = usage.get('completion_tokens', 0)
-                        cost = round((prompt_tokens * 0.001 + completion_tokens * 0.002) / 1000, 6)
-                        usage['cost_usd'] = cost
-                    
-                    svc.table("messages").insert({
-                        "dialog_id": dialog_id,
-                        "role": "user",
-                        "content": request.text,
-                        "model": response.model,
-                        "provider": response.provider,
-                        "created_at": datetime.now().isoformat()
-                    }).execute()
-                    svc.table("messages").insert({
-                        "dialog_id": dialog_id,
-                        "role": "assistant",
-                        "content": response.text,
-                        "model": response.model,
-                        "provider": response.provider,
-                        "metadata": {"usage": usage},
-                        "created_at": datetime.now().isoformat()
-                    }).execute()
-            except Exception as e:
-                logger.warning(f"Fallback dialog save failed: {e}")
+                from core.xray import get_meta_learner
+                get_meta_learner().record_outcome("simple", {
+                    "success": True,
+                    "confidence": 0.7,
+                })
+            except Exception:
+                pass
+
+            # Обновляем last_used_at у ключа
+            if request.key_id:
+                get_db_client(current_user).table("user_api_keys").update({
+                    "last_used_at": datetime.now().isoformat()
+                }).eq("id", request.key_id).execute()
+
+            return ChatResponse(
+                text=response.text,
+                model=response.model,
+                provider=response.provider,
+                usage=response.usage,
+                finish_reason=response.finish_reason,
+                timestamp=datetime.now().isoformat(),
+                is_fast_mode=True,
+                confidence=0.7,
+                truth_confidence=0.6,
+                meta={
+                    "fallback_used": provider_result.fallback_used,
+                    "fallback_from": provider_result.fallback_from,
+                    "fallback_to": provider_result.fallback_to,
+                } if provider_result.fallback_used else None,
+            )
+
+        # Сохраняем диалог в fallback-пути
+        try:
+            dialog_id = request.dialog_id
+            if request.dialog_id:
+                current = supabase.table("dialogs").select("message_count").eq("id", request.dialog_id).execute()
+                current_count = current.data[0].get("message_count", 0) if current.data else 0
+                supabase.table("dialogs").update({
+                    "message_count": current_count + 2,
+                    "last_message_at": datetime.now().isoformat()
+                }).eq("id", request.dialog_id).execute()
+            else:
+                dialog_result = supabase.table("dialogs").insert({
+                    "user_id": user_id,
+                    "title": request.text[:100],
+                    "message_count": 2,
+                    "last_message_at": datetime.now().isoformat()
+                }).execute()
+                dialog_id = dialog_result.data[0]["id"] if dialog_result.data else None
+
+            if dialog_id:
+                svc = get_supabase_service()
+                usage = response.usage or {}
+                cost = 0.0
+                if usage:
+                    prompt_tokens = usage.get('prompt_tokens', 0)
+                    completion_tokens = usage.get('completion_tokens', 0)
+                    cost = round((prompt_tokens * 0.001 + completion_tokens * 0.002) / 1000, 6)
+                    usage['cost_usd'] = cost
+
+                svc.table("messages").insert({
+                    "dialog_id": dialog_id,
+                    "role": "user",
+                    "content": request.text,
+                    "model": response.model,
+                    "provider": response.provider,
+                    "created_at": datetime.now().isoformat()
+                }).execute()
+                svc.table("messages").insert({
+                    "dialog_id": dialog_id,
+                    "role": "assistant",
+                    "content": response.text,
+                    "model": response.model,
+                    "provider": response.provider,
+                    "metadata": {"usage": usage},
+                    "created_at": datetime.now().isoformat()
+                }).execute()
+        except Exception as e:
+            logger.warning(f"Fallback dialog save failed: {e}")
             
             # Определяем финальный provider (может отличаться при fallback)
             if hasattr(result, 'provider'):
@@ -1813,7 +1816,7 @@ async def chat_stream(
             enc_len = len(key_data.get("api_key_encrypted", ""))
             logger.info(f"?? Stream: encrypted_len={enc_len}")
             api_key = encryptor.decrypt(key_data["api_key_encrypted"])
-            logger.info(f"?? Stream: decrypted_len={len(api_key)}")
+            logger.info(f"?? Stream: decrypted_len={len(api_key)}, key={_mask_api_key(api_key)}")
             provider = key_data["provider"]
             model = key_data.get("model_preference") or "auto"
     else:
@@ -1827,6 +1830,7 @@ async def chat_stream(
         if key_result.data:
             key_data = key_result.data[0]
             api_key = encryptor.decrypt(key_data["api_key_encrypted"])
+            logger.info(f"?? Stream default key loaded: provider={key_data['provider']}, key={_mask_api_key(api_key)}")
             provider = key_data["provider"]  # ВСЕГДА из БД
             model = key_data.get("model_preference") or "auto"
 
@@ -1890,13 +1894,32 @@ async def frontend_health():
 async def list_models(provider: Optional[str] = None):
     """
     Список всех доступных моделей
-    
+
     Args:
         provider: Опциональный фильтр по провайдеру
     """
     from runtime.llm_service import get_llm_service
-    
+
     llm = get_llm_service()
+
+    # Для OpenRouter грузим АКТУАЛЬНЫЙ список моделей из API (с TTL-кэшем).
+    # Публичный эндпоинт OpenRouter, ключ не требуется.
+    if not provider or provider == "openrouter":
+        live_models = await llm.fetch_openrouter_models()
+        if live_models:
+            if provider == "openrouter":
+                return {"models": live_models}
+            static = llm.get_available_models(None)
+            merged = static + live_models
+            seen = set()
+            unique = []
+            for m in merged:
+                mid = m.get("id")
+                if mid and mid not in seen:
+                    seen.add(mid)
+                    unique.append(m)
+            return {"models": unique}
+
     models = llm.get_available_models(provider)
     return {"models": models}
 
@@ -1968,26 +1991,13 @@ async def list_provider_models(provider_id: str, current_user: dict = Depends(ge
     supabase = get_db_client(current_user)
     if not supabase:
         raise HTTPException(status_code=500, detail="БД не подключена")
-    user_id = current_user["id"]
-    encryptor = get_encryptor()
-
-    # Получаем API ключ пользователя для этого провайдера
-    result = supabase.table("user_api_keys")\
-        .select("*")\
-        .eq("user_id", user_id)\
-        .eq("provider", provider_id)\
-        .eq("is_active", True)\
-        .execute()
-
-    api_key = None
-    if result.data:
-        api_key = encryptor.decrypt(result.data[0]["api_key_encrypted"])
 
     llm_service = get_llm_service()
 
-    # Для OpenRouter пытаемся загрузить актуальные модели из API (если есть ключ)
+    # Для OpenRouter загружаем актуальные модели из публичного API OpenRouter
+    # (ключ не требуется — эндпоинт models у OpenRouter публичный)
     models = []
-    if provider_id == "openrouter" and api_key:
+    if provider_id == "openrouter":
         try:
             live_models = await llm_service.fetch_openrouter_models()
             if live_models:

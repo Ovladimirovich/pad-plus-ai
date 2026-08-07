@@ -14,9 +14,10 @@ class SemanticPhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from memory import get_semantic_memory
-            semantic = get_semantic_memory()
-            procedure = semantic.find_applicable_procedure(ctx.user_message)
+            session_id = ctx.session_id
+            from memory.session_store import get_session_semantic_store
+            semantic_store = get_session_semantic_store()
+            procedure = semantic_store.find_applicable_procedure(session_id, ctx.user_message)
 
             procedure_context = ""
             procedure_name = None

@@ -149,31 +149,37 @@ async def test_pipeline_full_trace(mock_ext_deps):
     assert "remember" in stages, "Нет TraceStage remember"
     assert "emit" in stages, "Нет TraceStage emit"
 
-    # 5. Конкретные фазы pipeline записаны (по именам)
+    # 5. Конкретные фазы pipeline записаны (по именам).
+    #    Горячие фазы выполняются синхронно и пишутся в X-Ray гарантированно.
+    #    Background-фазы (consolidation, persona_evolution, health, reflection,
+    #    dreams, metrics, procedure_success) запускаются fire-and-forget после
+    #    ответа и НЕ гарантируют завершения к моменту проверки — их проверяем
+    #    отдельно, не по порядку.
     phases = [
         e.get("data", {}).get("phase")
         for e in events
         if e["type"] == "event_recorded" and e.get("data", {}).get("phase")
     ]
 
-    expected_phases = [
+    expected_hot_phases = [
         "safety", "intent", "rag", "knowledge_graph",
-        "episodic", "semantic", "emotion", "persona", "roots",
-        "identity", "generate", "truth_loop", "save_episode",
-        "emotion_update", "persona_evolution", "events_broadcast",
-        "health", "reflection", "dreams", "metrics", "response_guard",
+        "episodic", "semantic", "emotion", "impulse",
+        "persona", "roots", "identity", "generate",
+        "truth_loop", "evaluation", "save_episode",
+        "extraction", "emotion_update", "impulse_update",
+        "memory_maintenance", "events_broadcast", "response_guard",
     ]
 
-    for phase in expected_phases:
+    for phase in expected_hot_phases:
         assert phase in phases, f"Нет фазы pipeline: {phase}"
 
-    # 6. Порядок фаз совпадает с ожидаемым
-    for i, phase in enumerate(phases):
-        if i < len(expected_phases):
-            assert phase == expected_phases[i], (
-                f"Неправильный порядок на позиции {i}: "
-                f"ожидался {expected_phases[i]}, получен {phase}"
-            )
+    # 6. Порядок горячих фаз совпадает с ожидаемым (background-фазы отфильтровываем)
+    visible_hot = [p for p in phases if p in expected_hot_phases]
+    for i, phase in enumerate(visible_hot):
+        assert phase == expected_hot_phases[i], (
+            f"Неправильный порядок на позиции {i}: "
+            f"ожидался {expected_hot_phases[i]}, получен {phase}"
+        )
 
     # 7. Все длительности неотрицательные
     for e in events:

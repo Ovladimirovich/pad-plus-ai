@@ -251,7 +251,6 @@ class MemoryHygiene:
         if rag_memory:
             try:
                 stats = rag_memory.get_stats()
-                # Имитация сканирования
                 items_count = stats.get("total_dialogs", 0)
                 report.items_scanned += items_count
             except Exception as e:
@@ -264,21 +263,6 @@ class MemoryHygiene:
                 report.items_scanned += stats.get("total_facts", 0)
             except Exception as e:
                 logger.warning(f"Facts scan error: {e}")
-        
-        # Анализируем дубликаты (симуляция)
-        report.duplicates_found = max(0, report.items_scanned // 20)
-        if not dry_run:
-            report.duplicates_removed = report.duplicates_found // 2
-        
-        # Анализируем устаревшее
-        report.obsolete_found = max(0, report.items_scanned // 50)
-        if not dry_run:
-            report.obsolete_removed = report.obsolete_found
-        
-        # Анализируем низкое качество
-        report.low_quality_found = max(0, report.items_scanned // 30)
-        if not dry_run:
-            report.low_quality_removed = report.low_quality_found // 3
         
         # Оценка освобождённого места
         avg_item_size = 500  # байт

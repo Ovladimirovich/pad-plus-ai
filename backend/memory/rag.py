@@ -15,9 +15,14 @@ from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, timedelta
 import logging
 import math
+import time
 
 # Создаём логгер в начале
 logger = logging.getLogger("PAD+.rag")
+
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 
 
@@ -409,12 +414,11 @@ class RAGMemory:
         self.conn = None
         self.cursor = None
         self._keywords_cache = {}
-        self._topic_stats = {}
         self._lock = threading.Lock() if 'threading' in dir() else None
 
         db_url = os.getenv('DATABASE_URL')
         if not db_url:
-            logger.warning("DATABASE_URL не настроен, RAG работает без БД")
+            logger.info("DATABASE_URL не настроен, RAG работает без БД")
             return
 
         try:
@@ -794,9 +798,32 @@ class RAGMemory:
         n_results: int = CONTEXT_WINDOW
     ) -> List[Dict[str, Any]]:
         """Базовый поиск"""
-        return self.hybrid_search(query, n_results)
+        import time
+        start_time = time.perf_counter()
+        
+        result = self.hybrid_search(query, n_results)
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        from core.xray.memory_trace import emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+        
+        emit_memory_event(
+            operation=MemoryOperation.SEARCH,
+            component=MemoryComponent.RAG_MEMORY,
+            object_type=MemoryObjectType.DIALOG,
+            object_id="",
+            result=MemoryResult.FOUND if result else MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
+            phase="search",
+            payload_size_bytes=sum(len(str(r)) for r in result) if result else 0,
+            payload_preview=f"query={query}, n_results={n_results}",
+        )
+        
+        return result
     
     def get_context(self, query: str, user_id: Optional[str] = None) -> str:
+        import time
+        start_time = time.perf_counter()
         db_url = os.getenv('DATABASE_URL')
         if not db_url:
             return ""
@@ -843,6 +870,22 @@ class RAGMemory:
         except Exception as e:
             logger.error(f"Ошибка получения контекста из PostgreSQL: {e}")
             return ""
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        
+        from core.xray.memory_trace import emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+        
+        emit_memory_event(
+            operation=MemoryOperation.SEARCH,
+            component=MemoryComponent.RAG_MEMORY,
+            object_type=MemoryObjectType.DIALOG,
+            object_id="",
+            result=MemoryResult.FOUND if rows else MemoryResult.NOT_FOUND,
+            duration_ms=(time.perf_counter() - start_time) * 1000,
+            phase="get_context",
+            payload_size_bytes=sum(len(str(r)) for r in rows) if rows else 0,
+            payload_preview=f"query={query}, user_id={user_id}",
+        )
 
         if not dialogs:
             return ""

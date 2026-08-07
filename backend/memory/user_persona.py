@@ -14,6 +14,10 @@ from datetime import datetime
 import json
 import logging
 
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
+
 logger = logging.getLogger("PAD+.user_persona")
 
 
@@ -132,6 +136,16 @@ class UserPersona:
             topics_str = ", ".join(t[0] for t in top_topics)
             parts.append(f"Часто обсуждаемые темы: {topics_str}.")
         
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.USER_PERSONA,
+            object_type=MemoryObjectType.USER_PERSONA,
+            object_id=self.user_id,
+            result=MemoryResult.FOUND if parts else MemoryResult.PARTIAL,
+            phase="user_persona.get_context_for_prompt",
+            payload_size_bytes=sum(len(p) for p in parts),
+        )
+        
         return "\n".join(parts) if parts else None
     
     def record_interaction(
@@ -180,6 +194,15 @@ class UserPersona:
             reason: Причина изменения
         """
         if trait not in self.style_preferences:
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.USER_PERSONA,
+                object_type=MemoryObjectType.USER_PERSONA,
+                object_id=self.user_id,
+                result=MemoryResult.NOT_FOUND,
+                phase="user_persona.adjust_style",
+                payload_preview=f"trait={trait}",
+            )
             return
         
         # Ограничиваем изменение
@@ -199,6 +222,17 @@ class UserPersona:
                 "new_value": round(new_value, 2),
                 "reason": reason
             })
+        
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.USER_PERSONA,
+            object_type=MemoryObjectType.USER_PERSONA,
+            object_id=self.user_id,
+            result=MemoryResult.UPDATED,
+            phase="user_persona.adjust_style",
+            payload_size_bytes=len(trait) + (len(reason) if reason else 0),
+            payload_preview=f"trait={trait}, {old_value:.2f}->{new_value:.2f}",
+        )
         
         logger.debug(f"🎭 UserPersona {self.user_id[:8]}...: {trait} {old_value:.2f} → {new_value:.2f} ({reason})")
 
@@ -238,7 +272,23 @@ class UserPersonaManager:
             # Создаём новую персону
             self._personas[user_id] = UserPersona(user_id=user_id)
             logger.info(f"🎭 Создана новая UserPersona для {user_id[:8]}...")
+            emit_memory_event(
+                operation=MemoryOperation.WRITE,
+                component=MemoryComponent.USER_PERSONA,
+                object_type=MemoryObjectType.USER_PERSONA,
+                object_id=user_id,
+                result=MemoryResult.CREATED,
+                phase="user_persona.get_persona",
+            )
         
+        emit_memory_event(
+            operation=MemoryOperation.READ,
+            component=MemoryComponent.USER_PERSONA,
+            object_type=MemoryObjectType.USER_PERSONA,
+            object_id=user_id,
+            result=MemoryResult.FOUND,
+            phase="user_persona.get_persona",
+        )
         return self._personas[user_id]
     
     def save_persona(self, persona: UserPersona) -> None:
@@ -250,6 +300,15 @@ class UserPersonaManager:
         """
         self._personas[persona.user_id] = persona
         self._save()
+        emit_memory_event(
+            operation=MemoryOperation.WRITE,
+            component=MemoryComponent.USER_PERSONA,
+            object_type=MemoryObjectType.USER_PERSONA,
+            object_id=persona.user_id,
+            result=MemoryResult.UPDATED,
+            phase="user_persona.save_persona",
+            payload_size_bytes=len(json.dumps(persona.to_dict(), ensure_ascii=False)),
+        )
     
     def _load(self) -> None:
         """Загружает персоны из файла"""

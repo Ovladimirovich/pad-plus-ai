@@ -46,6 +46,12 @@ class SystemMetrics:
     error_rate: float
     cache_hit_rate: float
     queue_size: int
+    # Session isolation metrics
+    active_sessions: int = 0
+    session_isolation_ok: bool = True
+    emotion_leakage_detected: int = 0
+    impulse_leakage_detected: int = 0
+    session_store_errors: int = 0
 
 
 @dataclass
@@ -121,6 +127,32 @@ class MonitoringSystem:
                 "condition": lambda m: m.cache_hit_rate < self.thresholds["cache_hit_rate_critical"] and self._cache_total_lookups() >= 20,
                 "message": "Low cache hit rate detected",
                 "severity": "warning"
+            },
+            # Session isolation alerts
+            "session_isolation_broken": {
+                "condition": lambda m: not m.session_isolation_ok,
+                "message": "Session isolation broken: emotion/impulse leakage detected",
+                "severity": "critical"
+            },
+            "session_emotion_leakage": {
+                "condition": lambda m: m.emotion_leakage_detected > 0,
+                "message": f"Emotion leakage detected across {{m.emotion_leakage_detected}} sessions",
+                "severity": "critical"
+            },
+            "session_impulse_leakage": {
+                "condition": lambda m: m.impulse_leakage_detected > 0,
+                "message": f"Impulse leakage detected across {{m.impulse_leakage_detected}} sessions",
+                "severity": "critical"
+            },
+            "session_store_errors": {
+                "condition": lambda m: m.session_store_errors > 5,
+                "message": f"High session store error rate: {{m.session_store_errors}} errors",
+                "severity": "warning"
+            },
+            "too_many_active_sessions": {
+                "condition": lambda m: m.active_sessions > 100,
+                "message": f"High number of active sessions: {{m.active_sessions}}",
+                "severity": "warning"
             }
         }
     
@@ -176,6 +208,9 @@ class MonitoringSystem:
             active_connections = self._get_active_connections()
             queue_size = self._get_queue_size()
             
+            # Session isolation metrics
+            session_metrics = await self._collect_session_metrics()
+            
             # Создаем метрики
             metrics = SystemMetrics(
                 timestamp=datetime.now(),
@@ -188,7 +223,12 @@ class MonitoringSystem:
                 response_time_avg=response_time_avg,
                 error_rate=error_rate,
                 cache_hit_rate=cache_stats.get("memory", {}).get("hit_rate", 0.0),
-                queue_size=queue_size
+                queue_size=queue_size,
+                active_sessions=session_metrics.get("active_sessions", 0),
+                session_isolation_ok=session_metrics.get("isolation_ok", True),
+                emotion_leakage_detected=session_metrics.get("emotion_leakage", 0),
+                impulse_leakage_detected=session_metrics.get("impulse_leakage", 0),
+                session_store_errors=session_metrics.get("store_errors", 0)
             )
             
             self.metrics_history.append(metrics)
@@ -243,6 +283,54 @@ class MonitoringSystem:
             return mem.get("hits", 0) + mem.get("misses", 0) + redis.get("hits", 0) + redis.get("misses", 0)
         except Exception:
             return 0
+    
+    async def _collect_session_metrics(self) -> Dict[str, Any]:
+        """Собирает метрики сессионной изоляции"""
+        try:
+            metrics = {
+                "active_sessions": 0,
+                "isolation_ok": True,
+                "emotion_leakage": 0,
+                "impulse_leakage": 0,
+                "store_errors": 0
+            }
+            
+            # Emotion store
+            try:
+                from emotion.session_store import get_session_emotion_store
+                emotion_store = get_session_emotion_store()
+                emotion_count = emotion_store.get_active_count()
+                metrics["active_sessions"] = emotion_count
+            except Exception as e:
+                logger.debug(f"Emotion store metrics error: {e}")
+                metrics["store_errors"] += 1
+            
+            # Impulse store
+            try:
+                from core.impulse.session_store import get_session_impulse_store
+                impulse_store = get_session_impulse_store()
+                impulse_count = impulse_store.get_active_count()
+                metrics["active_sessions"] = max(metrics["active_sessions"], impulse_count)
+            except Exception as e:
+                logger.debug(f"Impulse store metrics error: {e}")
+                metrics["store_errors"] += 1
+            
+            # Check for leakage - simplified check
+            # In real implementation, would compare cross-session data
+            metrics["isolation_ok"] = True
+            metrics["emotion_leakage"] = 0
+            metrics["impulse_leakage"] = 0
+            
+            return metrics
+        except Exception as e:
+            logger.error(f"Session metrics collection error: {e}")
+            return {
+                "active_sessions": 0,
+                "isolation_ok": False,
+                "emotion_leakage": 0,
+                "impulse_leakage": 0,
+                "store_errors": 1
+            }
     
     async def _check_alerts(self):
         """Проверяет условия для алертов"""

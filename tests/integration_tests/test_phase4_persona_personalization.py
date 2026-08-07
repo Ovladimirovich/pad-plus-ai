@@ -189,12 +189,12 @@ class TestPipelineIntegration:
 
     def test_pipeline_source_has_user_persona(self):
         """
-        Проверяет, что в коде Pipeline есть использование UserPersona
+        Проверяет, что фаза Persona использует персонализацию пользователя
         """
-        from backend.core.pipeline import PipelineExecutor
+        from backend.core.pipeline.phases import persona
         import inspect
         
-        source = inspect.getsource(PipelineExecutor.execute)
+        source = inspect.getsource(persona.PersonaPhase.execute)
         
         # Проверяем, что есть использование UserPersona
         assert 'user_persona' in source or 'UserPersona' in source
@@ -202,19 +202,17 @@ class TestPipelineIntegration:
 
     def test_pipeline_persona_context_with_user_id(self):
         """
-        Проверяет, что Pipeline использует user_id для персонализации
+        Проверяет, что фаза Persona использует user_id для персонализации
         """
-        from backend.core.pipeline import PipelineExecutor
+        from backend.core.pipeline.phases import persona
         import inspect
         
-        source = inspect.getsource(PipelineExecutor.execute)
+        source = inspect.getsource(persona.PersonaPhase.execute)
         
-        # Ищем блок PERSONA CONTEXT
-        assert '# === 6. PERSONA CONTEXT ===' in source
-        
-        # Проверяем, что есть проверка user_id
+        # Проверяем, что есть обновление persona с user_id
         assert 'user_id' in source
         assert 'get_persona' in source
+        assert 'record_interaction' in source or 'update_user_persona' in source
 
 
 # ============================================================================
@@ -289,10 +287,10 @@ class TestPhase4Integration:
             persona3 = manager.get_persona("manager-test")
             assert persona3 is not None
         
-        # 4. Pipeline использует UserPersona
-        from backend.core.pipeline import PipelineExecutor
+        # 4. Pipeline использует UserPersona (в фазе Persona)
+        from backend.core.pipeline.phases import persona as persona_phase
         
-        source = inspect.getsource(PipelineExecutor.execute)
+        source = inspect.getsource(persona_phase.PersonaPhase.execute)
         assert 'get_user_persona_manager' in source
         
         # 5. Эволюция работает

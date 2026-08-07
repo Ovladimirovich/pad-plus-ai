@@ -21,7 +21,8 @@ class ImpulseUpdatePhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from core.impulse import apply_deltas, get_impulse_core, get_manager
+            from core.impulse import apply_deltas
+            from core.impulse.session_store import get_session_impulse_store
             from core.impulse.signals import ensure_experience_in_context
 
             interaction_type, significance = ensure_experience_in_context(
@@ -40,7 +41,8 @@ class ImpulseUpdatePhase(PipelinePhase):
                     },
                 )
 
-            core = get_impulse_core()
+            store = get_session_impulse_store()
+            core = store.get_or_create(ctx.session_id)
             before = core.get_primary_label()
             changed = apply_deltas(core, interaction_type, significance)
             if not changed:
@@ -54,7 +56,7 @@ class ImpulseUpdatePhase(PipelinePhase):
                     },
                 )
 
-            get_manager().save(core)
+            store.save(ctx.session_id)
             after_state = core.to_dict()
             after_primary = core.get_primary_label()
 

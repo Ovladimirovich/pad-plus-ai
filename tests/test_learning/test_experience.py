@@ -116,6 +116,7 @@ class TestPersistence:
         learner1 = ExperienceLearner(data_path=data_path)
         learner1.record_interaction("test", "reasoning", {"overall": 0.85})
         learner1.record_interaction("test2", "simple", {"overall": 0.7})
+        learner1.save()  # Принудительное сохранение на диск
 
         learner2 = ExperienceLearner(data_path=data_path)
         stats = learner2.get_stats()

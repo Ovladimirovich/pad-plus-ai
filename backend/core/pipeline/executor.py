@@ -16,6 +16,10 @@ from .models import PipelineState, DegradationInfo, PhaseResult, PipelineResult
 from .context import PipelineContext
 from .phases import AntiLoopPhase, MetricsPhase
 from .registry import get_registry
+from .contracts import ContractValidator, FOREGROUND_CONTRACTS
+from core.xray.memory_trace import (
+    emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
+)
 
 # Фазы, которые выполняются fire-and-forget после отправки ответа.
 # Не влияют на ответ, только на внутреннее состояние системы.
@@ -23,6 +27,25 @@ _BACKGROUND_PHASES: Set[str] = {
     "consolidation", "procedure_success",
     "persona_evolution", "health",
     "reflection", "dreams", "metrics",
+}
+
+# Маппинг фаз pipeline → компонент памяти (для MemoryEvent в X-Ray).
+# Фазы, не задействующие память, отсутствуют (не эмитят событий).
+_PHASE_MEMORY_COMPONENT: Dict[str, MemoryComponent] = {
+    "rag": MemoryComponent.RAG_MEMORY,
+    "episodic": MemoryComponent.EPISODIC_MEMORY,
+    "semantic": MemoryComponent.SEMANTIC_MEMORY,
+    "roots": MemoryComponent.ROOTS_MEMORY,
+    "persona": MemoryComponent.PERSONA_MEMORY,
+    "persona_evolution": MemoryComponent.PERSONA_MEMORY,
+    "emotion": MemoryComponent.EMOTION_ENGINE,
+    "emotion_update": MemoryComponent.EMOTION_ENGINE,
+    "impulse": MemoryComponent.IMPULSE_CORE,
+    "impulse_update": MemoryComponent.IMPULSE_CORE,
+    "save_episode": MemoryComponent.EPISODIC_MEMORY,
+    "consolidation": MemoryComponent.CONSOLIDATION,
+    "reflection": MemoryComponent.META_LEARNER,
+    "dreams": MemoryComponent.META_LEARNER,
 }
 
 logger = logging.getLogger("padplus.pipeline.executor")
@@ -55,6 +78,7 @@ class PipelineExecutor:
         self._consolidation_interval = int(os.getenv("CONSOLIDATION_INTERVAL", "10"))
         self._state = PipelineState.HEALTHY
         self._degradations: List[DegradationInfo] = []
+        self._contract_validator = ContractValidator(mode=ContractValidator.MODE_SOFT)
 
         self._phases = self._build_phases()
 
@@ -222,23 +246,19 @@ class PipelineExecutor:
             logger.warning("Decision log (strategy) failed: %s", e)
 
     def _fire_background_phases(self, ctx: PipelineContext, result: PipelineResult, request_id: str, start_time: float):
-        """Запускает background-фазы fire-and-forget после ответа пользователю."""
+        """Запускает background-фазы fire-and-forget после ответа пользователю.
+        
+        bg_data auto-generated from ctx.context (B2+B3):
+        - No manual assembly from PipelineResult fields
+        - ctx.context is the single source of truth for both foreground and background phases
+        """
         bg_data = {
             "user_message": ctx.user_message,
             "session_id": ctx.session_id,
-            "user_id": ctx.context.get("user_id"),
-            "response": result.response,
-            "strategy": result.strategy,
-            "intent": result.intent,
-            "emotion_style": result.emotion_style,
-            "impulse_primary": result.metadata.get("impulse_primary", ""),
-            "experience_interaction_type": ctx.context.get("experience_interaction_type", "new_knowledge"),
-            "experience_significance": ctx.context.get("experience_significance", 0.0),
-            "pipeline_success": result.success,
-            "rag_used": result.rag_used,
             "start_time": start_time,
             "request_id": request_id,
         }
+        bg_data.update(ctx.context)
 
         # 1. Consolidation (счётчик + запуск при необходимости)
         self._dialogs_since_consolidation += 1
@@ -259,25 +279,17 @@ class PipelineExecutor:
             asyncio.create_task(self._run_background_phase(phase_name, phase, bg_data, request_id))
 
     async def _run_background_phase(self, phase_name: str, phase, bg_data: dict, request_id: str):
-        """Выполняет одну background-фазу с X-Ray записью и изоляцией ошибок."""
+        """Выполняет одну background-фазу с X-Ray записью и изоляцией ошибок.
+        
+        Creates PipelineContext from bg_data (which is ctx.context + metadata).
+        """
         try:
             ctx = PipelineContext(
                 user_message=bg_data["user_message"],
-                context={
-                    "user_id": bg_data["user_id"],
-                    "response": bg_data["response"],
-                    "strategy": bg_data["strategy"],
-                    "intent": bg_data["intent"],
-                    "emotion_style": bg_data["emotion_style"],
-                    "impulse_primary": bg_data["impulse_primary"],
-                    "experience_interaction_type": bg_data["experience_interaction_type"],
-                    "experience_significance": bg_data["experience_significance"],
-                    "pipeline_success": bg_data["pipeline_success"],
-                    "rag_used": bg_data["rag_used"],
-                    "start_time": bg_data["start_time"],
-                    "request_id": request_id,
-                },
-                session_id=bg_data["session_id"],
+                context=bg_data,
+                session_id=bg_data.get("session_id"),
+                api_key=bg_data.get("api_key"),
+                provider=bg_data.get("provider"),
             )
             pr = await phase.execute(ctx)
             dur_ms = (time.perf_counter() - bg_data["start_time"]) * 1000
@@ -321,6 +333,30 @@ class PipelineExecutor:
             tc.record_event(request_id, stage, {**pdata, "phase": pname}, dur_ms, pstatus, perror)
         except Exception as e:
             logger.warning(f"X-Ray background record error: {e}")
+
+    def _record_memory_phase_event(self, pname: str, pdata: dict, dur_ms: float, ctx: PipelineContext, pstatus: str = "success", perror: str = None):
+        """Авто-инструментация: MemoryEvent для фаз, работающих с памятью."""
+        component = _PHASE_MEMORY_COMPONENT.get(pname)
+        if component is None:
+            return
+        op = MemoryOperation.READ if pstatus == "success" else MemoryOperation.ERROR
+        result = MemoryResult.FOUND if pstatus == "success" else MemoryResult.ERROR
+        try:
+            emit_memory_event(
+                operation=op,
+                component=component,
+                object_type=MemoryObjectType.CONTEXT,
+                object_id=pname,
+                result=result,
+                duration_ms=dur_ms,
+                error=perror,
+                session_id=ctx.session_id,
+                phase=pname,
+                payload_size_bytes=len(pdata),
+                payload_preview=pname,
+            )
+        except Exception as e:
+            logger.warning(f"MemoryEvent record error [{pname}]: {e}")
 
     async def execute(
         self,
@@ -497,6 +533,8 @@ class PipelineExecutor:
                         phase_perror = pr.errors[0] if pr.errors else None
                         tc = get_trace_collector()
                         tc.record_event(request_id, stage, {**(pr.data or {}), "phase": n}, phase_pdur, phase_pstatus, phase_perror)
+                        # MemoryEvent: авто-инструментация памяти
+                        self._record_memory_phase_event(n, pr.data or {}, phase_pdur, ctx, pstatus=phase_pstatus, perror=phase_perror)
                     except Exception as e:
                         logger.warning(f"{__name__} error: {e}")
                     if not pr.success:
@@ -521,6 +559,12 @@ class PipelineExecutor:
                     logger.info(f"  {key}: {val_preview}")
                 logger.info("=== КОНЕЦ СНИМКА ===")
 
+            # B4: Pre-execution contract validation
+            if phase_name in FOREGROUND_CONTRACTS:
+                violations = self._contract_validator.pre_check(phase_name, set(ctx.context.keys()))
+                if violations:
+                    logger.debug(f"Contract pre-check [{phase_name}]: {violations}")
+
             try:
                 phase_result = await phase.execute(ctx)
             except Exception as e:
@@ -542,6 +586,8 @@ class PipelineExecutor:
             phase_status = "error" if not phase_result.success else "success"
             phase_error = phase_result.errors[0] if phase_result.errors else None
             await _record_xray_phase(phase_name, phase_result.data or {}, phase_dur, pstatus=phase_status, perror=phase_error)
+            # MemoryEvent: авто-инструментация памяти
+            self._record_memory_phase_event(phase_name, phase_result.data or {}, phase_dur, ctx, pstatus=phase_status, perror=phase_error)
 
             if not phase_result.success:
                 if phase_result.degradation:
@@ -570,6 +616,13 @@ class PipelineExecutor:
 
             if phase_result.data:
                 ctx.context.update(phase_result.data)
+
+            # B4: Post-execution contract validation
+            if phase_name in FOREGROUND_CONTRACTS:
+                produced = set(phase_result.data.keys()) if phase_result.data else set()
+                violations = self._contract_validator.post_check(phase_name, produced)
+                if violations:
+                    logger.debug(f"Contract post-check [{phase_name}]: {violations}")
 
             self._apply_phase_result(phase_name, phase_result, result)
 
@@ -837,6 +890,10 @@ class PipelineExecutor:
             get_memory_hooks().execute("after_process", hctx)
         except Exception:
             pass
+
+        # B4: Log contract validation report
+        if self._contract_validator.has_violations:
+            logger.info(f"Pipeline contract report: {self._contract_validator.get_report()}")
 
         logger.info(
             f"Pipeline: {result.intent} | {result.strategy} | "

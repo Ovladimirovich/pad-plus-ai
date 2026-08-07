@@ -506,6 +506,117 @@ class EpisodicMemory:
         self._put_conn(conn)
         return [self._row_to_episode(row) for row in rows]
 
+    # === D'-3: Lifecycle / Forgetting методы ===
+
+    def get_count(self, user_id: Optional[str] = None) -> int:
+        """Возвращает количество эпизодов."""
+        conn = self._get_conn()
+        cur = conn.cursor()
+        if user_id:
+            cur.execute("SELECT COUNT(*) FROM episodes WHERE user_id = %s", (user_id,))
+        else:
+            cur.execute("SELECT COUNT(*) FROM episodes")
+        total = cur.fetchone()[0]
+        cur.close()
+        self._put_conn(conn)
+        return total
+
+    def get_all(self, limit: int = 1000) -> List[Episode]:
+        """Возвращает все эпизоды (последние первыми)."""
+        conn = self._get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM episodes ORDER BY timestamp DESC LIMIT %s", (limit,))
+        rows = cur.fetchall()
+        cur.close()
+        self._put_conn(conn)
+        return [self._row_to_episode(row) for row in rows]
+
+    def delete_by_id(self, episode_id: str) -> bool:
+        """Удаляет эпизод по ID."""
+        conn = self._get_conn()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM episodes WHERE id = %s", (episode_id,))
+        deleted = cur.rowcount > 0
+        conn.commit()
+        cur.close()
+        self._put_conn(conn)
+
+        if deleted:
+            emit_memory_event(
+                operation=MemoryOperation.DELETE,
+                component=MemoryComponent.EPISODIC_MEMORY,
+                object_type=MemoryObjectType.EPISODE,
+                object_id=episode_id,
+                result=MemoryResult.DELETED,
+                phase="episodic_pg.delete_by_id",
+            )
+            logger.info("🗑️ Эпизод удалён (PG): %s", episode_id)
+        return deleted
+
+    def delete_expired(
+        self,
+        max_age_hours: float,
+        user_id: Optional[str] = None,
+        min_significance: float = 0.7,
+        min_access_count: int = 5,
+    ) -> tuple:
+        """Удаляет эпизоды старше max_age_hours, сохраняя важные."""
+        from datetime import timedelta
+        import time as _time
+        start_time = _time.perf_counter()
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        conn = self._get_conn()
+        cur = conn.cursor()
+
+        # Считаем защищённые (важные) старые эпизоды
+        cur.execute("""
+            SELECT COUNT(*) FROM episodes
+            WHERE timestamp < %s
+              AND (significance >= %s OR access_count >= %s)
+        """, (cutoff, min_significance, min_access_count))
+        protected = cur.fetchone()[0]
+
+        # Удаляем старые и неважные
+        if user_id:
+            cur.execute("""
+                DELETE FROM episodes
+                WHERE timestamp < %s
+                  AND (significance < %s AND access_count < %s)
+                  AND user_id = %s
+            """, (cutoff, min_significance, min_access_count, user_id))
+        else:
+            cur.execute("""
+                DELETE FROM episodes
+                WHERE timestamp < %s
+                  AND (significance < %s AND access_count < %s)
+            """, (cutoff, min_significance, min_access_count))
+        expired = cur.rowcount
+        conn.commit()
+        cur.close()
+        self._put_conn(conn)
+
+        duration_ms = (_time.perf_counter() - start_time) * 1000
+        logger.info(
+            "⏰ Episodic PG TTL: удалено=%d, защищено=%d (max_age=%sh)",
+            expired, protected, max_age_hours,
+        )
+
+        if expired:
+            emit_memory_event(
+                operation=MemoryOperation.EVICT,
+                component=MemoryComponent.EPISODIC_MEMORY,
+                object_type=MemoryObjectType.EPISODE,
+                result=MemoryResult.EXPIRED,
+                phase="episodic_pg.delete_expired",
+                session_id=user_id,
+                duration_ms=duration_ms,
+                payload_size_bytes=expired,
+                metadata={"protected": protected, "max_age_hours": max_age_hours},
+            )
+
+        return expired, protected
+
     def link_episodes(self, episode_id: str, related_id: str, relation_type: str = "related"):
         """Создаёт связь между эпизодами"""
         conn = self._get_conn()

@@ -1,4 +1,5 @@
 import pytest
+import time
 from unittest.mock import MagicMock, patch
 
 from core.pipeline.context import PipelineContext
@@ -101,14 +102,15 @@ class TestEvaluationPhase:
             user_message="вопрос",
             context={
                 "response": "ответ",
-                "execution_time_ms": 1500,
+                "start_time": time.perf_counter(),
             },
         )
         await phase.execute(ctx)
 
         mock_evaluator.evaluate.assert_called_once()
         meta = mock_evaluator.evaluate.call_args[1]["metadata"]
-        assert meta["execution_time_ms"] == 1500
+        assert meta["execution_time_ms"] >= 0
+        assert isinstance(meta["execution_time_ms"], float)
 
     @pytest.mark.asyncio
     async def test_evaluator_error_handling(self, mock_collector):

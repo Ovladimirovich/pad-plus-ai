@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+import time
 
 from ..base import PipelinePhase
 from ..models import PhaseResult
@@ -36,12 +37,15 @@ class EvaluationPhase(PipelinePhase):
             collector = self._get_collector()
             user_message = ctx.user_message
 
+            start_time = ctx.context.get("start_time", time.perf_counter())
+            execution_time_ms = (time.perf_counter() - start_time) * 1000
+
             evaluation = evaluator.evaluate(
                 prompt=user_message,
                 response=response,
                 metadata={
                     "confidence": ctx.context.get("confidence"),
-                    "execution_time_ms": ctx.context.get("execution_time_ms"),
+                    "execution_time_ms": execution_time_ms,
                 },
             )
 
