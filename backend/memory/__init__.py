@@ -62,6 +62,12 @@ from .session_store import (
     get_session_rag_store, get_session_semantic_store, get_session_episodic_store,
 )
 
+# === Lifecycle & Forgetting (D'-3: TTL/quota/importance eviction) ===
+from .lifecycle import (
+    MemoryLifecycleConfig, ForgettingResult, MemoryLifecycleManager,
+    get_lifecycle, reset_lifecycle,
+)
+
 # === Утилиты ===
 from .hygiene import MemoryHygiene, get_hygiene
 
@@ -101,4 +107,11 @@ __all__ = [
     "get_session_rag_store",
     "get_session_semantic_store",
     "get_session_episodic_store",
+
+    # Lifecycle & Forgetting (D'-3)
+    "MemoryLifecycleConfig",
+    "ForgettingResult",
+    "MemoryLifecycleManager",
+    "get_lifecycle",
+    "reset_lifecycle",
 ]

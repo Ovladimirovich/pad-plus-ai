@@ -738,6 +738,107 @@ class SemanticMemory:
             limit=50,
         )
 
+    # === D'-3: Lifecycle / Forgetting методы ===
+
+    def get_count(self) -> int:
+        """Возвращает количество знаний."""
+        conn = self._get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM semantic_knowledge")
+        total = cur.fetchone()[0]
+        cur.close()
+        self._put_conn(conn)
+        return total
+
+    def get_all(self, limit: int = 1000) -> List[SemanticKnowledge]:
+        """Возвращает все знания."""
+        conn = self._get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM semantic_knowledge ORDER BY created_at DESC LIMIT %s",
+            (limit,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        self._put_conn(conn)
+        return [self._row_to_knowledge(row) for row in rows]
+
+    def delete_by_id(self, knowledge_id: str) -> bool:
+        """Удаляет знание по ID."""
+        conn = self._get_conn()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM semantic_knowledge WHERE id = %s", (knowledge_id,))
+        deleted = cur.rowcount > 0
+        cur.execute("DELETE FROM procedure_applications WHERE procedure_id = %s", (knowledge_id,))
+        conn.commit()
+        cur.close()
+        self._put_conn(conn)
+
+        if deleted:
+            self._procedures_cache.pop(knowledge_id, None)
+            emit_memory_event(
+                operation=MemoryOperation.DELETE,
+                component=MemoryComponent.SEMANTIC_MEMORY,
+                object_type=MemoryObjectType.FACT,
+                object_id=knowledge_id,
+                result=MemoryResult.DELETED,
+                phase="semantic_pg.delete_by_id",
+            )
+            logger.info("🗑️ Знание удалено (PG): %s", knowledge_id)
+        return deleted
+
+    def delete_expired(
+        self,
+        max_age_hours: float,
+        min_confidence: float = 0.7,
+        min_access_count: int = 5,
+    ) -> tuple:
+        """Удаляет знания старше max_age_hours, сохраняя важные."""
+        from datetime import timedelta
+        import time as _time
+        start_time = _time.perf_counter()
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        conn = self._get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT COUNT(*) FROM semantic_knowledge
+            WHERE created_at < %s
+              AND (confidence >= %s OR access_count >= %s)
+        """, (cutoff, min_confidence, min_access_count))
+        protected = cur.fetchone()[0]
+
+        cur.execute("""
+            DELETE FROM semantic_knowledge
+            WHERE created_at < %s
+              AND (confidence < %s AND access_count < %s)
+        """, (cutoff, min_confidence, min_access_count))
+        expired = cur.rowcount
+        conn.commit()
+        cur.close()
+        self._put_conn(conn)
+
+        duration_ms = (_time.perf_counter() - start_time) * 1000
+        logger.info(
+            "⏰ Semantic PG TTL: удалено=%d, защищено=%d (max_age=%sh)",
+            expired, protected, max_age_hours,
+        )
+
+        if expired:
+            emit_memory_event(
+                operation=MemoryOperation.EVICT,
+                component=MemoryComponent.SEMANTIC_MEMORY,
+                object_type=MemoryObjectType.FACT,
+                result=MemoryResult.EXPIRED,
+                phase="semantic_pg.delete_expired",
+                duration_ms=duration_ms,
+                payload_size_bytes=expired,
+                metadata={"protected": protected, "max_age_hours": max_age_hours},
+            )
+
+        return expired, protected
+
     # === Статистика ===
 
     def get_stats(self) -> Dict[str, Any]:

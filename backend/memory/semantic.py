@@ -9,7 +9,7 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from enum import Enum
 import json
@@ -489,7 +489,124 @@ class SemanticMemory:
             self._save_knowledge(k)
         
         return results
-    
+
+    # === D'-3: Lifecycle / Forgetting методы ===
+
+    def get_count(self) -> int:
+        """Возвращает количество знаний в семантической памяти."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM semantic_knowledge")
+        total = cursor.fetchone()[0]
+        conn.close()
+        return total
+
+    def get_all(self, limit: int = 1000) -> List[SemanticKnowledge]:
+        """Возвращает все знания (для lifecycle/forgetting)."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM semantic_knowledge ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [self._row_to_knowledge(row) for row in rows]
+
+    def delete_by_id(self, knowledge_id: str) -> bool:
+        """Удаляет знание по ID. Возвращает True, если удалено."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM semantic_knowledge WHERE id = ?", (knowledge_id,))
+        deleted = cursor.rowcount > 0
+        cursor.execute("DELETE FROM procedure_applications WHERE procedure_id = ?", (knowledge_id,))
+        conn.commit()
+        conn.close()
+
+        if deleted:
+            self._procedures_cache.pop(knowledge_id, None)
+            emit_memory_event(
+                operation=MemoryOperation.DELETE,
+                component=MemoryComponent.SEMANTIC_MEMORY,
+                object_type=MemoryObjectType.FACT,
+                object_id=knowledge_id,
+                result=MemoryResult.DELETED,
+                phase="semantic.delete_by_id",
+            )
+            logger.info("🗑️ Знание удалено: %s", knowledge_id)
+        return deleted
+
+    def delete_expired(
+        self,
+        max_age_hours: float,
+        min_confidence: float = 0.7,
+        min_access_count: int = 5,
+    ) -> tuple:
+        """
+        Удаляет знания старше max_age_hours, сохраняя важные
+        (высокая уверенность или частое использование).
+
+        Returns:
+            (expired_count, protected_count)
+        """
+        import time as _time
+        start_time = _time.perf_counter()
+
+        cutoff = datetime.now() - timedelta(hours=max_age_hours)
+        protected = 0
+        expired = 0
+
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id, created_at, confidence, access_count FROM semantic_knowledge")
+        rows = cursor.fetchall()
+
+        delete_ids = []
+        for row in rows:
+            ts = datetime.fromisoformat(row["created_at"])
+            ts_aware = ts if ts.tzinfo else ts.astimezone()
+            cutoff_aware = cutoff if cutoff.tzinfo else cutoff.astimezone()
+            if ts_aware >= cutoff_aware:
+                continue
+            if (row["confidence"] or 0) >= min_confidence or (row["access_count"] or 0) >= min_access_count:
+                protected += 1
+            else:
+                delete_ids.append(row["id"])
+
+        if delete_ids:
+            placeholders = ",".join("?" * len(delete_ids))
+            cursor.execute(f"DELETE FROM semantic_knowledge WHERE id IN ({placeholders})", delete_ids)
+            conn.commit()
+            expired = len(delete_ids)
+
+        conn.close()
+
+        for kid in delete_ids:
+            self._procedures_cache.pop(kid, None)
+
+        duration_ms = (_time.perf_counter() - start_time) * 1000
+        logger.info(
+            "⏰ Semantic TTL: удалено=%d, защищено=%d (max_age=%sh)",
+            expired, protected, max_age_hours,
+        )
+
+        if expired:
+            emit_memory_event(
+                operation=MemoryOperation.EVICT,
+                component=MemoryComponent.SEMANTIC_MEMORY,
+                object_type=MemoryObjectType.FACT,
+                result=MemoryResult.EXPIRED,
+                phase="semantic.delete_expired",
+                duration_ms=duration_ms,
+                payload_size_bytes=expired,
+                metadata={"protected": protected, "max_age_hours": max_age_hours},
+            )
+
+        return expired, protected
+
     # === Процедурные знания ===
     
     def learn_procedure(

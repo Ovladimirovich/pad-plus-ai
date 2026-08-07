@@ -71,38 +71,46 @@ class MemoryMaintenancePhase(PipelinePhase):
 
     async def _run_forgetting(self, ctx) -> Dict[str, Any]:
         try:
-            from memory.forgetting import PriorityForgetting
             from memory import get_episodic_memory, get_semantic_memory
+            from memory.lifecycle import MemoryLifecycleConfig, MemoryLifecycleManager
 
-            forgetting = PriorityForgetting()
             episodic = get_episodic_memory()
             semantic = get_semantic_memory()
 
-            ep_items = episodic.get_all() if hasattr(episodic, "get_all") else []
-            sem_items = semantic.get_all() if hasattr(semantic, "get_all") else []
-            ep_list = [e.to_dict() if hasattr(e, "to_dict") else e for e in ep_items]
-            sem_list = [s.to_dict() if hasattr(s, "to_dict") else s for s in sem_items]
+            # D'-3: единый lifecycle-фреймворк (TTL + quota + importance eviction)
+            # Безопасный конфиг для пиплайна: небольшие лимиты, чтобы забывание
+            # не выжирало CPU в каждом 25-м диалоге.
+            config = MemoryLifecycleConfig()
+            config.max_items["episodic"] = 20000
+            config.max_items["semantic"] = 10000
 
-            all_items = ep_list + sem_list
-            records = forgetting.forget_lowest_ranked(all_items)
-            forgotten_count = len(records)
+            manager = MemoryLifecycleManager(config)
+            user_id = ctx.context.get("user_id") if ctx.context else None
+            results = manager.run_maintenance(
+                episodic=episodic,
+                semantic=semantic,
+                user_id=user_id,
+            )
 
-            if records:
-                delete_ids = {}
-                for r in records:
-                    store = "episodic" if r.item_type in ("episodic", "unknown") else "semantic"
-                    delete_ids.setdefault(store, []).append(r.item_id)
-                for store_name, ids in delete_ids.items():
-                    store = episodic if store_name == "episodic" else semantic
-                    for item_id in ids:
-                        try:
-                            if hasattr(store, "delete"):
-                                store.delete(item_id)
-                        except Exception:
-                            pass
+            totals = {"expired": 0, "evicted": 0, "protected": 0}
+            for r in results.values():
+                totals["expired"] += r.expired
+                totals["evicted"] += r.evicted
+                totals["protected"] += r.protected
 
-            logger.info("Forgetting: %d items forgotten", forgotten_count)
-            return {"forgotten": forgotten_count, "records": len(records)}
+            forgotten_count = totals["expired"] + totals["evicted"]
+
+            logger.info(
+                "Forgetting: %d items forgotten (expired=%d, evicted=%d, protected=%d)",
+                forgotten_count, totals["expired"], totals["evicted"], totals["protected"],
+            )
+            return {
+                "forgotten": forgotten_count,
+                "expired": totals["expired"],
+                "evicted": totals["evicted"],
+                "protected": totals["protected"],
+                "by_component": {k: v.to_dict() for k, v in results.items()},
+            }
         except Exception as e:
-            logger.warning("Forgetting error: %s", e)
+            logger.warning("Forgetting error: %s", e, exc_info=True)
             return {"error": str(e)}

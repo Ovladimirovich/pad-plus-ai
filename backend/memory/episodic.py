@@ -12,7 +12,7 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 import json
 import os
@@ -577,7 +577,127 @@ class EpisodicMemory:
         conn.close()
         
         return [self._row_to_episode(row) for row in rows]
-    
+
+    # === D'-3: Lifecycle / Forgetting методы ===
+
+    def get_count(self, user_id: Optional[str] = None) -> int:
+        """Возвращает количество эпизодов (опционально по пользователю)."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        if user_id:
+            cursor.execute("SELECT COUNT(*) FROM episodes WHERE user_id = ?", (user_id,))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM episodes")
+        total = cursor.fetchone()[0]
+        conn.close()
+        return total
+
+    def get_all(self, limit: int = 1000) -> List[Episode]:
+        """Возвращает все эпизоды (алиас для lifecycle/forgetting)."""
+        return self.get_all_episodes(limit=limit)
+
+    def delete_by_id(self, episode_id: str) -> bool:
+        """Удаляет эпизод по ID. Возвращает True, если удалён."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM episodes WHERE id = ?", (episode_id,))
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+
+        if deleted:
+            self._recent_episodes = [ep for ep in self._recent_episodes if ep.id != episode_id]
+            emit_memory_event(
+                operation=MemoryOperation.DELETE,
+                component=MemoryComponent.EPISODIC_MEMORY,
+                object_type=MemoryObjectType.EPISODE,
+                object_id=episode_id,
+                result=MemoryResult.DELETED,
+                phase="episodic.delete_by_id",
+            )
+            logger.info("🗑️ Эпизод удалён: %s", episode_id)
+        return deleted
+
+    def delete_expired(
+        self,
+        max_age_hours: float,
+        user_id: Optional[str] = None,
+        min_significance: float = 0.7,
+        min_access_count: int = 5,
+    ) -> tuple:
+        """
+        Удаляет эпизоды старше max_age_hours, сохраняя «важные»
+        (высокая значимость или частое использование).
+
+        Returns:
+            (expired_count, protected_count)
+        """
+        import time as _time
+        start_time = _time.perf_counter()
+
+        cutoff = datetime.now() - timedelta(hours=max_age_hours)
+        protected = 0
+        expired = 0
+
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        sql = "SELECT id, timestamp, significance, access_count FROM episodes"
+        params: List[Any] = []
+        if user_id:
+            sql += " WHERE user_id = ?"
+            params.append(user_id)
+
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+
+        delete_ids = []
+        for row in rows:
+            ts = datetime.fromisoformat(row["timestamp"])
+            # Возраст: naive (локальный) либо aware — нормализуем сравнение
+            ts_aware = ts if ts.tzinfo else ts.astimezone()
+            cutoff_aware = cutoff if cutoff.tzinfo else cutoff.astimezone()
+            if ts_aware >= cutoff_aware:
+                continue
+            if (row["significance"] or 0) >= min_significance or (row["access_count"] or 0) >= min_access_count:
+                protected += 1
+            else:
+                delete_ids.append(row["id"])
+
+        if delete_ids:
+            placeholders = ",".join("?" * len(delete_ids))
+            cursor.execute(f"DELETE FROM episodes WHERE id IN ({placeholders})", delete_ids)
+            conn.commit()
+            expired = len(delete_ids)
+
+        conn.close()
+
+        # Чистим кэш недавних
+        delete_set = set(delete_ids)
+        self._recent_episodes = [ep for ep in self._recent_episodes if ep.id not in delete_set]
+
+        duration_ms = (_time.perf_counter() - start_time) * 1000
+        logger.info(
+            "⏰ Episodic TTL: удалено=%d, защищено=%d (max_age=%sh)",
+            expired, protected, max_age_hours,
+        )
+
+        if expired:
+            emit_memory_event(
+                operation=MemoryOperation.EVICT,
+                component=MemoryComponent.EPISODIC_MEMORY,
+                object_type=MemoryObjectType.EPISODE,
+                result=MemoryResult.EXPIRED,
+                phase="episodic.delete_expired",
+                session_id=user_id,
+                duration_ms=duration_ms,
+                payload_size_bytes=expired,
+                metadata={"protected": protected, "max_age_hours": max_age_hours},
+            )
+
+        return expired, protected
+
     def get_related_episodes(self, episode_id: str) -> List[Episode]:
         """
         Получает связанные эпизоды

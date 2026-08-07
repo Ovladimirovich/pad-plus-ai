@@ -191,8 +191,13 @@ class ImpulseCore:
     def get_active_questions(self, threshold: float = 0.5) -> list[ImpulseDimension]:
         return [d for d in self.dimensions if d.weight >= threshold]
 
+    MAX_STACK_DEPTH = 50  # D'-3: лимит стека (stack+ttl стратегия)
+
     def push(self):
         self._stack.append([d.to_dict() for d in self.dimensions])
+        # D'-3: ограничиваем глубину стека, чтобы избежать неограниченного роста
+        if len(self._stack) > self.MAX_STACK_DEPTH:
+            del self._stack[:len(self._stack) - self.MAX_STACK_DEPTH]
 
     def pop(self) -> bool:
         if not self._stack:
