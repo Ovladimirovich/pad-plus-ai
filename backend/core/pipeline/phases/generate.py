@@ -14,9 +14,6 @@ class GeneratePhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from runtime.llm_service import get_llm_service, LLMService
-            from core.anti_directive import ANTI_DIRECTIVE
-
             roots_context = ctx.context.get("roots_context", "")
             persona_context = ctx.context.get("persona_context", "")
             rag_context = ctx.context.get("rag_context", "")

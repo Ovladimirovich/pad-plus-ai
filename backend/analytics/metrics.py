@@ -88,93 +88,6 @@ class Analytics:
         conn.commit()
         conn.close()
     
-    def track_event(
-        self, 
-        event_type: str, 
-        event_data: Dict = None,
-        session_id: str = None
-    ) -> int:
-        """Записывает событие аналитики"""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO analytics_events 
-            (event_type, event_data, timestamp, session_id)
-            VALUES (?, ?, ?, ?)
-        """, (
-            event_type,
-            json.dumps(event_data or {}, ensure_ascii=False),
-            datetime.now().isoformat(),
-            session_id
-        ))
-        
-        event_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        return event_id
-    
-    def track_message(
-        self, 
-        role: str, 
-        text: str, 
-        tokens: int = 0,
-        session_id: str = None,
-        topic: str = None
-    ) -> int:
-        """Записывает сообщение чата"""
-        return self.track_event(
-            event_type="message",
-            event_data={
-                "role": role,
-                "text_length": len(text),
-                "tokens": tokens,
-                "topic": topic
-            },
-            session_id=session_id
-        )
-    
-    def start_session(self, session_id: str = None) -> str:
-        """Начинает новую сессию"""
-        import uuid
-        session_id = session_id or str(uuid.uuid4())
-        
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO sessions (id, started_at)
-            VALUES (?, ?)
-        """, (session_id, datetime.now().isoformat()))
-        
-        conn.commit()
-        conn.close()
-        
-        return session_id
-    
-    def end_session(self, session_id: str):
-        """Завершает сессию"""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        # Подсчитываем сообщения в сессии
-        cursor.execute("""
-            SELECT COUNT(*) as cnt FROM analytics_events
-            WHERE session_id = ? AND event_type = 'message'
-        """, (session_id,))
-        
-        count = cursor.fetchone()['cnt']
-        
-        cursor.execute("""
-            UPDATE sessions 
-            SET ended_at = ?, message_count = ?
-            WHERE id = ?
-        """, (datetime.now().isoformat(), count, session_id))
-        
-        conn.commit()
-        conn.close()
-    
     # === МЕТРИКИ ===
     
     def get_dashboard_metrics(self, days: int = 7) -> Dict[str, Any]:
@@ -350,28 +263,6 @@ class Analytics:
             "generated_at": datetime.now().isoformat()
         }
     
-    def clear_old_data(self, days: int = 30):
-        """Удаляет старые данные"""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        
-        cursor.execute(
-            "DELETE FROM analytics_events WHERE timestamp < ?", 
-            (cutoff,)
-        )
-        cursor.execute(
-            "DELETE FROM sessions WHERE started_at < ?", 
-            (cutoff,)
-        )
-        
-        deleted = cursor.rowcount
-        conn.commit()
-        conn.close()
-        
-        return deleted
-
     def get_activity_data(self, hours: int = 24) -> Dict[str, Any]:
         """Метрики активности для графиков (для dashboard)"""
         conn = self._get_connection()

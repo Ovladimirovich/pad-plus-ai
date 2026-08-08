@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from ..base import PipelinePhase
 from ..models import PhaseResult

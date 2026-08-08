@@ -10,13 +10,12 @@
 3. Интеграция — создание новых связей между концепциями
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 import logging
 import asyncio
 import os
-import random
 
 logger = logging.getLogger("PAD+.dreams")
 
@@ -91,14 +90,6 @@ class DreamSystem:
     def record_activity(self):
         """Записывает активность (для определения простоя)"""
         self._last_activity = datetime.now()
-    
-    def should_dream(self) -> bool:
-        """Проверяет, пора ли "спать" """
-        if self._is_dreaming:
-            return False
-        
-        idle_time = (datetime.now() - self._last_activity).total_seconds() / 60
-        return idle_time >= self.config["min_idle_minutes"]
     
     async def dream(self) -> DreamReport:
         """
@@ -435,24 +426,6 @@ class DreamSystem:
                 insight for d in self._dream_history[-3:]
                 for insight in d.insights
             ][:10]
-        }
-    
-    def get_last_dream_report(self) -> Optional[Dict[str, Any]]:
-        """Получает отчёт о последнем сне"""
-        if not self._dream_history:
-            return None
-        
-        last = self._dream_history[-1]
-        return {
-            "started_at": last.started_at.isoformat(),
-            "finished_at": last.finished_at.isoformat(),
-            "duration_seconds": round(last.total_duration, 2),
-            "phases_completed": last.phases_completed,
-            "episodes_consolidated": last.episodes_consolidated,
-            "new_knowledge_items": last.new_knowledge_items,
-            "new_connections": last.new_connections,
-            "insights": last.insights,
-            "recommendations": last.recommendations
         }
 
 

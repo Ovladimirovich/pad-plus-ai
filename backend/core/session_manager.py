@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any, Callable
 import json
 import os
+import threading
 import time
 import uuid
 import logging
@@ -147,6 +148,9 @@ class SessionManager:
             "total_messages": 0
         }
         
+        # Thread-safety: защищает _sessions/_ip_index/_auth_cache и _save()
+        self._lock = threading.RLock()
+        
         self._load()
     
     def _default_auth_validator(self, user_id: str) -> bool:
@@ -169,9 +173,10 @@ class SessionManager:
     def _is_auth_valid(self, user_id: str) -> bool:
         """Проверяет валидность auth-сессии с TTL-кэшированием."""
         now = time.monotonic()
-        cached = self._auth_cache.get(user_id)
-        if cached and (now - cached[0]) < self._auth_cache_ttl:
-            return cached[1]
+        with self._lock:
+            cached = self._auth_cache.get(user_id)
+            if cached and (now - cached[0]) < self._auth_cache_ttl:
+                return cached[1]
         
         validator = self._auth_validator or self._default_auth_validator
         try:
@@ -179,17 +184,20 @@ class SessionManager:
         except Exception:
             valid = True  # fail-open: не блокируем сессию при сбое валидатора
         
-        if user_id not in self._auth_cache:
-            if len(self._auth_cache) >= 10_000:
-                # Ограничиваем рост кэша
-                for key in list(self._auth_cache.keys())[:5_000]:
-                    del self._auth_cache[key]
-        self._auth_cache[user_id] = (now, valid)
+        with self._lock:
+            if user_id not in self._auth_cache:
+                if len(self._auth_cache) >= 10_000:
+                    # Ограничиваем рост кэша
+                    for key in list(self._auth_cache.keys())[:5_000]:
+                        del self._auth_cache[key]
+            self._auth_cache[user_id] = (now, valid)
         return valid
     
     def _load(self):
         """Загружает сессии из файла"""
-        if os.path.exists(self.data_path):
+        with self._lock:
+            if not os.path.exists(self.data_path):
+                return
             try:
                 with open(self.data_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -239,16 +247,17 @@ class SessionManager:
     
     def _save(self):
         """Сохраняет сессии в файл"""
-        os.makedirs(os.path.dirname(self.data_path), exist_ok=True)
-        
-        data = {
-            "updated": datetime.now().isoformat(),
-            "stats": self._stats,
-            "sessions": [s.to_dict() for s in self._sessions.values()]
-        }
-        
-        with open(self.data_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        with self._lock:
+            os.makedirs(os.path.dirname(self.data_path), exist_ok=True)
+            
+            data = {
+                "updated": datetime.now().isoformat(),
+                "stats": self._stats,
+                "sessions": [s.to_dict() for s in self._sessions.values()]
+            }
+            
+            with open(self.data_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
     
     def create_session(
         self,
@@ -276,13 +285,14 @@ class SessionManager:
             user_id=user_id
         )
         
-        self._sessions[session_id] = session
-        self._stats["total_sessions"] += 1
-        
-        if ip_address:
-            if ip_address not in self._ip_index:
-                self._ip_index[ip_address] = set()
-            self._ip_index[ip_address].add(session_id)
+        with self._lock:
+            self._sessions[session_id] = session
+            self._stats["total_sessions"] += 1
+            
+            if ip_address:
+                if ip_address not in self._ip_index:
+                    self._ip_index[ip_address] = set()
+                self._ip_index[ip_address].add(session_id)
         
         self._save()
         
@@ -301,57 +311,58 @@ class SessionManager:
     
     def get_session(self, session_id: str) -> Optional[Session]:
         """Получает сессию по ID"""
-        if session_id not in self._sessions:
+        with self._lock:
+            if session_id not in self._sessions:
+                emit_memory_event(
+                    operation=MemoryOperation.READ,
+                    component=MemoryComponent.SESSION_MANAGER,
+                    object_type=MemoryObjectType.SESSION,
+                    object_id=session_id,
+                    result=MemoryResult.NOT_FOUND,
+                    phase="session_manager.get_session",
+                )
+                return None
+            
+            session = self._sessions[session_id]
+            
+            if session.is_expired(self.max_age_hours):
+                self.end_session(session_id)
+                emit_memory_event(
+                    operation=MemoryOperation.READ,
+                    component=MemoryComponent.SESSION_MANAGER,
+                    object_type=MemoryObjectType.SESSION,
+                    object_id=session_id,
+                    result=MemoryResult.EXPIRED,
+                    phase="session_manager.get_session",
+                )
+                return None
+            
+            # C4: auth-сессия валидируется против Supabase (source of truth).
+            # Если пользователь удалён/отключён в Supabase — сессия невалидна.
+            if session.is_auth_session() and session.user_id and not self._is_auth_valid(session.user_id):
+                logger.info(f"🔐 Auth session invalidated by Supabase: {session.user_id[:12]}...")
+                self.end_session(session_id)
+                emit_memory_event(
+                    operation=MemoryOperation.READ,
+                    component=MemoryComponent.SESSION_MANAGER,
+                    object_type=MemoryObjectType.SESSION,
+                    object_id=session_id,
+                    result=MemoryResult.EXPIRED,
+                    phase="session_manager.get_session",
+                )
+                return None
+            
+            session.touch()
             emit_memory_event(
                 operation=MemoryOperation.READ,
                 component=MemoryComponent.SESSION_MANAGER,
                 object_type=MemoryObjectType.SESSION,
                 object_id=session_id,
-                result=MemoryResult.NOT_FOUND,
+                result=MemoryResult.FOUND,
                 phase="session_manager.get_session",
+                payload_size_bytes=len(session_id),
             )
-            return None
-        
-        session = self._sessions[session_id]
-        
-        if session.is_expired(self.max_age_hours):
-            self.end_session(session_id)
-            emit_memory_event(
-                operation=MemoryOperation.READ,
-                component=MemoryComponent.SESSION_MANAGER,
-                object_type=MemoryObjectType.SESSION,
-                object_id=session_id,
-                result=MemoryResult.EXPIRED,
-                phase="session_manager.get_session",
-            )
-            return None
-        
-        # C4: auth-сессия валидируется против Supabase (source of truth).
-        # Если пользователь удалён/отключён в Supabase — сессия невалидна.
-        if session.is_auth_session() and session.user_id and not self._is_auth_valid(session.user_id):
-            logger.info(f"🔐 Auth session invalidated by Supabase: {session.user_id[:12]}...")
-            self.end_session(session_id)
-            emit_memory_event(
-                operation=MemoryOperation.READ,
-                component=MemoryComponent.SESSION_MANAGER,
-                object_type=MemoryObjectType.SESSION,
-                object_id=session_id,
-                result=MemoryResult.EXPIRED,
-                phase="session_manager.get_session",
-            )
-            return None
-        
-        session.touch()
-        emit_memory_event(
-            operation=MemoryOperation.READ,
-            component=MemoryComponent.SESSION_MANAGER,
-            object_type=MemoryObjectType.SESSION,
-            object_id=session_id,
-            result=MemoryResult.FOUND,
-            phase="session_manager.get_session",
-            payload_size_bytes=len(session_id),
-        )
-        return session
+            return session
     
     def get_or_create(
         self,
@@ -379,17 +390,20 @@ class SessionManager:
     
     def end_session(self, session_id: str):
         """Завершает сессию"""
-        if session_id in self._sessions:
+        with self._lock:
+            if session_id not in self._sessions:
+                return
             session = self._sessions[session_id]
             
             if session.ip_address and session.ip_address in self._ip_index:
                 self._ip_index[session.ip_address].discard(session_id)
             
             del self._sessions[session_id]
-            self._save()
-            
-            logger.info(f"🔐 Session ended: {session_id}")
-            emit_memory_event(
+        
+        self._save()
+        
+        logger.info(f"🔐 Session ended: {session_id}")
+        emit_memory_event(
                 operation=MemoryOperation.DELETE,
                 component=MemoryComponent.SESSION_MANAGER,
                 object_type=MemoryObjectType.SESSION,
@@ -411,20 +425,21 @@ class SessionManager:
         if not session:
             return
         
-        session.message_count += 1
-        self._stats["total_messages"] += 1
-        
-        if intent:
-            session.context.last_intent = intent
-        
-        if topic:
-            session.context.add_topic(topic)
-        
-        if entity:
-            session.context.add_entity(entity)
-        
-        if emotion:
-            session.context.add_emotion(emotion)
+        with self._lock:
+            session.message_count += 1
+            self._stats["total_messages"] += 1
+            
+            if intent:
+                session.context.last_intent = intent
+            
+            if topic:
+                session.context.add_topic(topic)
+            
+            if entity:
+                session.context.add_entity(entity)
+            
+            if emotion:
+                session.context.add_emotion(emotion)
         
         self._save()
         emit_memory_event(
@@ -448,7 +463,9 @@ class SessionManager:
         if not session:
             return
         
-        session.settings.update(settings)
+        with self._lock:
+            session.settings.update(settings)
+        
         self._save()
     
     def get_context_for_prompt(self, session_id: str) -> str:
@@ -497,10 +514,11 @@ class SessionManager:
     
     def cleanup_expired(self):
         """Удаляет истёкшие сессии"""
-        to_remove = [
-            sid for sid, session in self._sessions.items()
-            if session.is_expired(self.max_age_hours)
-        ]
+        with self._lock:
+            to_remove = [
+                sid for sid, session in self._sessions.items()
+                if session.is_expired(self.max_age_hours)
+            ]
         
         for sid in to_remove:
             self.end_session(sid)
@@ -519,14 +537,15 @@ class SessionManager:
     
     def get_sessions_by_ip(self, ip_address: str) -> List[Session]:
         """Возвращает сессии по IP"""
-        if ip_address not in self._ip_index:
-            return []
-        
-        return [
-            self._sessions[sid]
-            for sid in self._ip_index[ip_address]
-            if sid in self._sessions
-        ]
+        with self._lock:
+            if ip_address not in self._ip_index:
+                return []
+            
+            return [
+                self._sessions[sid]
+                for sid in self._ip_index[ip_address]
+                if sid in self._sessions
+            ]
 
 
 # Глобальный экземпляр

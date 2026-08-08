@@ -414,7 +414,6 @@ class RAGMemory:
         self.conn = None
         self.cursor = None
         self._keywords_cache = {}
-        self._lock = threading.Lock() if 'threading' in dir() else None
 
         db_url = os.getenv('DATABASE_URL')
         if not db_url:
@@ -561,90 +560,6 @@ class RAGMemory:
             f"связей: {len(relations)}, "
             f"user_id: {user_id})"
         )
-        return doc_id
-    
-    async def add_dialog_async(
-        self, 
-        user_message: str, 
-        ai_response: str,
-        metadata: Dict[str, Any] = None
-    ) -> str:
-        """Добавляет диалог с LLM-суммаризацией"""
-        import uuid
-        import psycopg2
-        from psycopg2.extras import Json
-        
-        doc_id = str(uuid.uuid4())
-        
-        # LLM-суммаризация
-        if self.use_llm_summarization:
-            user_summary = await summarize_text_llm(user_message, MAX_DIALOG_LENGTH)
-            ai_summary = await summarize_text_llm(ai_response, MAX_DIALOG_LENGTH)
-        else:
-            user_summary = summarize_text_sync(user_message, MAX_DIALOG_LENGTH)
-            ai_summary = summarize_text_sync(ai_response, MAX_DIALOG_LENGTH)
-        
-        # Остальное как в синхронной версии
-        combined_text = f"{user_message} {ai_response}"
-        keywords = extract_keywords(combined_text)
-        topic_info = classify_dialog(user_message, ai_response)
-        entities = extract_entities(combined_text)
-        relations = extract_relations(user_message, ai_response)
-        
-        meta = metadata or {}
-        meta.update({
-            "user_message": user_summary,
-            "ai_response": ai_summary,
-            "user_full": user_message[:1000],
-            "ai_full": ai_response[:1000],
-            "timestamp": datetime.now().isoformat(),
-            "type": "dialog",
-            "keywords": ",".join(keywords),
-            "is_summarized": len(user_message) > MAX_DIALOG_LENGTH or 
-                            len(ai_response) > MAX_DIALOG_LENGTH,
-            "topic": topic_info["primary_topic"],
-            "topic_confidence": topic_info["confidence"],
-            "sentiment": topic_info["sentiment"],
-            "entities": json.dumps(entities, ensure_ascii=False),
-            "relations": json.dumps(relations, ensure_ascii=False)
-        })
-        
-        # Добавляем в PostgreSQL
-        try:
-            db_url = os.getenv('DATABASE_URL')
-            if not db_url:
-                raise RuntimeError("❌ DATABASE_URL не настроен! Добавьте в .env")
-            
-            conn = psycopg2.connect(db_url)
-            cursor = conn.cursor()
-            
-            cursor.execute(
-                "INSERT INTO rag_dialogs (id, user_message, ai_response, summary, keywords, topic, topic_confidence, sentiment, entities, relations, metadata, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())",
-                (
-                    doc_id,
-                    user_summary,
-                    ai_summary,
-                    f"Вопрос: {user_summary}\nОтвет: {ai_summary}",
-                    keywords,
-                    topic_info["primary_topic"],
-                    topic_info["confidence"],
-                    topic_info["sentiment"],
-                    Json(entities),
-                    Json(relations),
-                    Json(meta)
-                )
-            )
-            
-            conn.commit()
-            cursor.close()
-            conn.close()
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка добавления диалога в PostgreSQL: {e}")
-            raise
-        
-        self._keywords_cache[doc_id] = keywords
-        
         return doc_id
     
     def hybrid_search(
@@ -966,15 +881,6 @@ class RAGMemory:
         """Поиск по конкретной теме"""
         return self.hybrid_search("", n_results=n_results, topic_filter=topic)
     
-    def search_by_keywords(self, keywords: List[str], 
-                           n_results: int = CONTEXT_WINDOW) -> List[Dict[str, Any]]:
-        """Поиск по ключевым словам"""
-        if self.collection.count() == 0 or not keywords:
-            return []
-        
-        query = " ".join(keywords)
-        return self.hybrid_search(query, n_results, use_keywords=True, use_recency=False)
-    
     def get_recent(self, days: int = 7, n_results: int = 10) -> List[Dict[str, Any]]:
         """Получает недавние диалоги"""
         try:
@@ -1060,50 +966,6 @@ class RAGMemory:
             
         except Exception as e:
             logger.error(f"❌ Ошибка получения статистики по темам из PostgreSQL: {e}")
-            return {}
-    
-    def get_entity_index(self) -> Dict[str, List[str]]:
-        """Индекс сущностей -> документы"""
-        try:
-            import psycopg2
-            from psycopg2.extras import Json
-            
-            db_url = os.getenv('DATABASE_URL')
-            if not db_url:
-                raise RuntimeError("❌ DATABASE_URL не настроен! Добавьте в .env")
-            
-            conn = psycopg2.connect(db_url)
-            cursor = conn.cursor()
-            
-            # Получаем все диалоги с сущностями
-            cursor.execute(
-                "SELECT id, entities FROM rag_dialogs WHERE entities IS NOT NULL AND entities != '[]'"
-            )
-            rows = cursor.fetchall()
-            cursor.close()
-            conn.close()
-            
-            entity_index = {}
-            
-            for row in rows:
-                doc_id = row[0]
-                entities_json = row[1]
-                
-                try:
-                    entities = json.loads(entities_json) if entities_json else []
-                    for entity in entities:
-                        entity_value = entity.get('value', '')
-                        if entity_value:
-                            if entity_value not in entity_index:
-                                entity_index[entity_value] = []
-                            entity_index[entity_value].append(doc_id)
-                except Exception as e:
-                    logger.warning(f"{__name__} error: {e}")
-            
-            return entity_index
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка получения индекса сущностей из PostgreSQL: {e}")
             return {}
     
     def get_stats(self) -> Dict[str, Any]:
@@ -1246,7 +1108,6 @@ class RAGMemory:
             
         except Exception as e:
             logger.error(f"❌ Ошибка очистки RAG Memory из PostgreSQL: {e}")
-
 
 # Глобальный экземпляр
 _rag_memory: Optional[RAGMemory] = None

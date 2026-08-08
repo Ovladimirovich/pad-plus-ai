@@ -73,7 +73,7 @@ class TestConcurrentSessions:
         for u in users:
             auth.add(u)
 
-        manager = _make_manager(tmp_path)
+        manager = _make_manager(tmp_path, auth)
         errors, _ = _run_concurrently(lambda i: manager.get_or_create(user_id=users[i]))
 
         assert errors == [], f"Конкурентные создания не должны падать: {errors}"
@@ -83,7 +83,7 @@ class TestConcurrentSessions:
         """Гонка get_or_create для одного user_id не должна плодить дубликаты."""
         auth = FakeAuthStack()
         auth.add("user-single")
-        manager = _make_manager(tmp_path)
+        manager = _make_manager(tmp_path, auth)
 
         errors, results = _run_concurrently(
             lambda i: manager.get_or_create(user_id="user-single"), n=30
@@ -99,7 +99,7 @@ class TestConcurrentSessions:
         users = [f"user-{i:03d}" for i in range(50)]
         for u in users:
             auth.add(u)
-        manager = _make_manager(tmp_path)
+        manager = _make_manager(tmp_path, auth)
 
         def work(i):
             sid = manager.get_or_create(user_id=users[i]).session_id
@@ -123,7 +123,7 @@ class TestConcurrentSessions:
         users = [f"user-{i:03d}" for i in range(50)]
         for u in users:
             auth.add(u)
-        manager = _make_manager(tmp_path)
+        manager = _make_manager(tmp_path, auth)
         sessions_file = tmp_path / "sessions.json"
 
         def work(i):
