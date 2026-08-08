@@ -9,6 +9,7 @@ import RegistryTab from './research/RegistryTab';
 import DecisionsTab from './research/DecisionsTab';
 import MicroscopeTab from './research/MicroscopeTab';
 import ProvidersCompareTab from './research/ProvidersCompareTab';
+import MemoryAnalyticsTab from './research/MemoryAnalyticsTab';
 import ResearchHeader from './research/ResearchHeader';
 
 function TabButton({ active, onClick, children }) {
@@ -28,6 +29,7 @@ function TabButton({ active, onClick, children }) {
 
 const TABS = [
   { id: 'microscope', label: '🔬 Microscope' },
+  { id: 'memory', label: '🧠 Memory AI' },
   { id: 'runs', label: '▶ Experiments' },
   { id: 'compare', label: '⇄ Comparisons' },
   { id: 'providers', label: '🏢 Providers' },
@@ -68,6 +70,7 @@ export default function ResearchPage({ navParams = {} }) {
 
       <div className="flex-1 overflow-hidden">
         {tab === 'microscope' && <MicroscopeTab navParams={navParams} />}
+        {tab === 'memory' && <MemoryAnalyticsTab />}
         {tab === 'runs' && <RunsTab />}
         {tab === 'compare' && <CompareTab />}
         {tab === 'providers' && <ProvidersCompareTab />}
