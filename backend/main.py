@@ -581,6 +581,9 @@ def _register_routers(app):
     from api.memory_routes import router as memory_router
     app.include_router(memory_router)
 
+    from api.shadow_routes import router as shadow_router
+    app.include_router(shadow_router)
+
     from api.knowledge_routes import router as knowledge_router
     app.include_router(knowledge_router)
 
