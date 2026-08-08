@@ -17,9 +17,8 @@
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-import json
 import logging
 
 logger = logging.getLogger("padplus.metrics")
@@ -283,7 +282,6 @@ class MetricsCollector:
             Строка в формате Prometheus exposition format
         """
         lines = []
-        now = datetime.now().isoformat()
         
         # Метрика uptime
         uptime_seconds = (datetime.now() - self._started_at).total_seconds()

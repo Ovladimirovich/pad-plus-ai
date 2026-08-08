@@ -14,7 +14,7 @@ class KnowledgeGraphPhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from knowledge.search import find_related_triples, search_concepts
+            from knowledge.search import find_related_triples
 
             concept_names, graph_context = find_related_triples(
                 query=ctx.user_message,

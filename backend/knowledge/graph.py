@@ -213,7 +213,7 @@ class KnowledgeGraph:
 
         try:
             # 1. Пуллим из Supabase (новые/обновлённые)
-            from datetime import datetime, timezone
+            from datetime import datetime
             
             # Получаем max updated_at из локальной БД для концепций
             local_max_updated = None

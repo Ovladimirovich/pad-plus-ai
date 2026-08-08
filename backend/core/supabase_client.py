@@ -12,7 +12,6 @@
 import os
 import logging
 import sqlite3
-import json
 from typing import Optional, Any, Dict, List
 from pathlib import Path
 from types import SimpleNamespace
@@ -446,7 +445,6 @@ class LocalTable:
                 where_clause = " AND ".join(where_parts) if where_parts else "1"
                 select_sql = f"SELECT * FROM {self.table_name} WHERE {where_clause}"
                 cursor = conn.execute(select_sql, params)
-                column_names = [desc[0] for desc in cursor.description]
                 rows_before = [dict(r) for r in cursor.fetchall()]
 
                 set_parts = [f"\"{k}\" = ?" for k in self._update_data.keys()]
@@ -470,7 +468,6 @@ class LocalTable:
                 where_clause = " AND ".join(where_parts) if where_parts else "1"
                 select_sql = f"SELECT * FROM {self.table_name} WHERE {where_clause}"
                 cursor = conn.execute(select_sql, params)
-                column_names = [desc[0] for desc in cursor.description]
                 deleted_rows = [dict(r) for r in cursor.fetchall()]
 
                 sql = f"DELETE FROM {self.table_name}"
@@ -746,7 +743,7 @@ async def safe_delete(
     Returns:
         True если успешно
     """
-    result = await safe_query(
+    await safe_query(
         table=table,
         method="delete",
         fallback=False,

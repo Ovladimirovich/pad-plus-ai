@@ -40,9 +40,6 @@ async def _on_experience_captured(data: Dict[str, Any]) -> None:
         if not trait_deltas and not style_deltas:
             return
 
-        user_message = data.get("user_message", "")
-        ai_response = data.get("ai_response", "")
-
         from memory.persona import get_persona
         persona = get_persona()
         for trait, delta in trait_deltas.items():

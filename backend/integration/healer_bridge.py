@@ -12,10 +12,7 @@
 """
 
 import logging
-import os
 import sys
-import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -81,7 +78,6 @@ class HealerBridge:
         # Импорт HEALER модулей (после добавления в sys.path)
         from healer.orchestrator import HealerOrchestrator
         from healer.diagnostics.runner import run_diagnostics, filter_reports
-        from healer.meta.meta_learner import MetaLearner
 
         self._run_diagnostics = run_diagnostics
         self._filter_reports = filter_reports
@@ -211,7 +207,6 @@ class HealerBridge:
     def _on_session_completed(self, data: dict) -> None:
         """Закрывает HEALER-трейс при завершении сессии PAD+."""
         try:
-            from aethon.xray.trace import get_current_trace_id, set_current_trace_id
             from aethon.xray import store
 
             tid = data.get("request_id")

@@ -12,8 +12,7 @@ import re
 import html
 import logging
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, validator, Field, HttpUrl
-from pydantic.config import ConfigDict
+from pydantic import BaseModel, validator, Field
 
 logger = logging.getLogger("padplus.validation")
 

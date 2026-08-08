@@ -5,10 +5,9 @@
 """
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 import logging
 import asyncio
-from datetime import datetime
 
 logger = logging.getLogger("padplus.xray")
 

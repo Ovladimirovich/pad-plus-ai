@@ -9,7 +9,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, List, Any, Callable, Set
+from typing import Optional, Dict, List, Any, Set
 from enum import Enum
 import asyncio
 import json

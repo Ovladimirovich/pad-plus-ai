@@ -7,7 +7,7 @@
 Это то, что делает организм личностью.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pathlib import Path

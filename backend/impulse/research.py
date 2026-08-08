@@ -12,17 +12,14 @@ import json
 import logging
 import os
 import sys
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from experiments.analysis import (
-    analyze_keywords,
-    compare_profiles,
     generate_report_md,
     ExperimentResult,
     ExperimentReport,

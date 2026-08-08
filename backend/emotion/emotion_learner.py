@@ -1,7 +1,6 @@
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
-import re
 
 logger = logging.getLogger("PAD+.emotion_learner")
 

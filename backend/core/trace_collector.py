@@ -82,7 +82,6 @@ class TraceCollector:
                 severities[sev] += 1
             if ev.get("phase"):
                 phase = ev["phase"]
-        max_sev = max(severities, key=lambda k: severities[k]) if any(severities.values()) else "info"
         return {
             "session_id": session_id,
             "events": len(events),

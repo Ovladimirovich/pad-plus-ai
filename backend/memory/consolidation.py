@@ -17,8 +17,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 import logging
-import json
-import os
 
 import os as _os
 
@@ -34,7 +32,7 @@ if _use_postgres or (_os.environ.get("DATABASE_URL", "").startswith("postgresql"
     from .rag_postgres import get_rag as get_rag_memory
 else:
     from .episodic import get_episodic_memory, Episode
-    from .semantic import get_semantic_memory, SemanticMemory, KnowledgeType
+    from .semantic import get_semantic_memory, KnowledgeType
     from .rag import get_rag as get_rag_memory
 from .roots import get_roots_memory
 

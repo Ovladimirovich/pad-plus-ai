@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Query
-from typing import Optional
 import logging
 
 logger = logging.getLogger("padplus.api.learning")

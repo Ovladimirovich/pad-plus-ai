@@ -10,8 +10,8 @@
 
 import time
 import logging
-from typing import Dict, Optional
-from fastapi import Request, Response, HTTPException
+from typing import Dict
+from fastapi import Request, Response
 try:
     from fastapi.middleware.base import BaseHTTPMiddleware
 except ImportError:

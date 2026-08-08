@@ -3,11 +3,9 @@ Knowledge Graph API — доступ к графу знаний.
 """
 
 from fastapi import APIRouter, Query, Body, HTTPException, Depends
-from typing import Optional, Dict, Any, List
+from typing import List
 import logging
 import os
-import struct
-import httpx
 
 logger = logging.getLogger("padplus.knowledge")
 
@@ -105,7 +103,7 @@ async def extract_from_text(text: str = Body(..., embed=True)):
 
 def _simple_extract(text: str, graph) -> int:
     """Простое извлечение: ключевые слова из текста"""
-    import re, uuid
+    import re
     # Tokenize by non-alpha separators, filter short words
     words = re.findall(r'[А-Яа-яA-Za-z]{3,}', text)
     # Frequency
@@ -310,7 +308,6 @@ async def recompute_embeddings(
                 # Обновляем в SQLite
                 if not graph._use_supabase and os.path.exists(graph.db_path):
                     import sqlite3
-                    import json
                     emb_bytes = struct.pack(f"{len(emb)}f", *emb)
                     conn = sqlite3.connect(graph.db_path)
                     cursor = conn.cursor()

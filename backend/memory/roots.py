@@ -22,7 +22,6 @@ from core.xray.memory_trace import (
     emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
 )
 
-from .base import MemoryRecord
 
 from core.config import USE_PG_STORAGE
 
@@ -280,7 +279,6 @@ class RootsMemory:
     
     def get(self, root_id: str) -> Optional[RootKnowledge]:
         """Получает знание по ID"""
-        import time
         start_time = time.perf_counter()
         
         root = self._roots.get(root_id)
@@ -299,7 +297,6 @@ class RootsMemory:
     
     def get_all(self) -> List[RootKnowledge]:
         """Возвращает все корневые знания"""
-        import time
         start_time = time.perf_counter()
         
         result = sorted(self._roots.values(), key=lambda x: -x.priority)
@@ -319,7 +316,6 @@ class RootsMemory:
     
     def search(self, query: str, limit: int = 10) -> List[RootKnowledge]:
         """Поиск по тексту"""
-        import time
         start_time = time.perf_counter()
         
         query_lower = query.lower()
@@ -351,8 +347,6 @@ class RootsMemory:
         
         ВНИМАНИЕ: immutable=False позволяет изменять/удалять
         """
-        import time
-        import uuid
         start_time = time.perf_counter()
         
         root = RootKnowledge(
@@ -382,31 +376,8 @@ class RootsMemory:
         )
         return root
     
-    def add(self, text: str, category: str, priority: int = 50,
-            immutable: bool = True, source: str = "learned",
-            metadata: dict = None) -> RootKnowledge:
-        """
-        Добавляет новое корневое знание
-        
-        ВНИМАНИЕ: immutable=False позволяет изменять/удалять
-        """
-        import uuid
-        root = RootKnowledge(
-            id=f"root_{uuid.uuid4().hex[:8]}",
-            text=text,
-            category=category,
-            priority=priority,
-            immutable=immutable,
-            source=source,
-            metadata=metadata or {}
-        )
-        self._roots[root.id] = root
-        self._save()
-        return root
-    
     def update(self, root_id: str, **kwargs) -> bool:
         """Обновляет знание (если не immutable)"""
-        import time
         start_time = time.perf_counter()
         
         root = self._roots.get(root_id)
@@ -456,7 +427,6 @@ class RootsMemory:
     
     def delete(self, root_id: str) -> bool:
         """Удаляет знание (если не immutable)"""
-        import time
         start_time = time.perf_counter()
         
         root = self._roots.get(root_id)
@@ -503,7 +473,6 @@ class RootsMemory:
     
     def count(self) -> int:
         """Возвращает количество знаний"""
-        import time
         start_time = time.perf_counter()
         
         result = len(self._roots)

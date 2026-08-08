@@ -63,7 +63,6 @@ class BaseSessionStore:
 
     def set(self, session_id: str, key: str, value: Any) -> None:
         """Сохраняет значение в кэш сессии."""
-        import time
         start_time = time.perf_counter()
         with self._lock:
             self._maybe_cleanup()
@@ -169,7 +168,6 @@ class SessionRAGStore(BaseSessionStore):
 
     def get_context(self, session_id: str, query: str, user_id: Optional[str] = None) -> str:
         """Возвращает RAG-контекст с per-session кэшированием."""
-        import time
         start_time = time.perf_counter()
 
         if not session_id:
@@ -209,9 +207,6 @@ class SessionSemanticStore(BaseSessionStore):
 
     def find_applicable_procedure(self, session_id: str, text: str):
         """Возвращает применимую процедуру с per-session кэшированием."""
-        import time
-        start_time = time.perf_counter()
-
         if not session_id:
             from memory import get_semantic_memory
             return get_semantic_memory().find_applicable_procedure(text)
@@ -239,9 +234,6 @@ class SessionEpisodicStore(BaseSessionStore):
 
     def search_episodes(self, session_id: str, query: str, limit: int = 2, user_id: Optional[str] = None):
         """Возвращает похожие эпизоды с per-session кэшированием."""
-        import time
-        start_time = time.perf_counter()
-
         if not session_id:
             from memory import get_episodic_memory
             return get_episodic_memory().search_episodes(query, limit=limit, user_id=user_id)

@@ -56,11 +56,8 @@ class MetaController:
         return self._state
 
     def adapt(self, signals: Dict[str, Any]) -> None:
-        from core.events import get_events
         from core.xray.meta_learner import get_meta_learner
 
-        strategy_success = signals.get("strategy_success", 0.5)
-        interaction_type = signals.get("interaction_type", "new_knowledge")
         significance = signals.get("significance", 0.0)
         impulse_label = signals.get("impulse_primary", "")
 

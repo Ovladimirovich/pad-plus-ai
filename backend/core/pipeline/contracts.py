@@ -11,7 +11,7 @@ Post-hook: проверяет что все produced ключи соответс
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Set, Optional
+from typing import Dict, Set
 import logging
 
 logger = logging.getLogger("padplus.pipeline.contracts")

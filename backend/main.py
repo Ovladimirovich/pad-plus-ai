@@ -61,10 +61,8 @@ from core.anti_directive import ANTI_DIRECTIVE, check_integrity
 from core.cache_manager import get_cache_manager
 from core.monitoring import get_monitoring_system
 from core.dependencies import register_dependencies
-from api import routes
 
 # Импортируем core модули ПОСЛЕ загрузки .env
-from core.supabase_client import get_supabase, check_database_connection
 from core.auth_manager import get_current_user_safe
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -179,7 +177,7 @@ async def lifespan(app: FastAPI):
         logger.info("🧠 RAG Memory (фон)...")
         try:
             from memory import get_rag
-            rag = get_rag()
+            get_rag()
             logger.info("✅ RAG Memory инициализирована")
         except Exception as e:
             logger.warning(f"⚠️ RAG Memory: {e}")
@@ -240,7 +238,7 @@ async def lifespan(app: FastAPI):
 
             def _forward_xray_to_ws(event_type: str, data: dict):
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     asyncio.ensure_future(manager.broadcast({
                         "type": event_type,
                         "data": data,

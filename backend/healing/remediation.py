@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 import logging
 
-from healing.report import DiagnosticReport, ReportSeverity
+from healing.report import DiagnosticReport
 
 logger = logging.getLogger("padplus.healing.remediation")
 

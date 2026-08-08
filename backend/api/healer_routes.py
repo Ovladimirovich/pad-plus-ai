@@ -11,8 +11,7 @@ import logging
 from datetime import datetime
 
 from healing.listener import get_healer
-from healing.runner import run_diagnostics, filter_reports
-from healing.report import DiagnosticReport
+from healing.runner import run_diagnostics
 
 # HealerBridge (HEALER integration)
 _bridge_available = False

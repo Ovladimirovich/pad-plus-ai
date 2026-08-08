@@ -14,7 +14,7 @@ PAD+ Эмоциональная модель PAD+ AI
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict
 import json
 import logging
 import os

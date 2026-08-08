@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 import logging
 import re
-import time
 
 logger = logging.getLogger("padplus.learning.evaluator")
 

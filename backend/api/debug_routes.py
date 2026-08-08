@@ -6,8 +6,7 @@
 - GET /api/v1/debug/key-access — диагностика доступа к ключам
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional, Dict, Any
+from fastapi import APIRouter
 import logging
 import os
 
@@ -26,8 +25,6 @@ async def debug_gigachat():
     Шаг 3: Проверка SSL
     Шаг 4: Проверка сетевой доступности (DNS + TCP)
     """
-    import httpx
-    import sys
 
     result = {
         "timestamp": __import__("datetime").datetime.now().isoformat(),
@@ -181,7 +178,7 @@ async def debug_key_access(
     2. Есть ли ключи в таблице user_api_keys
     3. Работает ли расшифровка
     """
-    from core.supabase_client import get_supabase, get_supabase_service
+    from core.supabase_client import get_supabase_service
     from core.encryption import get_encryptor
     from core.auth_manager import get_current_user_safe
 

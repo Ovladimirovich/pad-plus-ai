@@ -29,13 +29,9 @@ import logging
 import uvicorn
 from datetime import datetime
 import json
-import asyncio
-import aiohttp
-import base64
 import uuid
 from pathlib import Path
 import hashlib
-import tempfile
 import os
 import sys
 
@@ -211,8 +207,6 @@ app = FastAPI(
 )
 
 # Добавляем middleware для правильной кодировки
-from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
 
 # Создаем кастомный JSON response с правильной кодировкой
 def create_json_response(content, status_code=200):

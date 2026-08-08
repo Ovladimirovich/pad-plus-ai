@@ -4,7 +4,7 @@ import os
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("padplus.learning.experience")
 
@@ -169,7 +169,6 @@ class ExperienceLearner:
         for strategy, scores in strategies.items():
             if len(scores) < self.MIN_SAMPLES_PER_CONTEXT:
                 continue
-            raw_avg = sum(scores) / len(scores)
             bayesian = (
                 (sum(scores) + self.DEFAULT_PSEUDO_COUNT * self.DEFAULT_PSEUDO_SCORE)
                 / (len(scores) + self.DEFAULT_PSEUDO_COUNT)
@@ -186,7 +185,6 @@ class ExperienceLearner:
             count = self._strategy_counts[strategy]
             if count < self.MIN_SAMPLES_PER_CONTEXT:
                 continue
-            avg = self._strategy_totals[strategy] / count
             bayesian = (
                 (self._strategy_totals[strategy]
                  + self.DEFAULT_PSEUDO_COUNT * self.DEFAULT_PSEUDO_SCORE)

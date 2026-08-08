@@ -4,7 +4,7 @@
 
 import re
 import logging
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Tuple
 from collections import Counter
 
 logger = logging.getLogger("padplus.knowledge.extractor")
@@ -114,7 +114,6 @@ def _find_relation_type(sentence: str, name_a: str, name_b: str) -> str:
 
 def extract_and_add(text: str, graph) -> dict:
     """Извлекает концепции и связи из текста и добавляет в граф"""
-    from knowledge.graph import Concept
 
     min_freq = 1 if len(text) < 500 else 2
     keywords = extract_keywords(text, min_freq=min_freq)

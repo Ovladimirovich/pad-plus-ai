@@ -23,13 +23,9 @@ from prometheus_client import (
     Gauge,
     generate_latest,
     CONTENT_TYPE_LATEST,
-    CollectorRegistry,
-    multiprocess,
-    CollectorRegistry,
 )
 from prometheus_client import REGISTRY
 import time
-import os
 from functools import wraps
 from typing import Callable, Any
 import logging
@@ -213,7 +209,7 @@ def track_llm_request(provider: str):
             try:
                 result = await func(*args, **kwargs)
                 return result
-            except Exception as e:
+            except Exception:
                 status = "error"
                 raise
             finally:
@@ -293,16 +289,6 @@ def update_memory_usage():
 def update_cache_size(cache_type: str, size: int):
     """Обновляет размер кэша"""
     CACHE_SIZE.labels(cache_type=cache_type).set(size)
-
-
-def update_websocket_count(count: int):
-    """Обновляет количество активных WebSocket"""
-    ACTIVE_WEBSOCKETS.set(count)
-
-
-def update_pipeline_queue_size(size: int):
-    """Обновляет размер очереди Pipeline"""
-    PIPELINE_QUEUE_SIZE.set(size)
 
 
 def get_metrics() -> bytes:

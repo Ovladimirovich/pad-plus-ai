@@ -13,7 +13,7 @@ v2.0: Полноценный production-контроль выхода модел
 """
 
 import re
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import logging
 
 logger = logging.getLogger("padplus.guard")

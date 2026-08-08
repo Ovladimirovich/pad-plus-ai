@@ -425,7 +425,7 @@ class PipelineExecutor:
         async def _record_xray_phase(pname: str, pdata: dict, dur_ms: float, pstatus: str = "success", perror: str = None):
             """Запись события фазы в X-Ray TraceCollector + Broadcaster"""
             try:
-                from core.xray import get_trace_collector, get_xray_broadcaster, get_thought_visualizer
+                from core.xray import get_trace_collector, get_xray_broadcaster
                 from core.xray.trace_collector import TraceStage
 
                 stage = TraceStage(_stage_map.get(pname, "retrieve"))

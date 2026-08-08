@@ -8,7 +8,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger("padplus.integration.auto_cycle")
 

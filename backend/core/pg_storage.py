@@ -7,9 +7,8 @@ pg_storage.py — PostgreSQL storage backend для Persona/Roots/Emotion
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, List
 
 logger = logging.getLogger("PAD+.pg_storage")
 
@@ -37,7 +36,7 @@ class PgStorage:
         try:
             conn = get_connection()
             return func(conn)
-        except Exception as e:
+        except Exception:
             raise
         finally:
             if conn is not None:
@@ -86,7 +85,7 @@ class PgStorage:
                         )
                     """)
                 conn.commit()
-            except Exception as e:
+            except Exception:
                 conn.rollback()
                 raise
             finally:

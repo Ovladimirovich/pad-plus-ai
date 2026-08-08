@@ -16,17 +16,16 @@
 
 import json
 import logging
-import re
 import traceback
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import FastAPI, Request, Response
 from starlette.datastructures import QueryParams
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from core.input_sanitizer import sanitize_input, validate_input, SanitizerSeverity
+from core.input_sanitizer import sanitize_input, validate_input
 
 logger = logging.getLogger("padplus.validation")
 

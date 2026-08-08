@@ -13,8 +13,6 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
-from pathlib import Path
-import json
 import logging
 import re
 
@@ -244,8 +242,6 @@ class MemoryHygiene:
             low_quality_removed=0,
             space_freed=0
         )
-        
-        items = []
         
         # Собираем элементы из RAG
         if rag_memory:

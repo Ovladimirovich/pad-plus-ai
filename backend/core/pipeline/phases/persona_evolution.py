@@ -45,7 +45,7 @@ class PersonaEvolutionPhase(PipelinePhase):
             else:
                 from memory.persona import get_persona
                 persona = get_persona()
-                evolution = persona.evolve_from_dialog(
+                persona.evolve_from_dialog(
                     user_message=user_message,
                     ai_response=response,
                 )

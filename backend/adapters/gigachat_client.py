@@ -8,7 +8,7 @@ GigaChatClient — HTTP-клиент для GigaChat API.
 - Полный и streaming режимы
 """
 
-from typing import Optional, Dict, Any, AsyncGenerator
+from typing import Optional, Dict, AsyncGenerator
 from datetime import datetime
 import os
 import asyncio

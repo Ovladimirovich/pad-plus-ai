@@ -2,7 +2,7 @@
 Feedback API — сбор обратной связи от пользователя.
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime

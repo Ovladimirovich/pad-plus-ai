@@ -11,12 +11,10 @@ API Routes для управления пользователем и настр�
 - DELETE /api/v1/user/avatar - Удалить аватар
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Header, UploadFile, File, Form
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List
-from datetime import datetime
+from fastapi import APIRouter, HTTPException, Depends, Header, UploadFile, File
+from pydantic import BaseModel
+from typing import Optional
 import logging
-import uuid
 
 logger = logging.getLogger("padplus")
 

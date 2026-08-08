@@ -14,10 +14,8 @@ class ReflectionPhase(PipelinePhase):
 
     async def execute(self, ctx: PipelineContext) -> PhaseResult:
         try:
-            from core.xray.reflection import get_reflection_loop
             from core.xray.system_state import get_system_state_manager
 
-            reflection = get_reflection_loop()
             state_manager = get_system_state_manager()
             pipeline_result = ctx.context.get("pipeline_result")
             result_dict = pipeline_result.to_dict() if pipeline_result else {}

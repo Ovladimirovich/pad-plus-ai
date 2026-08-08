@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional, Any
+from typing import Optional
 
 logger = logging.getLogger("padplus.sentry_healer")
 

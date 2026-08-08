@@ -19,8 +19,6 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import logging
-import json
-import uuid
 
 logger = logging.getLogger("padplus")
 
@@ -402,7 +400,7 @@ async def delete_all_dialogs(
     supabase = get_db_client(current_user)
     user_id = current_user["id"]
     
-    result = supabase.table("dialogs")\
+    supabase.table("dialogs")\
         .delete()\
         .eq("user_id", user_id)\
         .execute()

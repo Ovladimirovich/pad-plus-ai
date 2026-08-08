@@ -42,7 +42,6 @@ class MemoryFusion:
         episodic_items: List[Dict[str, Any]],
         semantic_items: List[Dict[str, Any]],
     ) -> List[Tuple[Dict[str, Any], Dict[str, Any], float]]:
-        pairs = []
         text_map = defaultdict(list)
 
         for item in episodic_items:

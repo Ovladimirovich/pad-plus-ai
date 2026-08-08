@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Query, Depends, HTTPException
 
@@ -569,7 +568,6 @@ async def replay_trace(
     # === Извлечение API-ключа пользователя (идентично frontend_routes.py) ===
     api_key = None
     provider = payload.get("provider")
-    model = payload.get("model") or "auto"
 
     try:
         from core.supabase_client import get_db_client
@@ -589,7 +587,6 @@ async def replay_trace(
                     raw = getattr(raw, "text", None) or getattr(raw, "response", None) or str(raw)
                 api_key = raw.strip().encode("ascii", errors="ignore").decode("ascii")
                 provider = kd["provider"]
-                model = kd.get("model_preference") or "auto"
 
         if not api_key:
             # default-ключ пользователя
@@ -602,7 +599,6 @@ async def replay_trace(
                     raw = getattr(raw, "text", None) or getattr(raw, "response", None) or str(raw)
                 api_key = raw.strip().encode("ascii", errors="ignore").decode("ascii")
                 provider = kd["provider"]
-                model = kd.get("model_preference") or "auto"
     except Exception as e:
         logger.warning(f"Replay key lookup error: {e}")
 

@@ -286,7 +286,7 @@ def get_xray_broadcaster() -> XRayBroadcaster:
         # Запускаем автоматически при первом использовании
         # (в asyncio контексте)
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # Если есть running loop, создаём task
             if not _broadcaster._broadcast_task:
                 _broadcaster._broadcast_task = asyncio.create_task(

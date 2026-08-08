@@ -13,11 +13,10 @@ import re
 import asyncio
 from types import SimpleNamespace
 from typing import Optional, Dict, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import wraps
 
-from fastapi import HTTPException, Header, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import HTTPException, Header, Request
 
 logger = logging.getLogger("padplus.auth")
 

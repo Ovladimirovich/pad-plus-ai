@@ -4,12 +4,10 @@ Checkpointer для сохранения фазовых чекпоинтов в�
 """
 
 from __future__ import annotations
-import json
 import logging
 import sqlite3
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from pathlib import Path
+from typing import Any, Optional
 
 from .schemas import TurnWorkspace, PhaseName, ConversationWorkspace
 

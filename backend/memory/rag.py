@@ -587,7 +587,6 @@ class RAGMemory:
         """
         try:
             import psycopg2
-            from psycopg2.extras import Json
             
             db_url = os.getenv('DATABASE_URL')
             if not db_url:
@@ -648,7 +647,6 @@ class RAGMemory:
                 doc_id = row[0]
                 user_message = row[1]
                 ai_response = row[2]
-                summary = row[3]
                 meta = row[4] if isinstance(row[4], dict) else json.loads(row[4]) if row[4] else {}
                 created_at = row[5].isoformat() if row[5] else datetime.now().isoformat()
                 
@@ -713,7 +711,6 @@ class RAGMemory:
         n_results: int = CONTEXT_WINDOW
     ) -> List[Dict[str, Any]]:
         """Базовый поиск"""
-        import time
         start_time = time.perf_counter()
         
         result = self.hybrid_search(query, n_results)
@@ -743,7 +740,6 @@ class RAGMemory:
         в контекст попадают только те, кто получил вердикт KEEP.
         Устаревшие (stale), дистракторы и низкоскорные записи отбрасываются.
         """
-        import time
         start_time = time.perf_counter()
         db_url = os.getenv('DATABASE_URL')
         if not db_url:
@@ -818,7 +814,6 @@ class RAGMemory:
         # === Memory Decision Layer (ADR-0010) ===
         # Каждому кандидату назначаем признаки для decision-слоя и
         # затем собираем контекст только из получивших вердикт KEEP.
-        keep_idx = None  # Индексы кандидатов, разрешённых decision-слоем
 
         try:
             from core.workspace.decision_layer import MemoryDecisionLayer
@@ -885,7 +880,6 @@ class RAGMemory:
         """Получает недавние диалоги"""
         try:
             import psycopg2
-            from psycopg2.extras import Json
             
             db_url = os.getenv('DATABASE_URL')
             if not db_url:
@@ -940,7 +934,6 @@ class RAGMemory:
         """Статистика по темам"""
         try:
             import psycopg2
-            from psycopg2.extras import Json
             
             db_url = os.getenv('DATABASE_URL')
             if not db_url:
@@ -999,7 +992,6 @@ class RAGMemory:
             }
     
         try:
-            from psycopg2.extras import Json
             
             # Получаем URL базы данных
             db_url = os.getenv('DATABASE_URL')

@@ -6,7 +6,7 @@ Fallback Generator — Генератор "умных" ответов для с�
 
 import logging
 from typing import Optional, Dict, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 logger = logging.getLogger("padplus.fallback_generator")
 

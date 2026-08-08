@@ -1,4 +1,4 @@
-import sys, os
+import sys
 sys.path.insert(0, '.')
 sys.path.insert(0, '..')
 from dotenv import load_dotenv

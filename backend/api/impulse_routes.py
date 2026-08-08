@@ -9,7 +9,7 @@ Impulse API — REST-интерфейс к импульсному ядру PAD+
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Optional
+from typing import Dict
 import logging
 
 logger = logging.getLogger("padplus.impulse")

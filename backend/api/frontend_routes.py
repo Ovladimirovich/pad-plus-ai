@@ -15,15 +15,13 @@ Endpoints for the new frontend with Supabase Auth:
 
 from fastapi import APIRouter, HTTPException, Depends, Header
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Generic, TypeVar
 from datetime import datetime
 import logging
 import uuid
-import asyncio
 
 logger = logging.getLogger("padplus")
-import hashlib
 import json
 import os
 
@@ -347,7 +345,7 @@ async def register(data: UserRegister):
             else:
                 # Новый профиль
                 client.table("users").insert(profile_data).execute()
-        except Exception as profile_err:
+        except Exception:
             # Если service client не сработал, пробуем anon
             try:
                 existing = supabase.table("users").select("id").eq("email", data.email).execute()
@@ -1297,7 +1295,7 @@ async def chat(
                             "message_count": current_count + 2,
                             "last_message_at": datetime.now().isoformat()
                         }).eq("id", dialog_id).execute()
-                    except Exception as count_err:
+                    except Exception:
                         supabase.table("dialogs").update({
                             "last_message_at": datetime.now().isoformat()
                         }).eq("id", dialog_id).execute()
@@ -1986,7 +1984,6 @@ async def list_provider_models(provider_id: str, current_user: dict = Depends(ge
     Список моделей конкретного провайдера — загружает АКТУАЛЬНЫЕ модели через LLMService
     """
     from runtime.llm_service import get_llm_service
-    from core.encryption import get_encryptor
 
     supabase = get_db_client(current_user)
     if not supabase:

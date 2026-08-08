@@ -10,7 +10,7 @@ Truth, Safety, Healer, Research, X-Ray.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger("padplus.anatomy")
 

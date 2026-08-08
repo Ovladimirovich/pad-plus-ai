@@ -8,9 +8,7 @@ Experience Analyzer — CLI-отчёт по накопленному опыту.
 """
 
 import argparse
-import sys
-from collections import Counter, defaultdict
-from datetime import datetime
+from collections import Counter
 
 from .store import ExperienceStore
 

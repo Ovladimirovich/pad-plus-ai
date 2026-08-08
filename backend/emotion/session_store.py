@@ -45,7 +45,6 @@ class SessionEmotionStore:
 
     def get_or_create(self, session_id: str) -> PADModel:
         """Возвращает PADModel для сессии, создаёт если нет."""
-        import time
         start_time = time.perf_counter()
         
         if not session_id:
@@ -82,7 +81,6 @@ class SessionEmotionStore:
 
     def save(self, session_id: str) -> None:
         """Сохраняет состояние эмоций для сессии."""
-        import time
         start_time = time.perf_counter()
         
         with self._lock:

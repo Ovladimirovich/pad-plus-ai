@@ -2,8 +2,8 @@
 ReflectionEngine — движок рефлексии для анализа гипотез и evidence в WorkingScratchpad (D'-3).
 """
 
-from typing import Dict, Any, List
-from .schemas import TurnWorkspace, WorkingScratchpad, PhaseName
+from typing import Dict, Any
+from .schemas import TurnWorkspace, PhaseName
 
 
 class ReflectionEngine:

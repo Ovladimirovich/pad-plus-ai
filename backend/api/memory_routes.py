@@ -4,8 +4,7 @@ Memory Dashboard — единая точка сбора статистики в�
 Агрегирует: эпизоды, семантика, консолидация, RAG, roots, persona, meta-learner, feedback.
 """
 
-from fastapi import APIRouter, Depends
-from typing import Dict, Any
+from fastapi import APIRouter
 import logging
 
 logger = logging.getLogger("padplus.memory_dashboard")

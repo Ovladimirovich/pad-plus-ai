@@ -1,6 +1,6 @@
 """Поиск по графу знаний: концепции + связи → контекст для LLM."""
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 import logging
 
 logger = logging.getLogger("padplus.knowledge.search")

@@ -4,7 +4,7 @@ Shadow Routes — API для мониторинга и аналитики Memory
 
 import logging
 from typing import Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter
 
 logger = logging.getLogger("padplus.api.shadow")
 

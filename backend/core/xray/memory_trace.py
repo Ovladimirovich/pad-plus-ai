@@ -6,7 +6,7 @@ MemoryEvent — новый тип события в X-Ray для полной н
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 

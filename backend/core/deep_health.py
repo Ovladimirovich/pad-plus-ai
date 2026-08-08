@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import traceback
 from datetime import datetime
 
 logger = logging.getLogger("padplus.health")
@@ -56,8 +55,7 @@ async def check_memory():
 async def check_xray():
     try:
         from core.xray import (
-            get_trace_collector, get_thought_visualizer,
-            get_xray_broadcaster, get_xray_history
+            get_trace_collector, get_xray_broadcaster, get_xray_history
         )
         return {
             "status": "ok",
@@ -80,7 +78,6 @@ async def check_pipeline():
 
 async def check_healer():
     try:
-        from api.healer_routes import router
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "error": str(e)}

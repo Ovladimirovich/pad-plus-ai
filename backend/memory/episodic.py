@@ -271,7 +271,6 @@ class EpisodicMemory:
             user_id: ID владельца эпизода (None для общих)
         """
         import uuid
-        import time
 
         start_time = time.perf_counter()
         episode_id = str(uuid.uuid4())[:12]
@@ -390,7 +389,6 @@ class EpisodicMemory:
     
     def get_episode(self, episode_id: str) -> Optional[Episode]:
         """Получает эпизод по ID"""
-        import time
         start_time = time.perf_counter()
         # Сначала проверяем кэш
         for ep in self._recent_episodes:
@@ -494,7 +492,6 @@ class EpisodicMemory:
         Args:
             user_id: ID владельца (None для поиска по всем + общим записям)
         """
-        import time
         start_time = time.perf_counter()
         
         conn = sqlite3.connect(self.db_path)

@@ -7,14 +7,13 @@
 - Миграция данных
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 from enum import Enum
 import json
 import os
 import zipfile
-import tempfile
 import logging
 
 logger = logging.getLogger("PAD+.data_manager")

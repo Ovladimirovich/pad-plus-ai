@@ -12,7 +12,7 @@ API для получения метрик и генерации отчётов.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional, Any
 import json
 import os

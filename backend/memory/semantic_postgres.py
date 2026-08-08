@@ -9,9 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from enum import Enum
-import json
 import logging
-import os
 import uuid
 
 logger = logging.getLogger("PAD+.semantic_pg")

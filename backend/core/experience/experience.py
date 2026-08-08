@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 
 from .extractor import ExperienceExtractor
-from .models import ExperienceRecord, ExperienceSignals
+from .models import ExperienceRecord
 from .store import ExperienceStore
 
 logger = logging.getLogger("padplus.experience")

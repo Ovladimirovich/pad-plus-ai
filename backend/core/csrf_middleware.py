@@ -336,7 +336,6 @@ def get_csrf_token_from_request(request: Request) -> Optional[str]:
 # ДЕКОРАТОРЫ ДЛЯ ЗАЩИТЫ ENDPOINTS
 # ============================================================================
 
-from fastapi import Depends
 
 async def get_csrf_token_validated(request: Request) -> bool:
     """

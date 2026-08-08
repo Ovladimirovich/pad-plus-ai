@@ -3,7 +3,7 @@ Planner и Learning Coordinator для управления целями и си
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from .schemas import ConversationWorkspace, TurnWorkspace
 
 logger = logging.getLogger("padplus.workspace.planner")
@@ -21,7 +21,6 @@ class CognitivePlanner:
         - Интента
         """
         active_goals = conversation.core.active_goals
-        intent = workspace.intent
 
         steps = ["safety", "intent", "rag", "knowledge_graph"]
 

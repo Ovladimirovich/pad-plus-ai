@@ -10,9 +10,9 @@ Circuit Breaker паттерн для подключения к Supabase:
 """
 
 import asyncio
-from datetime import datetime, timedelta
-from typing import Optional, Callable, Any, Dict, List
-from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Optional, Callable, Any, Dict
+from dataclasses import dataclass
 from enum import Enum
 import logging
 

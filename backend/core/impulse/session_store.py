@@ -51,7 +51,6 @@ class SessionImpulseStore:
 
     def get_or_create(self, session_id: str) -> ImpulseCore:
         """Возвращает ImpulseCore для сессии, создаёт если нет."""
-        import time
         start_time = time.perf_counter()
         
         if not session_id:
@@ -86,7 +85,6 @@ class SessionImpulseStore:
 
     def save(self, session_id: str) -> None:
         """Сохраняет состояние импульса для сессии."""
-        import time
         start_time = time.perf_counter()
         
         with self._lock:

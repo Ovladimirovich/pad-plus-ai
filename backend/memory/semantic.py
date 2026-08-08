@@ -268,7 +268,6 @@ class SemanticMemory:
         Добавляет новое знание в память
         """
         import uuid
-        import time
         start_time = time.perf_counter()
         
         knowledge_id = str(uuid.uuid4())[:12]
@@ -317,7 +316,6 @@ class SemanticMemory:
     
     def _save_knowledge(self, knowledge: SemanticKnowledge):
         """Сохраняет знание в БД"""
-        import time
         start_time = time.perf_counter()
         
         conn = sqlite3.connect(self.db_path)
@@ -373,7 +371,6 @@ class SemanticMemory:
     
     def get_knowledge(self, knowledge_id: str) -> Optional[SemanticKnowledge]:
         """Получает знание по ID"""
-        import time
         start_time = time.perf_counter()
         
         conn = sqlite3.connect(self.db_path)
@@ -421,7 +418,6 @@ class SemanticMemory:
         """
         Поиск знаний по критериям
         """
-        import time
         start_time = time.perf_counter()
         
         conn = sqlite3.connect(self.db_path)

@@ -15,15 +15,11 @@ API Routes для управления документами RAG
 - DELETE /api/v1/collections/{id} - Удалить коллекцию
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Header, UploadFile, File, Form, Query, Body
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query, Body
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+from typing import Optional, Dict, Any
 import logging
 import uuid
-import os
-import io
 import httpx
 
 logger = logging.getLogger("padplus")
@@ -126,7 +122,7 @@ async def upload_document(
         if not db:
             raise HTTPException(status_code=500, detail="БД не подключена")
         
-        result = db.table("documents")\
+        db.table("documents")\
             .insert({
                 "id": document_id,
                 "user_id": user_id,
@@ -140,8 +136,6 @@ async def upload_document(
                 "status": "pending",
             })\
             .execute()
-        
-        document_data = result.data[0]
         
         # Запускаем фоновую обработку документа
         asyncio.create_task(process_document(document_id))

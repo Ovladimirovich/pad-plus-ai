@@ -7,12 +7,10 @@ ExperienceSQLiteStore — SQLite хранилище для Experience Layer.
 
 import json
 import logging
-import os
 import sqlite3
 import threading
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger("padplus.experience_sqlite")
 
