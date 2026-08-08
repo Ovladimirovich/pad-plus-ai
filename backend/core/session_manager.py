@@ -9,9 +9,10 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Callable
 import json
 import os
+import time
 import uuid
 import logging
 
@@ -68,6 +69,7 @@ class Session:
     settings: Dict[str, Any] = field(default_factory=dict)
     message_count: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
+    user_id: Optional[str] = None
     
     def is_expired(self, max_age_hours: int = 24) -> bool:
         age = datetime.now() - self.last_active
@@ -76,6 +78,10 @@ class Session:
     def touch(self):
         """Обновляет время последней активности"""
         self.last_active = datetime.now()
+    
+    def is_auth_session(self) -> bool:
+        """True, если сессия привязана к пользователю Supabase Auth."""
+        return bool(self.user_id)
     
     def to_dict(self) -> dict:
         return {
@@ -86,7 +92,8 @@ class Session:
             "message_count": self.message_count,
             "context": self.context.to_dict(),
             "settings": self.settings,
-            "metadata": self.metadata
+            "metadata": self.metadata,
+            "user_id": self.user_id
         }
 
 
@@ -110,7 +117,9 @@ class SessionManager:
         "show_confidence": False
     }
     
-    def __init__(self, data_path: str = None, max_age_hours: int = 24):
+    def __init__(self, data_path: str = None, max_age_hours: int = 24,
+                 auth_validator: Optional[Callable[[str], bool]] = None,
+                 auth_cache_ttl_seconds: int = 60):
         if data_path is None:
             data_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -125,6 +134,13 @@ class SessionManager:
         # Индекс по IP: ip_address -> set of session_ids
         self._ip_index: Dict[str, set] = {}
         
+        # Кэш валидности auth-сессий: user_id -> (timestamp, valid)
+        # C4: SessionManager = cache over Supabase Auth (source of truth),
+        # а не независимый lifecycle.
+        self._auth_validator = auth_validator
+        self._auth_cache_ttl = auth_cache_ttl_seconds
+        self._auth_cache: Dict[str, tuple] = {}
+        
         self._stats = {
             "total_sessions": 0,
             "active_sessions": 0,
@@ -132,6 +148,44 @@ class SessionManager:
         }
         
         self._load()
+    
+    def _default_auth_validator(self, user_id: str) -> bool:
+        """Проверяет существование пользователя в Supabase Auth.
+
+        Source of truth для auth-сессий — Supabase (таблица `users`).
+        Если БД недоступна (локальный dev), считаем пользователя валидным.
+        """
+        try:
+            from core.supabase_client import get_supabase_service, get_supabase
+            client = get_supabase_service() or get_supabase()
+            if client is None:
+                return True  # dev/local — не блокируем
+            result = client.table("users").select("id").eq("id", user_id).limit(1).execute()
+            return bool(result.data)
+        except Exception as e:
+            logger.warning(f"⚠️ Auth validator error for {user_id}: {e}")
+            return True
+    
+    def _is_auth_valid(self, user_id: str) -> bool:
+        """Проверяет валидность auth-сессии с TTL-кэшированием."""
+        now = time.monotonic()
+        cached = self._auth_cache.get(user_id)
+        if cached and (now - cached[0]) < self._auth_cache_ttl:
+            return cached[1]
+        
+        validator = self._auth_validator or self._default_auth_validator
+        try:
+            valid = bool(validator(user_id))
+        except Exception:
+            valid = True  # fail-open: не блокируем сессию при сбое валидатора
+        
+        if user_id not in self._auth_cache:
+            if len(self._auth_cache) >= 10_000:
+                # Ограничиваем рост кэша
+                for key in list(self._auth_cache.keys())[:5_000]:
+                    del self._auth_cache[key]
+        self._auth_cache[user_id] = (now, valid)
+        return valid
     
     def _load(self):
         """Загружает сессии из файла"""
@@ -155,7 +209,8 @@ class SessionManager:
                             user_agent=session_data.get('user_agent', ''),
                             message_count=session_data.get('message_count', 0),
                             settings=session_data.get('settings', {}),
-                            metadata=session_data.get('metadata', {})
+                            metadata=session_data.get('metadata', {}),
+                            user_id=session_data.get('user_id')
                         )
                         
                         # Восстанавливаем контекст
@@ -217,7 +272,8 @@ class SessionManager:
             last_active=datetime.now(),
             ip_address=ip_address,
             user_agent=user_agent,
-            settings={**self.DEFAULT_SETTINGS, **(settings or {})}
+            settings={**self.DEFAULT_SETTINGS, **(settings or {})},
+            user_id=user_id
         )
         
         self._sessions[session_id] = session
@@ -259,6 +315,21 @@ class SessionManager:
         session = self._sessions[session_id]
         
         if session.is_expired(self.max_age_hours):
+            self.end_session(session_id)
+            emit_memory_event(
+                operation=MemoryOperation.READ,
+                component=MemoryComponent.SESSION_MANAGER,
+                object_type=MemoryObjectType.SESSION,
+                object_id=session_id,
+                result=MemoryResult.EXPIRED,
+                phase="session_manager.get_session",
+            )
+            return None
+        
+        # C4: auth-сессия валидируется против Supabase (source of truth).
+        # Если пользователь удалён/отключён в Supabase — сессия невалидна.
+        if session.is_auth_session() and session.user_id and not self._is_auth_valid(session.user_id):
+            logger.info(f"🔐 Auth session invalidated by Supabase: {session.user_id[:12]}...")
             self.end_session(session_id)
             emit_memory_event(
                 operation=MemoryOperation.READ,
@@ -319,7 +390,7 @@ class SessionManager:
             
             logger.info(f"🔐 Session ended: {session_id}")
             emit_memory_event(
-                operation=MemoryOperation.DELETED,
+                operation=MemoryOperation.DELETE,
                 component=MemoryComponent.SESSION_MANAGER,
                 object_type=MemoryObjectType.SESSION,
                 object_id=session_id,
@@ -437,7 +508,7 @@ class SessionManager:
         if to_remove:
             logger.info(f"Cleaned up {len(to_remove)} expired sessions")
             emit_memory_event(
-                operation=MemoryOperation.DELETED,
+                operation=MemoryOperation.DELETE,
                 component=MemoryComponent.SESSION_MANAGER,
                 object_type=MemoryObjectType.SESSION,
                 result=MemoryResult.EXPIRED,

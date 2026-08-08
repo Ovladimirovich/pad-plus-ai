@@ -54,7 +54,7 @@
 | C1 Unified session identity | ✅ | `ctx.session_id` flows API → executor → phases |
 | C2 EmotionEngine per-session | ✅ | `SessionEmotionStore` в emotion phases |
 | C3 ImpulseCore per-session | ✅ | `SessionImpulseStore` в impulse phases |
-| C4 SessionManager ↔ Supabase | ✅ | `user_id` = `session_id` для auth users |
+| C4 SessionManager ↔ Supabase | ✅ | `user_id` = `session_id` для auth users; SessionManager = кэш с валидацией против Supabase |
 | C5 TTL/LRU eviction | ✅ | 24h TTL, max 500 sessions в обоих stores |
 
 **Definition of Done Phase C:**

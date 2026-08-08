@@ -119,17 +119,24 @@
 
 ---
 
-### C4: SessionManager deduplicate with Supabase auth sessions
+### C4: SessionManager deduplicate with Supabase auth sessions ✅
 
 **Проблема:** SessionManager и Supabase управляют lifecycle независимо.
 
-**Шаги:**
-1. [ ] Найти два независимых lifecycle session management
-2. [ ] Объединить — использовать Supabase как source of truth
-3. [ ] SessionManager становится кэшем over Supabase
-4. [ ] Добавить тест: session lifecycle consistency
+**Решение (2026-08-08):**
+- `Session.user_id` выделен отдельным полем (`is_auth_session()`)
+- Auth-сессии валидируются против Supabase при чтении (`_is_auth_valid`) — Supabase = **source of truth**
+- SessionManager стал **кэшем**: валидность сверяется через `auth_validator` (TTL 60с, fail-open при недоступности БД)
+- Анонимные сессии (`sess_*`) Supabase-валидацию **не проходят**
+- Починён баг: `MemoryOperation.DELETED` → `MemoryOperation.DELETE` (enum не содержит DELETED)
 
-**Оценка:** 2-3 дня
+**Шаги:**
+1. [x] Найти два независимых lifecycle session management
+2. [x] Объединить — использовать Supabase как source of truth
+3. [x] SessionManager становится кэшем over Supabase
+4. [x] Добавить тест: session lifecycle consistency (`tests/test_workspace/test_session_dedup.py`, 3 теста)
+
+**Критерий успеха:** `SessionManager` и Supabase используют единый lifecycle — удалённый в Supabase пользователь немедленно теряет кэш-сессию.
 
 ---
 
