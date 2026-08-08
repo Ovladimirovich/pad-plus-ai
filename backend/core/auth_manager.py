@@ -82,8 +82,13 @@ class AuthManager:
                 # Токен валиден - возвращаем только пользователя (без session)
                 return {"user": user_response.user}, None, ""
         except Exception as auth_error:
-            logger.warning(f"Ошибка get_user: {type(auth_error).__name__}: {auth_error}")
-            # Продолжаем - попробуем обновить токен
+            error_type = type(auth_error).__name__
+            error_msg = str(auth_error)
+            logger.warning(f"Ошибка get_user: {error_type}: {error_msg}")
+            
+            # Сетевая ошибка — refresh_token тоже не сработает, сразу возвращаем ошибку
+            if "NetworkError" in error_type or "ConnectionError" in error_type:
+                return None, None, "Ошибка подключения к серверу аутентификации"
             
             # 3. Если токен истек, пытаемся обновить
             if refresh_token:
@@ -103,22 +108,11 @@ class AuthManager:
                     logger.warning(f"Не удалось обновить токен: {refresh_error}")
                     return None, None, "Неверный refresh токен"
             
-            return None, None, "Токен истек или невалиден"
-            
-        except Exception as e:
-            error_type = type(e).__name__
-            error_msg = str(e)
-            
-            # Логируем детали для отладки
-            logger.error(f"Ошибка аутентификации: {error_type}: {error_msg}")
-            
-            # Различаем типы ошибок
+            # Классифицируем ошибку по типу исключения
             if "InvalidCredentials" in error_type or "AuthError" in error_type:
                 return None, None, "Неверные учетные данные"
-            elif "NetworkError" in error_type or "ConnectionError" in error_type:
-                return None, None, "Ошибка подключения к серверу аутентификации"
-            else:
-                return None, None, f"Ошибка аутентификации: {error_msg}"
+            
+            return None, None, "Токен истек или невалиден"
     
     def extract_token_from_header(self, authorization: str) -> Tuple[Optional[str], Optional[str]]:
         """

@@ -89,6 +89,13 @@ class TestExtractTokenFromHeader:
 
 
 class TestValidateAndRefresh:
+    """Классы ошибок с именами, похожими на supabase-py (AuthError/NetworkError)."""
+    class _AuthError(Exception):
+        pass
+
+    class _NetworkError(Exception):
+        pass
+
     def test_no_supabase(self):
         mgr = AuthManager()
         user, new_token, err = asyncio.run(mgr.validate_and_refresh(None, "abc.def.GHI"))
@@ -166,12 +173,35 @@ class TestValidateAndRefresh:
         assert err == ""
 
     def test_auth_error_classification(self):
-        """AuthError: первый except ловит все исключения → generic ошибка.
-        ВНИМАНИЕ: ветка классификации (InvalidCredentials/NetworkError) недостижима —
-        это мёртвый код в validate_and_refresh. Тест фиксирует фактическое поведение."""
+        """AuthError → «Неверные учетные данные» (ранее недостижимая ветка)"""
         mgr = AuthManager()
         supabase = MagicMock()
-        supabase.auth.get_user.side_effect = Exception("AuthError: invalid credentials")
+        supabase.auth.get_user.side_effect = self._AuthError("invalid credentials")
+
+        user, new_token, err = asyncio.run(
+            mgr.validate_and_refresh(supabase, "a.b.c")
+        )
+        assert user is None
+        assert err == "Неверные учетные данные"
+
+    def test_network_error_classification(self):
+        """NetworkError → возвращаемся сразу, без попытки refresh"""
+        mgr = AuthManager()
+        supabase = MagicMock()
+        supabase.auth.get_user.side_effect = self._NetworkError("connection refused")
+
+        user, new_token, err = asyncio.run(
+            mgr.validate_and_refresh(supabase, "a.b.c", refresh_token="some-refresh")
+        )
+        assert user is None
+        assert err == "Ошибка подключения к серверу аутентификации"
+        supabase.auth.refresh_session.assert_not_called()
+
+    def test_generic_error_falls_back(self):
+        """Произвольная ошибка (не Auth/Network) — generic «истек или невалиден»"""
+        mgr = AuthManager()
+        supabase = MagicMock()
+        supabase.auth.get_user.side_effect = RuntimeError("strange failure")
 
         user, new_token, err = asyncio.run(
             mgr.validate_and_refresh(supabase, "a.b.c")
