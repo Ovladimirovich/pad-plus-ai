@@ -822,10 +822,25 @@ class RAGMemory:
         return result
     
     def get_context(self, query: str, user_id: Optional[str] = None) -> str:
+        """Возвращает RAG-контекст, пропущенный через MemoryDecisionLayer (ADR-0010).
+
+        Кандидаты (диалоги из памяти) фильтруются активным decision-слоем:
+        в контекст попадают только те, кто получил вердикт KEEP.
+        Устаревшие (stale), дистракторы и низкоскорные записи отбрасываются.
+        """
         import time
         start_time = time.perf_counter()
         db_url = os.getenv('DATABASE_URL')
         if not db_url:
+            emit_memory_event(
+                operation=MemoryOperation.SEARCH,
+                component=MemoryComponent.RAG_MEMORY,
+                object_type=MemoryObjectType.DIALOG,
+                object_id="",
+                result=MemoryResult.NOT_FOUND,
+                phase="get_context",
+                payload_preview=f"query={query}, user_id={user_id}",
+            )
             return ""
 
         try:
@@ -866,35 +881,82 @@ class RAGMemory:
             dialogs = []
             for row in rows:
                 meta = row[2] if isinstance(row[2], dict) else json.loads(row[2]) if row[2] else {}
-                dialogs.append({'metadata': meta, 'combined_score': 0.5, 'topic': row[3] if row[3] else 'общее', 'timestamp': row[4].isoformat() if row[4] else datetime.now().isoformat()})
+                dialogs.append({
+                    'metadata': meta,
+                    'combined_score': 0.5,
+                    'topic': row[3] if row[3] else 'общее',
+                    'timestamp': row[4].isoformat() if row[4] else datetime.now().isoformat(),
+                })
         except Exception as e:
             logger.error(f"Ошибка получения контекста из PostgreSQL: {e}")
+            emit_memory_event(
+                operation=MemoryOperation.SEARCH,
+                component=MemoryComponent.RAG_MEMORY,
+                object_type=MemoryObjectType.DIALOG,
+                object_id="",
+                result=MemoryResult.ERROR,
+                phase="get_context",
+                payload_preview=str(e)[:200],
+            )
             return ""
 
+        # === Memory Decision Layer (ADR-0010) ===
+        # Каждому кандидату назначаем признаки для decision-слоя и
+        # затем собираем контекст только из получивших вердикт KEEP.
+        keep_idx = None  # Индексы кандидатов, разрешённых decision-слоем
+
+        try:
+            from core.workspace.decision_layer import MemoryDecisionLayer
+        except Exception as e:
+            logger.warning("⚠️ MemoryDecisionLayer недоступен, RAG работает без фильтра: %s", e)
+            MemoryDecisionLayer = None
+
+        if MemoryDecisionLayer is not None:
+            candidates = []
+            for idx, d in enumerate(dialogs):
+                ts = d.get('timestamp')
+                score = d.get('combined_score', 0.5)
+                recency = 0.5
+                if ts:
+                    try:
+                        import math
+                        age_days = (datetime.now() - datetime.fromisoformat(ts)).days
+                        recency = math.exp(-age_days / 7.0)
+                    except Exception:
+                        recency = 0.5
+                # Дистрактор — слабое совпадение (> порога похоже, но общая запись)
+                is_stale = recency < 0.25
+                category = "distractor" if score < 0.35 else "relevant"
+                candidates.append({
+                    "_idx": idx,
+                    "score": float(score),
+                    "is_stale": is_stale,
+                    "category": category,
+                })
+            approved = MemoryDecisionLayer.filter_candidates(candidates)
+            keep = {c["_idx"] for c in approved if "_idx" in c}
+        else:
+            keep = {i for i, d in enumerate(dialogs) if d.get('combined_score', 0) > 0.25}
+
+        kept = [d for i, d in enumerate(dialogs) if i in keep]
         duration_ms = (time.perf_counter() - start_time) * 1000
-        
-        from core.xray.memory_trace import emit_memory_event, MemoryOperation, MemoryComponent, MemoryObjectType, MemoryResult
-        
+
         emit_memory_event(
             operation=MemoryOperation.SEARCH,
             component=MemoryComponent.RAG_MEMORY,
             object_type=MemoryObjectType.DIALOG,
             object_id="",
-            result=MemoryResult.FOUND if rows else MemoryResult.NOT_FOUND,
-            duration_ms=(time.perf_counter() - start_time) * 1000,
+            result=MemoryResult.FOUND if kept else MemoryResult.NOT_FOUND,
+            duration_ms=duration_ms,
             phase="get_context",
-            payload_size_bytes=sum(len(str(r)) for r in rows) if rows else 0,
-            payload_preview=f"query={query}, user_id={user_id}",
+            payload_size_bytes=sum(len(str(r)) for r in kept) if kept else 0,
+            payload_preview=f"query={query}, user_id={user_id}, decision_filtered={len(dialogs)}->{len(kept)}",
         )
 
-        if not dialogs:
+        if not kept:
             return ""
-        relevant = [d for d in dialogs if d['combined_score'] > 0.25]
-        if not relevant:
-            return ""
-
         context_parts = ["Релевантный контекст из памяти:\n"]
-        for i, dialog in enumerate(relevant[:3], 1):
+        for i, dialog in enumerate(kept[:3], 1):
             meta = dialog['metadata']
             context_parts.append(f"[{i}] (тема: {dialog['topic']}, score: {dialog['combined_score']:.2f})\nВопрос: {meta.get('user_message', '')}\nОтвет: {meta.get('ai_response', '')}\n")
         context_parts.append("\nИспользуй этот контекст для ответа.\n")

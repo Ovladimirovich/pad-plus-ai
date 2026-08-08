@@ -28,8 +28,9 @@ class ReflectionPhase(PipelinePhase):
         try:
             from core.meta_controller import get_meta_controller
             meta = get_meta_controller()
+            pipeline_result = ctx.context.get("pipeline_result")
             meta.adapt({
-                "strategy_success": ctx.context.get("pipeline_result", {}).get("success", False),
+                "strategy_success": bool(getattr(pipeline_result, "success", False)) if pipeline_result else False,
                 "interaction_type": ctx.context.get("experience_interaction_type", "new_knowledge"),
                 "significance": ctx.context.get("experience_significance", 0.0),
                 "emotion": ctx.context.get("emotion_style", {}),
